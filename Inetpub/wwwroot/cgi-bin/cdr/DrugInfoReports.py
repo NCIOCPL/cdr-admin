@@ -34,6 +34,7 @@ class Control(Controller):
             ("Drug Information Comprehensive Review Date Report",
              "DrugCRD.py"),
             ("Drug Information Summaries Lists", "DISLists.py"),
+            ("Drug Information Type Of Change", "DISTypeChangeReport.py"),
             ("Drug Processing Status Report", "DISProcessingStatusReport.py"),
             ("Drug Summaries with Markup Report", "DISWithMarkup.py"),
         ):

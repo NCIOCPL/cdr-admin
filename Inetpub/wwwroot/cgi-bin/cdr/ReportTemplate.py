@@ -5,6 +5,7 @@
 
 from datetime import date, timedelta
 from cdrcgi import Controller
+from cdrcgi import Reporter
 
 
 class Control(Controller):
@@ -13,7 +14,17 @@ class Control(Controller):
     SUBTITLE = "Simple report on Publishing Jobs"
 
     def build_tables(self):
-        """Create the table for the report."""
+        """Create the table for the report.
+
+           In the simple case we receive a list of lists containing
+           the values from a SQL query and pass it to the Reporter.Table()
+           class.  Each value will be placed in a single cell.
+
+           In cases where a cell needs to be formatted or - like in this
+           case - we're adding a link to a cell, we will create a Cell
+           object.  The list passed to the table class may contain
+           regular values from the SQL query or Cell objects!
+        """
 
         fields = "id", "pub_subset", "started", "completed", "status"
         query = self.Query("pub_proc", *fields)
@@ -22,9 +33,44 @@ class Control(Controller):
         query.where(query.Condition("started", end, "<="))
         query.order("1 DESC")
         rows = query.execute().fetchall()
+
+        # For-loop to create a new list containing a cell object as the
+        # first element and adding the SQL output for the remaining list
+        # elements
+        # If no special formatting - like creating the link to the
+        # PubStatus.py report - is needed you may pass the rows list to
+        # the Reporter.Table class instead of the table_rows list.
+        # --------------------------------------------------------------
+        table_rows = []
+        for row in rows:
+            cells = [
+                self.Reporter.Cell(row[0], href=f"PubStatus.py?id={row[0]}")
+            ]
+            cells += row[1:]
+            table_rows.append(cells)
+
         columns = "Job ID", "Job Type", "Started", "Completed", "Status"
         opts = dict(columns=columns, caption="Jobs")
-        return self.Reporter.Table(rows, **opts)
+        return self.Reporter.Table(table_rows, **opts)
+
+
+    def show_report(self):
+        """Special formatting of report output
+
+           Overriding this method allows us to add CSS rules to the
+           report output, like styling the column header row or choosing
+           a background color for the report, for instance.  By using this
+           method we can use the page method add_css(<CSS rule>)
+
+           Removing this method will ensure usage of the standard report
+           formatting rules.
+        """
+
+        elapsed = self.report.page.html.get_element_by_id("elapsed", None)
+        if elapsed is not None:
+            elapsed.text = str(self.elapsed)
+        self.report.page.add_css("th { background-color: yellow; }")
+        self.report.send(self.format)
 
     def populate_form(self, page):
         """Put the fields on the form.
