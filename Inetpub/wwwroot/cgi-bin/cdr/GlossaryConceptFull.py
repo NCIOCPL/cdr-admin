@@ -563,6 +563,9 @@ class Concept:
                     markup.tag = "span"
                 args = [markup, f" (CDR{name.id})"]
                 if self.langcode == "es":
+                    if name.spanish_pronunciation is not None:
+                        args.append(" ")
+                        args.append(name.spanish_pronunciation)
                     if name.spanish_name is None:
                         markup = B.SPAN(" (en ingl\xe9s)", B.CLASS("special"))
                         args.append(markup)
@@ -578,6 +581,9 @@ class Concept:
                                 markup.tag = "span"
                             args.append(markup)
                         args.append("]")
+                elif name.english_pronunciation is not None:
+                    args.append(" ")
+                    args.append(name.english_pronunciation)
                 if name.blocked:
                     args = ["BLOCKED - "] + args + [B.CLASS("blocked")]
                 table.append(B.TR(B.TD("Name"), B.TD(*args), B.CLASS("name")))
@@ -871,6 +877,22 @@ class Concept:
             return self._english_name
 
         @property
+        def english_pronunciation(self):
+            """Link to the audio file for pronunciation of the English name."""
+
+            if not hasattr(self, "_english_pronunciation"):
+                self._english_pronunciation = None
+                node = self.doc.root.find("TermName/MediaLink/MediaID")
+                if node is not None:
+                    id = node.get(f"{{{Doc.NS}}}ref")
+                    if id:
+                        B = builder
+                        url=f"GetCdrBlob.py?disp=inline&id={id}"
+                        link = B.A("\u25b6", B.CLASS("sound"), href=url)
+                        self._english_pronunciation = link
+            return self._english_pronunciation
+
+        @property
         def replacements(self):
             """The name's replacement strings for definition placeholders."""
 
@@ -897,6 +919,22 @@ class Concept:
                 if not hasattr(self, "_alternate_spanish_names"):
                     self._alternate_spanish_names = alternates
             return self._spanish_name
+
+        @property
+        def spanish_pronunciation(self):
+            """Link to the audio file for pronunciation of the Spanish name."""
+
+            if not hasattr(self, "_spanish_pronunciation"):
+                self._spanish_pronunciation = None
+                node = self.doc.root.find("TranslatedName/MediaLink/MediaID")
+                if node is not None:
+                    id = node.get(f"{{{Doc.NS}}}ref")
+                    if id:
+                        B = builder
+                        url=f"GetCdrBlob.py?disp=inline&id={id}"
+                        link = B.A("\u25b6", B.CLASS("sound"), href=url)
+                        self._spanish_pronunciation = link
+            return self._spanish_pronunciation
 
         @staticmethod
         def markup_for_name(name):

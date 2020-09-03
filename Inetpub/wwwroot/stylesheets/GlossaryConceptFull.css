@@ -21,3 +21,4 @@ td:first-child { width: 20%; }
 .term-normal { background-color: yellow; }
 .term-name { color: blue; font-weight: bold; }
 .lang-wrapper { float: left; width: 48%; margin: 0 5px; }
+a.sound { text-decoration: none; color: blue; }
