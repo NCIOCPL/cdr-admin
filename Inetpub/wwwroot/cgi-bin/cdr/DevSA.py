@@ -39,6 +39,7 @@ class Control(Controller):
             ("Re-Publishing", "Republish.py"),
             ("Replace CWD with Older Version", "ReplaceCWDwithVersion.py"),
             ("Reports", "Reports.py"),
+            ("Restore Deleted Documents", "RestoreDeletedDocs.py"),
             ("Schema - Post", "post-schema.py"),
             ("Schema - Show", "GetSchema.py"),
             ("Unblock Documents", "UnblockDoc.py"),

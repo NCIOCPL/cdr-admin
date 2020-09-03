@@ -233,6 +233,7 @@ class Item:
         "replacecwdreport.py",
         "replacedocwithnewdoc.py",
         "republish.py",
+        "restoredeleteddocs.py",
         "runicrdbstatreport.py",
         "runpcibstatreport.py",
         "semantictypereport.py",
