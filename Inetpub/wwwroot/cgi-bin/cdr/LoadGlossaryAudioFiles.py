@@ -121,7 +121,8 @@ class Control(Controller):
                         bookpath = name
                 if bookpath is None:
                     self.bail(f"no workbook in {path}")
-                book = load_workbook(BytesIO(zipfile.read(bookpath)), True)
+                opts = dict(read_only=True, data_only=True)
+                book = load_workbook(BytesIO(zipfile.read(bookpath)), **opts)
                 sheet = book.active
                 for row in sheet:
 
