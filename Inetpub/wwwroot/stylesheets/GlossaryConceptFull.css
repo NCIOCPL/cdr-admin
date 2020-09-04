@@ -22,3 +22,4 @@ td:first-child { width: 20%; }
 .term-name { color: blue; font-weight: bold; }
 .lang-wrapper { float: left; width: 48%; margin: 0 5px; }
 a.sound { text-decoration: none; color: blue; }
+img.sound { height: 13.34px; width: 15px; border: none; }

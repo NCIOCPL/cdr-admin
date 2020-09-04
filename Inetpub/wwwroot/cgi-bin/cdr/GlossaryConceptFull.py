@@ -902,7 +902,8 @@ jQuery(function() {
                     if id:
                         B = builder
                         url=f"GetCdrBlob.py?disp=inline&id={id}"
-                        link = B.A("\u25b6", B.CLASS("sound"), href=url)
+                        img = B.IMG(B.CLASS("sound"), src="/images/audio.png")
+                        link = B.A(img, B.CLASS("sound"), href=url)
                         self._english_pronunciation = link
             return self._english_pronunciation
 
@@ -946,7 +947,8 @@ jQuery(function() {
                     if id:
                         B = builder
                         url=f"GetCdrBlob.py?disp=inline&id={id}"
-                        link = B.A("\u25b6", B.CLASS("sound"), href=url)
+                        img = B.IMG(B.CLASS("sound"), src="/images/audio.png")
+                        link = B.A(img, B.CLASS("sound"), href=url)
                         self._spanish_pronunciation = link
             return self._spanish_pronunciation
 
