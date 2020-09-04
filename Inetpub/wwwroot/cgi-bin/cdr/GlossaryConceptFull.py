@@ -286,7 +286,8 @@ class Concept:
             meta = B.META(charset="utf-8")
             link = B.LINK(href=self.CSS, rel="stylesheet")
             icon = B.LINK(href="/favicon.ico", rel="icon")
-            head = B.HEAD(meta, B.TITLE(self.TITLE), icon, link)
+            jqry = B.SCRIPT(src=self.control.HTMLPage.JQUERY)
+            head = B.HEAD(meta, B.TITLE(self.TITLE), icon, link, jqry)
             time = B.SPAN(self.control.started.ctime())
             args = self.SUBTITLE, B.BR(), "QC Report", B.BR(), time
             concept_id = B.P(f"CDR{self.doc.id}", id="concept-id")
@@ -308,6 +309,19 @@ class Concept:
             if self.related_info_table is not None:
                 body.append(B.H2("Related Information"))
                 body.append(self.related_info_table)
+            body.append(B.SCRIPT("""\
+jQuery(function() {
+    jQuery("a.sound").click(function() {
+        var url = jQuery(this).attr("href");
+        var audio = document.createElement("audio");
+        audio.setAttribute("src", url);
+        audio.load();
+        audio.addEventListener("canplay", function() {
+            audio.play();
+        });
+        return false;
+    });
+});"""))
         return self._report
 
     @property
