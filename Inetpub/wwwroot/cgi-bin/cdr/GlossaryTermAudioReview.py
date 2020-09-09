@@ -85,7 +85,7 @@ class Control(Controller):
     IGNORE = "__MACOSX"
     NOTEPAT = compile(r"[\r\n]+")
     NAMEPAT = compile(r"(?i)(?P<base>Week_\d{3})(?P<rev>_Rev\d)*.zip")
-    REVPAT = compile(r"(?i)_Rev(?P<num>\d{3})")
+    REVPAT = compile(r"(?i)_Rev(?P<num>\d+)")
     MAXNOTE = 2040
     MAXFILE = 250
     MAXTERM = 250
