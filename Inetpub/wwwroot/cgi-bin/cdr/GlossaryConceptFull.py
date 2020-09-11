@@ -526,7 +526,8 @@ jQuery(function() {
                 self.__add_row(rows, "dictionaries", "Dictionary")
                 self.__add_row(rows, "status", self.STATUSES[self.langcode])
                 self.__add_row(rows, "status_date", "Status Date")
-                for comment in self.comments:
+                # Only include the topmost comment
+                for comment in self.comments[:1]:
                     rows.append(comment.row)
                 self.__add_row(rows, "last_modified", "Date Last Modified")
                 self.__add_row(rows, "last_reviewed", "Date Last Reviewed")
