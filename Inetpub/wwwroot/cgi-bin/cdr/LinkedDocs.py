@@ -159,7 +159,7 @@ class Control(Controller):
 
         if not self.links:
             nada = "No link to this document found."
-            column = cdrcgi.Report.Column(nada, width="500px")
+            column = self.Reporter.Column(nada, width="500px")
             return [self.Reporter.Table([], columns=[column])]
         tables = []
         for doctype in sorted(self.links):
