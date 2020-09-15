@@ -555,7 +555,11 @@ class Summary:
 
     @property
     def display_title(self):
-        return f"{self.title} ({self.id:d})"
+        if not hasattr(self, "_display_title"):
+            self._display_title = f"{self.title} ({self.id:d})"
+            if self.doc.root.get("AvailableAsModule") == "Yes":
+                self._display_title += " [Module]"
+        return self._display_title
 
     @property
     def id(self):
