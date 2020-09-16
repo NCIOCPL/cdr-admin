@@ -34,9 +34,11 @@ on the landing page for this script.
 
 """
 
+from importlib import import_module
 from json import loads, dumps
 from cdrcgi import Controller, navigateTo
 from cdr import ordinal
+from sys import path
 
 
 class Control(Controller):
@@ -345,6 +347,12 @@ class Control(Controller):
                 if name and value:
                     if name in opts:
                         self.bail(f"Duplicate option {name!r}")
+                    elif self.supported_parameters is not None:
+                        if name not in self.supported_parameters:
+                            message = f"Parameter {name!r} not supported"
+                            supported = ", ".join(self.supported_parameters)
+                            extra = [f"Supported parameters: {supported}"]
+                            self.bail(message, extra=extra)
                     opts[name] = value
                 i += 1
             self._opts = dumps(opts)
@@ -375,6 +383,26 @@ class Control(Controller):
             else:
                 self._subtitle = self.SUBTITLE
         return self._subtitle
+
+    @property
+    def supported_parameters(self):
+        """Set of option names allowed for the job (None if unrestricted)."""
+
+        if not hasattr(self, "_supported_parameters"):
+            if "scheduler" not in str(path).lower():
+                path.insert("d:/cdr/Scheduler")
+            self._supported_parameters = None
+            try:
+                module_name, class_name = self.job_class.split(".", 1)
+                module = import_module(f"jobs.{module_name}")
+                job_class = getattr(module, class_name)
+                supported = getattr(job_class, "SUPPORTED_PARAMETERS")
+                self._supported_parameters = supported
+            except Exception as e:
+                args = self.job_class, e
+                self.logger.exception("supported_parameters for %s: %s", *args)
+                self.bail(f"Unable to load jobs.{self.job_class}: {e}")
+        return self._supported_parameters
 
 
 class Job:
