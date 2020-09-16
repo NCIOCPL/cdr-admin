@@ -175,11 +175,11 @@ class Concept:
         if not hasattr(self, "_definitions"):
             self._definitions = {}
             for langcode in self.LANGUAGES:
-                self._definitions[langcode] = []
+                self._definitions[langcode] = {}
             for name in self.DEFINITION_ELEMENTS:
                 for node in self.doc.root.findall(name):
                     definition = self.Definition(self, node)
-                    self._definitions[definition.langcode].append(definition)
+                    self._definitions[definition.langcode].update({definition.audience : definition})
         return self._definitions
 
     @property
@@ -298,11 +298,12 @@ class Concept:
                 if self.parallel:
                     wrapper = B.DIV(B.CLASS("lang-wrapper"))
                     body.append(wrapper)
-                for definition in self.definitions[langcode]:
-                    section = f"{language} - {definition.audience}"
+                for audience in sorted(self.definitions[langcode], reverse=True):
+                    aud = self.definitions[langcode][audience].audience
+                    section = f"{language} - {aud.title()}"
                     wrapper.append(B.H2(section))
-                    wrapper.append(definition.term_table)
-                    wrapper.append(definition.info_table)
+                    wrapper.append(self.definitions[langcode][audience].term_table)
+                    wrapper.append(self.definitions[langcode][audience].info_table)
             if self.media_table is not None:
                 body.append(self.media_table)
             body.append(self.term_type_table)
