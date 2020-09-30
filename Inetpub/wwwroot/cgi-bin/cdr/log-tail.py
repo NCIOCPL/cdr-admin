@@ -9,10 +9,10 @@ import sys
 import time
 import re
 import cdr
-import cdrcgi
+from cdrcgi import Controller
 
 
-class Control(cdrcgi.Controller):
+class Control(Controller):
     """Script master."""
 
     SUBTITLE = "Log Viewer"
@@ -38,12 +38,12 @@ class Control(cdrcgi.Controller):
             else:
                 self.show()
         else:
-            cdrcgi.Control.run(self)
+            Controller.run(self)
 
     def authenticate(self):
         """Ensure that only those authorized to do so can run this scropt."""
         if not self.session or not cdr.canDo(self.session, "VIEW LOGS"):
-            cdrcgi.bail("Account not authorized for this action")
+            self.bail("Account not authorized for this action")
 
     def populate_form(self, page):
         """Put the fields on the form.
@@ -211,7 +211,7 @@ Content-type: text/plain; charset=utf-8
                 except Exception as e:
                     exceptions.append(f"encoding {encoding!r}: {e}")
         if not hasattr(self, "_offsets"):
-            cdrcgi.bail(f"{self.path}: {exceptions}")
+            self.bail(f"{self.path}: {exceptions}")
         return self._offsets
 
     @property
