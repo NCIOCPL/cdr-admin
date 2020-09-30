@@ -109,15 +109,16 @@ class Control(Controller):
         if not hasattr(self, "_file_bytes"):
             self._file_bytes = None
             if self.file_field is not None:
-                segments = []
-                while True:
-                    more_bytes = self.file_field.file.read()
-                    if not more_bytes:
-                        break
-                    segments.append(more_bytes)
-            else:
-                segments = [self.file_field.value]
-            self._file_bytes = b"".join(segments)
+                if self.file_field.file:
+                    segments = []
+                    while True:
+                        more_bytes = self.file_field.file.read()
+                        if not more_bytes:
+                            break
+                        segments.append(more_bytes)
+                else:
+                    segments = [self.file_field.value]
+                self._file_bytes = b"".join(segments)
         return self._file_bytes
 
     @property
