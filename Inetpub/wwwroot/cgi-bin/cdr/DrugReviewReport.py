@@ -300,7 +300,7 @@ class Drug:
         Note that there is a bug in Microsoft Excel, which prevents the
         auto-height feature from working properly. So the user may need to
         manually expand the height of a row containing large values in
-        merged cells (see http://tinyurl.com/excel-merged-height-bug).
+        merged cells (see https://tinyurl.com/excel-merged-height-bug).
         To mitigate the impact of this bug, I have made the width of the
         affected columns larger than in the original version of this report.
 
