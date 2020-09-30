@@ -154,7 +154,7 @@ jQuery(function() {{
         comments = (self.job.comments or "").replace("\r", "")
         action = "Create" if self.job.new else "Edit"
         legend = f"{action} Translation Job for CDR{self.english_id:d}"
-        fieldset = page.fieldset(legend)
+        fieldset = page.fieldset(legend, id="job-fields")
         opts = dict(options=types, default=change_type)
         fieldset.append(page.select("change_type", **opts))
         opts = dict(options=users, default=user)
@@ -162,10 +162,36 @@ jQuery(function() {{
         opts = dict(options=states, default=state_id)
         fieldset.append(page.select("status", **opts))
         fieldset.append(page.textarea("comments", value=comments))
-        opts = dict(label="QC Report(s)", multiple=True)
-        fieldset.append(page.file_field("file", **opts))
+        opts = dict(label="QC Report", classes="file-field")
+        file = page.file_field("file-1", **opts)
+        opts = {
+            "src": "/images/add.gif",
+            "onclick": "add_file_field()",
+            "class": "clickable",
+            "title": "Add another file",
+        }
+        image = page.B.IMG(**opts)
+        button = page.B.SPAN(image, id="add-file-button")
+        file.append(button)
+        fieldset.append(file)
         page.form.append(page.hidden_field("english_id", self.english_id))
+        page.form.append(page.hidden_field("nfiles", "1"))
         page.form.append(fieldset)
+        page.add_script("""\
+function add_file_field() {
+    var nfiles = jQuery("#job-fields .file-field").length + 1;
+    var id = "file-" + nfiles;
+    var field = jQuery("<div>", {class: "labeled-field"});
+    field.append(jQuery("<label>", {for: id, text: "QC Report"}));
+    field.append(jQuery("<input>", {
+        name: id,
+        type: "file",
+        id: id,
+        class: "file-field"
+    }));
+    jQuery("#job-fields").append(field);
+    jQuery("input[name='nfiles']").val(nfiles);
+}""");
 
     def populate_summary_selection_form(self, page):
         """
@@ -278,12 +304,13 @@ jQuery(function() {{
         """Attachments to be appended to email notification."""
 
         if not hasattr(self, "_files"):
+            nfiles = int(self.fields.getvalue("nfiles", "0"))
             self._files = []
-            if "file" in self.fields.keys():
-                files = self.fields["file"]
-                if not isinstance(files, list):
-                    files = [files]
-                for f in files:
+            keys = set(self.fields.keys())
+            for i in range(nfiles):
+                name = f"file-{i+1}"
+                if name in keys:
+                    f = self.fields[name]
                     if f.file:
                         file_bytes = []
                         while True:
@@ -299,7 +326,7 @@ jQuery(function() {{
                         attachment = EmailAttachment(file_bytes, f.filename)
                         self._files.append(attachment)
                     else:
-                        self.logger.warning("%s empty", f.filename)
+                        self.logger.warning("%s empty", name)
         return self._files
 
     @property
