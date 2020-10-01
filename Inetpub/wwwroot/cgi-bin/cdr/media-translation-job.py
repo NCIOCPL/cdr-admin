@@ -122,6 +122,8 @@ jQuery(function() {{
         if not self.english_id:
             fieldset.append(page.text_field("english_id", label="English ID"))
         user = self.job.assigned_to if self.job else self.lead_translator
+        if not user:
+            user = self.lead_translator
         opts = dict(options=self.translators, default=user)
         fieldset.append(page.select("assigned_to", **opts))
         states = self.states.values
