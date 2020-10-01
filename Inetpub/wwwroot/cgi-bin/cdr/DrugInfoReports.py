@@ -15,6 +15,16 @@ class Control(Controller):
 
     def populate_form(self, page):
         page.body.set("class", "admin-menu")
+        page.form.append(page.B.H3("Management Reports"))
+        ol = page.B.OL()
+        page.form.append(ol)
+        for display, script in (
+            ("Drug Date Last Modified Report", "DrugDateLastModified.py"),
+            ("Drug Information Summaries Processing Report",
+             "DISProcessingStatusReport.py"),
+            ("Drug Summaries with Markup Report", "DISWithMarkup.py"),
+        ):
+            ol.append(page.B.LI(page.menu_link(script, display)))
         page.form.append(page.B.H3("QC Reports"))
         ol = page.B.OL()
         page.form.append(ol)
@@ -35,7 +45,6 @@ class Control(Controller):
              "DrugCRD.py"),
             ("Drug Information Summaries Lists", "DISLists.py"),
             ("Drug Information Type Of Change", "DISTypeChangeReport.py"),
-            ("Drug Processing Status Report", "DISProcessingStatusReport.py"),
             ("Drug Summaries with Markup Report", "DISWithMarkup.py"),
         ):
             ol.append(page.B.LI(page.menu_link(script, display)))
