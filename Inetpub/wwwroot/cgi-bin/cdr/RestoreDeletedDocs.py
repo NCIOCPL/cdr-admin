@@ -92,14 +92,20 @@ class Control(Controller):
                 for id in self.ids:
                     doc = Doc(self.session, id=id)
                     cdr_id = doc.cdr_id
+                    if doc.active_status != Doc.DELETED:
+                        message = f"{cdr_id} already restored"
+                        self.logger.warning(message)
+                        items.append(B.LI(message, B.CLASS("error")))
+                        continue
                     try:
                         doc.set_status(self.status, comment=self.reason)
                         self.logger.info("Restored %s", cdr_id)
                         message = f"{cdr_id} restored successfully"
                         items.append(B.LI(message, B.CLASS("info")))
                         for error in doc.errors:
-                            self.logger.warning("%s: %s", cdr_id, error)
-                            items.append(B.LI(f"{cdr_id}: {error}"))
+                            message = f"{cdr_id}: {error}"
+                            self.logger.warning(message)
+                            items.append(B.LI(message, B.CLASS("error")))
                     except Exception as e:
                         self.logger.exception(cdr_id)
                         items.append(B.LI(f"{cdr_id}: {e}", B.CLASS("error")))
