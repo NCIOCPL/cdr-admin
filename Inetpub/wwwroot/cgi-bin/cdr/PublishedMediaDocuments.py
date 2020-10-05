@@ -34,6 +34,7 @@ class Control(Controller):
         "v.dt",
         "b.value as blocked",
         "v.publishable",
+        "a.value as audience"
     )
 
     def build_tables(self):
@@ -136,6 +137,9 @@ class Control(Controller):
         query.where(query.Condition("d.id", subquery, "IN"))
         query.where(query.Condition("v.num", last_ver))
 
+        query.join("query_term_pub a", "a.doc_id = d.id")
+        query.where(query.Condition("a.path", self.PATHS, "IN"))
+
         # The language is determined indirectly.  If a TranslationOf
         # element exists the document is a Spanish translation, 
         # otherwise the document is English.  This where-clause 
@@ -148,27 +152,67 @@ class Control(Controller):
         elif self.language == 'Spanish':
             query.where("l.value IS NOT NULL") # Spanish
 
+        #  Query for all media, including HP and Patien records
+        all_rows = query.execute(self.cursor).fetchall()
+
+        # Users want to use the audience check boxes a little differently
+        # Instead of selecting all records with audience HP OR patient when
+        # checking both audiences, they want to display records with 
+        # audience HP AND patient instead.
+        # Similarily, when the Patients checkbox is selected they only want
+        # to include those documents that include ONLY a patient caption, 
+        # not those that also include an HP caption.
+        # Using sets to determine the appropriate intersections
+        # -----------------------------------------------------------------
+        hp = set()
+        pat = set()
+        selected = set()
+        
+        for row in all_rows:
+            if row[6] == 'Patients': pat.add(row[0])
+            else: hp.add(row[0])
+
+        patandhp = pat & hp
+        pat_only = pat - hp
+        hp_only  = hp - pat
+
+        # self.audience doesn't exist if both audience checkboxes have
+        # been selected
+        # ------------------------------------------------------------
+        audience = ''
         if self.audience:
-            audience = self.audience.replace(" ", "_")
-            query.join("query_term_pub a", "a.doc_id = d.id")
-            query.where(query.Condition("a.path", self.PATHS, "IN"))
-            query.where(query.Condition("a.value", audience))
+            if self.audience == 'Patients':
+                selected = pat_only
+            else:
+                selected = hp_only
+            #audience = self.audience.replace(" ", "_")
+        else:
+            audience = 'both'
+            selected = patandhp
+
         rows = []
-        for row in query.execute(self.cursor).fetchall():
-            #for id, title, first, verDt, audDt, volFlag, ver, \
-            #    publishable in mediaRecords:
-            url = f"GetCdrImage.py?id=CDR{row.doc_id}.jpg"
-            first_pub = str(row.first_pub)[:10] if row.first_pub else ""
-            version_date = str(row.dt)[:10] if row.dt else ""
-            blocked = row.blocked[0] if row.blocked else ""
-            rows.append([
-                self.Reporter.Cell(row.doc_id, href=url, center=True),
-                row.title,
-                self.Reporter.Cell(first_pub, center=True),
-                self.Reporter.Cell(version_date, center=True),
-                self.Reporter.Cell(row.publishable, center=True),
-                self.Reporter.Cell(blocked, center=True),
-            ])
+        
+        for row in all_rows:
+            if row[0] in selected: 
+                url = f"GetCdrImage.py?id=CDR{row.doc_id}.jpg"
+                first_pub = str(row.first_pub)[:10] if row.first_pub else ""
+                version_date = str(row.dt)[:10] if row.dt else ""
+                blocked = row.blocked[0] if row.blocked else ""
+
+                # Since records for HP and Patients are listed twice in 
+                # the select result we're skipping one of the two
+                # ---------------------------------------------------------------
+                if audience == 'both' and row.audience == 'Health_professionals':
+                    continue
+                
+                rows.append([
+                    self.Reporter.Cell(row.doc_id, href=url, center=True),
+                    row.title,
+                    self.Reporter.Cell(first_pub, center=True),
+                    self.Reporter.Cell(version_date, center=True),
+                    self.Reporter.Cell(row.publishable, center=True),
+                    self.Reporter.Cell(blocked, center=True),
+                ])
         return rows
 
     @property
