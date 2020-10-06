@@ -72,7 +72,19 @@ class Control(Controller):
         page.form.append(page.hidden_field("doctype", "Media"))
         page.form.append(page.hidden_field("VOL", "Y"))
 
+        # Include instructions for the audience option since these
+        # are used differently for this report.
+        # --------------------------------------------------------
+        instruction = ("NOTE: The audience option is working differently for "
+                       "this report. Selecting both audiences will display only "
+                       "those documens for which BOTH audiences exist rather "
+                       "than documents for which either one of the audiences exists. "
+                       "Similarily for selecting one audience only. In this case "
+                       "a document will not be included if a caption for the other "
+                       "audience type also exists")
         fieldset = page.fieldset("Audience(s)")
+        para = page.B.P(instruction)
+        fieldset.append(para)
         for audience in self.AUDIENCES:
             opts = dict(value=audience, checked=True)
             fieldset.append(page.checkbox("audience", **opts))
@@ -141,8 +153,8 @@ class Control(Controller):
         query.where(query.Condition("a.path", self.PATHS, "IN"))
 
         # The language is determined indirectly.  If a TranslationOf
-        # element exists the document is a Spanish translation, 
-        # otherwise the document is English.  This where-clause 
+        # element exists the document is a Spanish translation,
+        # otherwise the document is English.  This where-clause
         # adjusts the query accordingly.  If either both or none of
         # the languages are selected the report displays both
         # languages.
@@ -157,17 +169,17 @@ class Control(Controller):
 
         # Users want to use the audience check boxes a little differently
         # Instead of selecting all records with audience HP OR patient when
-        # checking both audiences, they want to display records with 
+        # checking both audiences, they want to display records with
         # audience HP AND patient instead.
         # Similarily, when the Patients checkbox is selected they only want
-        # to include those documents that include ONLY a patient caption, 
+        # to include those documents that include ONLY a patient caption,
         # not those that also include an HP caption.
         # Using sets to determine the appropriate intersections
         # -----------------------------------------------------------------
         hp = set()
         pat = set()
         selected = set()
-        
+
         for row in all_rows:
             if row[6] == 'Patients': pat.add(row[0])
             else: hp.add(row[0])
@@ -191,20 +203,20 @@ class Control(Controller):
             selected = patandhp
 
         rows = []
-        
+
         for row in all_rows:
-            if row[0] in selected: 
+            if row[0] in selected:
                 url = f"GetCdrImage.py?id=CDR{row.doc_id}.jpg"
                 first_pub = str(row.first_pub)[:10] if row.first_pub else ""
                 version_date = str(row.dt)[:10] if row.dt else ""
                 blocked = row.blocked[0] if row.blocked else ""
 
-                # Since records for HP and Patients are listed twice in 
+                # Since records for HP and Patients are listed twice in
                 # the select result we're skipping one of the two
                 # ---------------------------------------------------------------
                 if audience == 'both' and row.audience == 'Health_professionals':
                     continue
-                
+
                 rows.append([
                     self.Reporter.Cell(row.doc_id, href=url, center=True),
                     row.title,
