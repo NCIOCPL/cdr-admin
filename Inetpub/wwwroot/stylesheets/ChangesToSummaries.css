@@ -125,3 +125,8 @@ span.SectionRef { text-decoration: underline; font-weight: bold; }
 .summary { border: 2px solid black; text-align: left; }
 .board   { margin-top: 40px; }
 .changes { margin-bottom: 40px; }
+
+.totals-table { border-collapse: collapse; margin-bottom: 20px; }
+.totals-table th { text-align: left; width: 250px; font-weight: normal; }
+.totals-table td { text-align: right; width: 30px; }
+.totals-table th, .totals-table td { font-size: .8em; }
