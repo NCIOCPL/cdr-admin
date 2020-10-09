@@ -6,7 +6,6 @@
 #----------------------------------------------------------------------
 import cgi
 import cdr
-import cdrcgi
 from cdrapi import db
 
 LOGNAME = "check-auth"
