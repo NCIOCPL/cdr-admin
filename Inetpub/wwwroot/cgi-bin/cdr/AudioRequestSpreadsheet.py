@@ -10,6 +10,7 @@ from cdrcgi import Controller, Excel
 from cdrapi.docs import Doc
 from cdr import run_command
 
+
 class Control(Controller):
     """Script logic encapsulated here."""
 
@@ -27,6 +28,7 @@ class Control(Controller):
     )
     NAME_PATH = "/GlossaryTermName/T%Name/TermNameString"
     MEDIA_PATH = "/GlossaryTermName/%/MediaLink/MediaID/@cdr:ref"
+    REDO_PATH = "/GlossaryTermName/%/MediaLink/@NeedsReplacementMedia"
 
     def populate_form(self, page):
         """Generate the workbook and provide the link to it.
@@ -54,7 +56,7 @@ class Control(Controller):
         """Excel workbook contining the names without pronunciations."""
 
         if not hasattr(self, "_book"):
-            self._book = book = Excel("Report4926", stamp=True)
+            self._book = book = Excel(f"Week_{self.week}")
             book.add_sheet("Term Names")
             styles = dict(alignment=book.center, font=book.bold)
             col = 1
@@ -63,12 +65,24 @@ class Control(Controller):
                 book.write(1, col, name, styles)
                 col += 1
             row = 2
+            counts = {}
             for doc in self.docs:
                 for name in doc.names:
+                    lang = "en" if name.language == "English" else "es"
+                    filename = f"{doc.id}_{lang}"
+                    if filename not in counts:
+                        counts[filename] = 1
+                    else:
+                        counts[filename] += 1
+                        n = counts[filename]
+                        filename = f"{filename}{n}"
                     book.write(row, 1, doc.id)
                     book.write(row, 2, name.string)
                     book.write(row, 3, name.language)
-                    book.write(row, 4,name.pronunciation)
+                    book.write(row, 4, name.pronunciation)
+                    book.write(row, 5, f"Week_{self.week}/{filename}.mp3")
+                    if name.media_id:
+                        book.write(row, 8, name.media_id)
                     row += 1
         return self._book
 
@@ -90,8 +104,10 @@ class Control(Controller):
             query.outer("query_term m", "m.doc_id = n.doc_id",
                         f"m.path LIKE '{self.MEDIA_PATH}'",
                         "LEFT(m.node_loc, 4) = LEFT(n.node_loc, 4)")
+            query.outer("query_term r", "r.doc_id = n.doc_id",
+                        f"r.path LIKE '{self.REDO_PATH}'", "r.value = 'Yes'")
             query.where(f"n.path LIKE '{self.NAME_PATH}'")
-            query.where("m.doc_id IS NULL")
+            query.where("m.doc_id IS NULL OR r.doc_id IS NOT NULL")
             rows = query.unique().execute(self.cursor).fetchall()
             self._docs = [TermNameDoc(self, row.doc_id) for row in rows]
         return self._docs
@@ -113,6 +129,15 @@ class Control(Controller):
                               extra=[process.stderr])
                 self._url = f"/cdrReports/{self.book.filename}"
         return self._url
+
+    @property
+    def week(self):
+        """String for the current week using ISO numbering."""
+
+        if not hasattr(self, "_week"):
+            year, week, day = self.started.isocalendar()
+            self._week = f"{year}_{week:02d}"
+        return self._week
 
 
 class TermNameDoc:
@@ -187,7 +212,7 @@ class TermNameDoc:
             if not hasattr(self, "_exclude"):
                 self._exclude = self.node.get("AudioRecording") == "No"
                 if not self._exclude:
-                    if self.node.find("MediaLink") is not None:
+                    if self.media_id and not self.needs_replacement:
                         self._exclude = True
             return self._exclude
 
@@ -195,6 +220,34 @@ class TermNameDoc:
         def language(self):
             """English or Spanish."""
             return "English" if self.node.tag == "TermName" else "Spanish"
+
+        @property
+        def media_id(self):
+            """Media ID if we already have audio for this name."""
+
+            if not hasattr(self, "_media_id"):
+                self._media_id = None
+                node = self.node.find("MediaLink/MediaID")
+                if node is not None:
+                    value = node.get(f"{{{Doc.NS}}}ref")
+                    try:
+                        self._media_id = Doc.extract_id(value)
+                    except Exception:
+                        pass
+            return self._media_id
+
+        @property
+        def needs_replacement(self):
+            """True if the existing media needs to be replaced."""
+
+            if not hasattr(self, "_needs_replacement"):
+                self._needs_replacement = None
+                node = self.node.find("MediaLink")
+                if node is not None:
+                    self._needs_replacement = False
+                    if node.get("NeedsReplacementMedia") == "Yes":
+                        self._needs_replacement = True
+            return self._needs_replacement
 
         @property
         def string(self):
