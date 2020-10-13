@@ -1,190 +1,177 @@
 #!/usr/bin/env python
 
-#----------------------------------------------------------------------
-# Request form for generating PDQ Editorial Board Members Mailing.
-#
-# BZIssue::1664
-# BZIssue::3132
-# BZIssue::OCECDR-3640: Unable to run Advisory Board Summary Mailers
-# Rewritten Summer 2015 as part of security sweep.
-# JIRA::OCECDR-4573 - generate tracking documents without mailer jobs
-#----------------------------------------------------------------------
+"""Request PDQ Advisory Board Members Summary Mailers.
+"""
 
 from datetime import datetime
 from json import dumps
 from operator import attrgetter
 from lxml import etree
-from cdr import canDo as can_do
-from cdrapi import db
 from cdrapi.docs import Doc
-from cdrapi.users import Session
-import cdrcgi
+from cdrcgi import Controller
 
-class Control(cdrcgi.Control):
-    """
+
+class Control(Controller):
+    """Top-level control for the mailer request script.
+
     Controls script processing, presenting the user with request options,
     collection the user's choices, and creating a job to generate the
     requested tracking documents.
     """
 
     SUBMENU = "Mailer Menu"
-    TITLE = "CDR Administration"
-    BUTTONS = ("Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out")
+    SUBTITLE = "PDQ Advisory Board Members Tracking Request Form"
     LOGNAME = "advisory-board-trackers"
-
-    def __init__(self):
-        """
-        Collect and verify the CGI parameters.
-        """
-
-        cdrcgi.Control.__init__(self)
-        self.boards = self.collect_boards()
-        self.board = self.get_board()
-        self.members = self.fields.getlist("members") or ["all"]
-        self.summaries = self.fields.getlist("summaries") or ["all"]
-        self.pairs = self.fields.getlist("pairs")
-        self.method = self.fields.getvalue("method") or "all"
-        self.section = "PDQ Advisory Board Members Tracking Request Form"
-        self.cursor = db.connect(user="CdrGuest", timeout=300).cursor()
-        self.sanitize()
+    INSTRUCTIONS = (
+        "To generate tracking documents for an Advisory board, first select "
+        "the board's name from the picklist below.",
+        "If you check 'Create Trackers for All Summaries and All Board "
+        "Members', tracking documents will be created immediately.",
+        "If you want to select specific summaries and/or specific board "
+        "members, check one of the other two radio buttons.",
+        "If you check 'Select by Summary', you can select from the list "
+        "below the radio buttons the specific summaries for which you want "
+        "tracking documents created. You will be sent to a new page which "
+        "lets you select the members for which the tracking documents "
+        "should be created for each of the selected summaries.",
+        "If you check 'Select by Board Member', you can select from the "
+        "list below the radio buttons the specific members for which you "
+        "want tracking documents to be created. You will be taken to a "
+        "second page which will let you select the summaries for which "
+        "the tracking documents should be created for each of the selected "
+        "members.",
+        "Click Submit when your selections are ready.",
+    )
 
     def run(self):
-        "Top-level processing driver"
+        """Override for custom routing."""
 
-        if self.request == cdrcgi.MAINMENU:
-            cdrcgi.navigateTo("Admin.py", self.session)
-        elif self.request == Control.SUBMENU:
-            cdrcgi.navigateTo("Mailers.py", self.session)
-        elif self.request == "Log Out":
-            cdrcgi.logout(self.session)
-        elif not self.board:
-            self.show_form()
-        elif self.method == "all" or self.pairs:
-            self.show_report()
-        else:
-            self.show_candidates()
+        if not self.session.can_do("SUMMARY MAILERS"):
+            self.bail("User not authorized to create Summary mailers")
+        if self.request == self.SUBMENU:
+            return self.redirect("Mailers.py")
+        elif self.request == self.SUBMIT:
+            if self.selection_method == "all" or self.pairs:
+                return self.show_report()
+            else:
+                return self.show_candidates()
+        return Controller.run(self)
 
     def build_tables(self):
         """
         Create the tracking documents and show them
         """
 
-        session = Session(self.session)
         trackers = []
         attrs = "reviewer.title", "summary.title"
         labels = "Tracker", "Reviewer", "Summary"
-        cols = [cdrcgi.Report.Column(label) for label in labels]
-        if self.method == "summary":
+        if self.selection_method == "summary":
             attrs = "summary.title", "reviewer.title"
             labels = "Tracker", "Summary", "Reviewer"
-        if self.method == "all":
+        if self.selection_method == "all":
             for summary in list(self.board.summaries.values()):
-                for recip_id in summary.get_checkbox_ids():
-                    tracker = Tracker(session, summary.id, recip_id)
-                    #print("{}-{}".format(summary.id, recip_id))
+                for recip_id in summary.checkbox_ids:
+                    tracker = Tracker(self.session, summary.id, recip_id)
                     trackers.append(tracker)
         else:
             for pair in self.pairs:
                 ids = [int(string) for string in pair.split("-")]
-                if self.method == "member":
+                if self.selection_method == "member":
                     ids.reverse()
-                trackers.append(Tracker(session, *ids))
+                trackers.append(Tracker(self.session, *ids))
         msg = "queued %d tracker documents for creation"
         self.logger.info(msg, len(trackers))
         rows = []
         opts = dict(target="_blank")
         for tracker in sorted(trackers, key=attrgetter(*attrs)):
             try:
-                tracker.save()
-                url = "ShowCdrDocument.py?doc-id={:d}".format(tracker.id)
-                cdr_id = Doc.normalize_id(tracker.id)
-                tracker_link = cdrcgi.Report.Cell(cdr_id, href=url, **opts)
+                id = tracker.save()
+                url = f"ShowCdrDocument.py?doc-id={id:d}"
+                cdr_id = Doc.normalize_id(id)
+                tracker_link = self.Reporter.Cell(cdr_id, href=url, **opts)
             except Exception as e:
                 tracker_link = str(e)
             title = tracker.reviewer.title
-            url = "QcReport.py?DocId={:d}".format(tracker.reviewer.id)
-            reviewer_link = cdrcgi.Report.Cell(title, href=url, **opts)
+            url = f"QcReport.py?DocId={tracker.reviewer.id:d}"
+            reviewer_link = self.Reporter.Cell(title, href=url, **opts)
             title = tracker.summary.title
-            url = "QcReport.py?DocVersion=-1&DocId={tracker.summary.id:d}"
-            summary_link = cdrcgi.Report.Cell(title, href=url, **opts)
-            if self.method == "summary":
+            url = f"QcReport.py?DocId={tracker.summary.id:d}"
+            summary_link = self.Reporter.Cell(title, href=url, **opts)
+            if self.selection_method == "summary":
                 rows.append((tracker_link, summary_link, reviewer_link))
             else:
                 rows.append((tracker_link, reviewer_link, summary_link))
-            #print(repr(rows[-1]))
-        self.subtitle = "Tracker Documents Generated"
-        self.title = self.TITLE
-        return [cdrcgi.Report.Table(cols, rows, caption="Trackers")]
+        cols = [self.Reporter.Column(label) for label in labels]
+        opts = dict(columns=cols, caption="Trackers")
+        return self.Reporter.Table(rows, **opts)
 
-    def show_form(self):
-        "Put up the request form for PDQ summary mailer generation."
+    def populate_form(self, page):
+        """Put up the request form for PDQ summary mailer generation.
 
-        opts = {
-            "subtitle": self.section,
-            "action": self.script,
-            "buttons": self.BUTTONS,
-            "session": self.session
-        }
-        page = cdrcgi.Page(Control.TITLE, **opts)
+        Pass:
+            page - HTMLPage object on which the form is drawn
+        """
+
         self.add_instructions(page)
-        page.add("<fieldset>")
-        page.add(page.B.LEGEND("Common Options"))
-        page.add_select("board", "Board", self.make_board_list(),
-                        onchange="board_change()")
-        page.add("</fieldset>")
-        page.add('<fieldset id="method-block" class="hidden">')
-        page.add(page.B.LEGEND("Selection Method"))
-        page.add_radio("method", "Send All Summaries to all Board Members",
-                       "all", checked=True)
-        page.add_radio("method", "Select by Summary", "summary")
-        page.add_radio("method", "Select by Board Member", "member")
-        page.add("</fieldset>")
-        page.add('<fieldset id="members-block" class="hidden">')
-        page.add(page.B.LEGEND("Choose Member(s)"))
-        page.add_select("members", "Members", (), onchange="memchg()",
-                        multiple=True, tooltip="Hold down the control (Ctrl) "
-                        "key while left-clicking to select multiple board "
-                        "members", classes="taller")
-        page.add("</fieldset>")
-        page.add('<fieldset id="summaries-block" class="hidden">')
-        page.add(page.B.LEGEND("Choose One Or More Summaries"))
-        page.add_select("summaries", "Summaries", (), onchange="sumchg()",
-                        multiple=True, tooltip="Hold down the control (Ctrl) "
-                        "key while left-clicking to select multiple summaries",
-                        classes="taller")
-        page.add("</fieldset>")
+        fieldset = page.fieldset("Common Options")
+        opts = dict(onchange="board_change()", options=self.board_list)
+        fieldset.append(page.select("board", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Selection Method", id="method-block")
+        fieldset.set("class", "hidden")
+        all = "Send All Summaries to all Board Members"
+        opts = dict(label=all, value="all", checked=True)
+        fieldset.append(page.radio_button("selection_method", **opts))
+        opts = dict(label="Select by Summary", value="summary")
+        fieldset.append(page.radio_button("selection_method", **opts))
+        opts = dict(label="Select by Board Member", value="member")
+        fieldset.append(page.radio_button("selection_method", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Choose Member(s)", id="members-block")
+        fieldset.set("class", "hidden")
+        opts = dict(tooltip="Hold down the control (Ctrl) key while "
+                    "left-clicking to select multiple board members",
+                    multiple=True, classes="taller", onchange="memchg()")
+        fieldset.append(page.select("members", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Choose One Or More Summaries(s)")
+        fieldset.set("id", "summaries-block")
+        fieldset.set("class", "hidden")
+        opts = dict(tooltip="Hold down the control (Ctrl) key while "
+                    "left-clicking to select multiple summaries",
+                    multiple=True, classes="taller", onchange="sumchg()")
+        fieldset.append(page.select("summaries", **opts))
+        page.form.append(fieldset)
         self.add_script(page)
         page.add_css("select.taller { height: 150px; }")
         page.send()
 
     def show_candidates(self):
-        """
+        """Put up a cascading second form.
+
         Show the user the candidate recipient-summary pairs based
         on the initial selection of board member recipients or
         summary documents for the chosen board, and let the user
         refine the selections by pruning away some of the candidate
         pairs.
         """
-        opts = {
-            "buttons": self.BUTTONS,
-            "subtitle": "Board Mailer Request Form",
-            "action": self.script,
-            "session": self.session
-        }
-        form = cdrcgi.Page(self.TITLE, **opts)
-        form.add_hidden_field("method", self.method)
-        form.add_hidden_field("board", self.board.id)
-        form.add("<fieldset>")
-        form.add(form.B.LEGEND(self.board.name))
-        form.add('<div id="extra-buttons">')
-        form.add(form.B.BUTTON("Check All", type="button",
-                               onclick="check_all()"))
-        form.add(form.B.BUTTON("Clear All", type="button",
-                               onclick="clear_all()"))
-        form.add("</div>")
-        self.board.show_choices(form)
-        form.add("</fieldset>")
-        form.add_script("""\
+
+        if not self.board:
+            return self.show_form()
+        page = self.form_page
+        args = "selection_method", self.selection_method
+        page.form.append(page.hidden_field(*args))
+        page.form.append(page.hidden_field("board", self.board.id))
+        fieldset = page.fieldset(self.board.name)
+        div = page.B.DIV(id="extra-buttons")
+        opts = dict(type="button", onclick="check_all()")
+        div.append(page.B.BUTTON("Check All", **opts))
+        opts["onclick"] = "clear_all()"
+        div.append(page.B.BUTTON("Clear All", **opts))
+        fieldset.append(div)
+        self.board.show_choices(page, fieldset)
+        page.form.append(fieldset)
+        page.add_script("""\
 function check_all() {
     jQuery(".outer-cb input").prop("checked", true);
     jQuery(".inner-cb input").prop("checked", true);
@@ -206,52 +193,44 @@ function outer_clicked(id) {
         jQuery(".inner-" + id).prop("checked", false);
 }""")
 
-        form.add_css("""\
+        page.add_css("""\
 fieldset { width: 750px; padding-bottom: 25px; }
 .outer-cb { margin-top: 15px; }
 .inner-cb { margin-left: 15px; }
-#extra-buttons { xtext-align: center; margin: 15px 0 5px 25px; }""")
-        form.send()
+#extra-buttons { margin: 15px 0 5px 25px; }
+#extra-buttons button { margin-right: 5px; }""")
+        page.send()
 
     def add_instructions(self, page):
-        "Explain (in a collabsible box) how to use the form."
+        """Explain (in a collabsible box) how to use the form.
+
+        Pass:
+            page - HTMLPage object for the form
+        """
 
         tooltip = "Click [More] to see more complete instructions."
-        page.add('<fieldset id="instructions" title="%s">' % tooltip)
-        page.add(page.B.LEGEND("Instructions [More]", onclick="toggle_help()"))
+        opts = dict(title=tooltip, id="instructions")
+        fieldset = page.fieldset("Instructions [More]", **opts)
+        legend = fieldset.find("legend")
+        legend.set("onclick", "toggle_help()")
         page.add_css("#instructions legend { cursor: pointer }")
-        page.add(page.B.P("To generate tracking documents for an Advisory "
-                          "board, first select the board's name from the "
-                          "picklist below."))
-        page.add(page.B.P("If you check 'Create Trackers for All Summaries "
-                          "and All Board Members', tracking documents will be "
-                          "created immediately.", page.B.CLASS("more hidden")))
-        page.add(page.B.P("If you want to select specific summaries and/or "
-                          "specific board members, check one of the other "
-                          "two radio buttons.", page.B.CLASS("more hidden")))
-        page.add(page.B.P("If you check 'Select by Summary', you can select "
-                          "from the list below the radio buttons the "
-                          "specific summaries for which you want tracking "
-                          "documents created. You will be sent to a new page "
-                          "which lets you select the members for which the "
-                          "tracking documents should be created for each "
-                          "of the selected summaries.",
-                          page.B.CLASS("more hidden")))
-        page.add(page.B.P("If you check 'Select by Board Member', you can "
-                          "select from the list below the radio buttons "
-                          "the specific members for which you want tracking "
-                          "documents to be created. You will be taken to a "
-                          "second page which will let you select the "
-                          "summaries for which the tracking documents should "
-                          "be created for each of the selected members.",
-                          page.B.CLASS("more hidden")))
-        page.add(page.B.P("Click Submit when your selections are ready.",
-                          page.B.CLASS("more hidden")))
-        page.add("</fieldset>")
+        classes = []
+        for paragraph in self.INSTRUCTIONS:
+            p = page.B.P(paragraph)
+            if classes:
+                p.set("class", " ".join(classes))
+            fieldset.append(p)
+            classes = "more", "hidden"
+        page.form.append(fieldset)
 
     def add_script(self, page):
-        "Add the Javascript needed to make the form responsive."
-        page.add_script(self.make_board_objects())
+        """Add the Javascript needed to make the form responsive.
+
+        Pass:
+            page - HTMLPage object to which we attach the script
+        """
+
+        page.add_script(self.board_objects)
         page.add_script("""\
 function toggle_help() {
     var tooltip = 'Click [More] to see more complete instructions.';
@@ -269,7 +248,7 @@ function toggle_help() {
             break;
     }
 }
-function check_method(method) {
+function check_selection_method(method) {
     switch (method) {
         case 'all':
             jQuery('#members-block').hide();
@@ -307,7 +286,7 @@ function board_change() {
         return;
     }
     jQuery('#method-block').show();
-    check_method(jQuery('input[name=method]:checked').val());
+    check_selection_method(jQuery('input[name=selection_method]:checked').val());
     var board = boards[board_id];
     var members = jQuery('#members');
     var summaries = jQuery('#summaries');
@@ -326,109 +305,31 @@ function board_change() {
 }
 jQuery(document).ready(function() { board_change(); });""")
 
-    def make_board_list(self):
-        "Generate a picklist for the PDQ Editorial Boards"
+    @property
+    def board(self):
+        "Load selected board, if any."
+
+        if not hasattr(self, "_board"):
+            self._board = None
+            board_id = self.fields.getvalue("board")
+            if board_id:
+                if not board_id.isdigit():
+                    self.bail()
+                self._board = self.boards.get(int(board_id))
+                if not self._board:
+                    self.bail()
+        return self._board
+
+    @property
+    def board_list(self):
+        "Generate a picklist for the PDQ Advisory Boards"
         boards = sorted(self.boards.values())
         return [("", "Choose One")] + [(b.id, b.name) for b in boards]
 
-    def sanitize(self):
-        "Make sure the CGI parameters haven't been tampered with."
-        msg = cdrcgi.TAMPERING
-        if not self.session or not can_do(self.session, "SUMMARY MAILERS"):
-            cdrcgi.bail("User not authorized to create Summary mailers")
-        cdrcgi.valParmVal(self.request, val_list=self.BUTTONS, empty_ok=True,
-                          msg=msg)
-        cdrcgi.valParmVal(self.method, val_list=("all", "summary", "member"),
-                          msg=msg)
-        self.all_or_digits(self.members)
-        self.all_or_digits(self.summaries)
-        for pair in self.pairs:
-            ids = pair.split("-")
-            if len(ids) != 2 or not ids[0].isdigit() or not ids[1].isdigit():
-                cdrcgi.bail()
+    @property
+    def board_objects(self):
+        """Create JavaScript for a list of Board objects."""
 
-    def collect_boards(self):
-        """
-        Find out which boards have which summaries and which board members.
-        Board members have two documents: a PDQBoardMemberInfo document
-        and a Person document. We get the member's name from the first
-        doc and the ID from the second (because that's the ID the mailer
-        generation software expects).
-        """
-
-        boards = {}
-        p_path = "/PDQBoardMemberInfo/BoardMemberName/@cdr:ref"
-        c_path = "/PDQBoardMemberInfo/BoardMembershipDetails/CurrentMember"
-        b_path = "/PDQBoardMemberInfo/BoardMembershipDetails/BoardName/@cdr:ref"
-        t_path = "/Organization/OrganizationType"
-        query = db.Query("active_doc d", "p.int_val", "b.int_val", "d.title")
-        query.join("doc_version v", "v.id = d.id")
-        query.join("query_term c", "c.doc_id = d.id")
-        query.join("query_term b", "b.doc_id = c.doc_id "
-                   "AND LEFT(b.node_loc, 4) = LEFT(c.node_loc, 4)")
-        query.join("active_doc active_board", "active_board.id = b.int_val")
-        query.join("query_term p", "p.doc_id = d.id")
-        query.join("query_term t", "t.doc_id = b.int_val")
-        query.where(query.Condition("v.val_status", "V"))
-        query.where(query.Condition("c.path", c_path))
-        query.where(query.Condition("b.path", b_path))
-        query.where(query.Condition("t.path", t_path))
-        query.where(query.Condition("p.path", p_path))
-        query.where(query.Condition("c.value", "Yes"))
-        query.where("t.value = 'PDQ Advisory Board'")
-        query.unique()
-        rows = query.execute(self.cursor).fetchall()
-        for member_id, board_id, doc_title in rows:
-            board = boards.get(board_id)
-            if not board:
-                board = boards[board_id] = Board(self, board_id)
-            board.members[member_id] = BoardMember(board, member_id, doc_title)
-
-        # Can't use placeholders in queries with subqueries because
-        # of a Microsoft bug. OK because we control all of the
-        # string values being tested.
-        b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
-        a_path = "/Summary/SummaryMetaData/SummaryAudience"
-        subquery = db.Query("document d", "d.id").unique()
-        subquery.join("query_term t", "t.doc_id = d.id")
-        subquery.where("t.path = '%s'" % t_path)
-        subquery.where("t.value = 'PDQ Advisory Board'")
-        cols = "d.id", "MAX(v.num)", "b.int_val", "d.title"
-        query = db.Query("active_doc d", *cols)
-        query.join("doc_version v", "v.id = d.id")
-        query.join("query_term b", "b.doc_id = d.id")
-        query.join("active_doc active_board", "active_board.id = b.int_val")
-        query.join("query_term a", "a.doc_id = d.id")
-        query.where("v.publishable = 'Y'")
-        query.where(query.Condition("b.int_val", subquery, "IN"))
-        query.where("b.path = '%s'" % b_path)
-        query.where("a.path = '%s'" % a_path)
-        query.where("a.value = 'Health professionals'")
-        query.group("d.id", "d.title", "b.int_val")
-        rows = query.execute(self.cursor).fetchall()
-        for doc_id, doc_version, board_id, doc_title in rows:
-            board = boards.get(board_id)
-            if not board:
-                board = boards[board_id] = Board(self, board_id)
-            board.summaries[doc_id] = BoardSummary(board, doc_id, doc_title)
-        return boards
-
-    def get_board(self):
-        "Load selected board, if any."
-        board_id = self.fields.getvalue("board")
-        if not board_id:
-            return None
-        if not board_id.isdigit():
-            cdrcgi.bail()
-        board = self.boards.get(int(board_id))
-        if not board:
-            cdrcgi.bail()
-        return board
-
-    def make_board_objects(self):
-        """
-        Create JavaScript for a list of Board objects.
-        """
         return """\
 function Board(id, boardType, members, summaries) {
     this.id        = id;
@@ -442,55 +343,175 @@ function Choice(label, value) {
 }
 var boards = {
 %s
-};""" % ",\n".join([self.boards[key].to_script() for key in self.boards])
+};""" % ",\n".join([self.boards[key].script for key in self.boards])
 
-    @staticmethod
-    def all_or_digits(values):
-        "Make sure every value in the list is a number or the string 'all'"
-        for value in values:
-            if value != "all" and not value.isdigit():
-                cdrcgi.bail()
+    @property
+    def boards(self):
+        """
+        Find out which boards have which summaries and which board members.
+        Board members have two documents: a PDQBoardMemberInfo document
+        and a Person document. We get the member's name from the first
+        doc and the ID from the second (because that's the ID the mailer
+        generation software expects).
+        """
+
+        if not hasattr(self, "_boards"):
+            boards = {}
+            i_path = "/PDQBoardMemberInfo"
+            p_path = f"{i_path}/BoardMemberName/@cdr:ref"
+            c_path = f"{i_path}/BoardMembershipDetails/CurrentMember"
+            b_path = f"{i_path}/BoardMembershipDetails/BoardName/@cdr:ref"
+            t_path = "/Organization/OrganizationType"
+            fields = "p.int_val", "b.int_val", "d.title"
+            query = self.Query("active_doc d", *fields)
+            query.join("doc_version v", "v.id = d.id")
+            query.join("query_term c", "c.doc_id = d.id")
+            query.join("query_term b", "b.doc_id = c.doc_id "
+                       "AND LEFT(b.node_loc, 4) = LEFT(c.node_loc, 4)")
+            query.join("active_doc active_board",
+                       "active_board.id = b.int_val")
+            query.join("query_term p", "p.doc_id = d.id")
+            query.join("query_term t", "t.doc_id = b.int_val")
+            query.where(query.Condition("v.val_status", "V"))
+            query.where(query.Condition("c.path", c_path))
+            query.where(query.Condition("b.path", b_path))
+            query.where(query.Condition("t.path", t_path))
+            query.where(query.Condition("p.path", p_path))
+            query.where(query.Condition("c.value", "Yes"))
+            query.where("t.value = 'PDQ Advisory Board'")
+            query.unique()
+            rows = query.execute(self.cursor).fetchall()
+            for member_id, board_id, doc_title in rows:
+                board = boards.get(board_id)
+                if not board:
+                    board = boards[board_id] = Board(self, board_id)
+                args = self, board, member_id, doc_title
+                board.members[member_id] = BoardMember(*args)
+
+            # Can't use placeholders in queries with subqueries because
+            # of a Microsoft bug. OK because we control all of the
+            # string values being tested.
+            b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
+            a_path = "/Summary/SummaryMetaData/SummaryAudience"
+            subquery = self.Query("document d", "d.id").unique()
+            subquery.join("query_term t", "t.doc_id = d.id")
+            subquery.where("t.path = '%s'" % t_path)
+            subquery.where("t.value = 'PDQ Advisory Board'")
+            cols = "d.id", "MAX(v.num)", "b.int_val", "d.title"
+            query = self.Query("active_doc d", *cols)
+            query.join("doc_version v", "v.id = d.id")
+            query.join("query_term b", "b.doc_id = d.id")
+            query.join("active_doc active_board",
+                       "active_board.id = b.int_val")
+            query.join("query_term a", "a.doc_id = d.id")
+            query.where("v.publishable = 'Y'")
+            query.where(query.Condition("b.int_val", subquery, "IN"))
+            query.where("b.path = '%s'" % b_path)
+            query.where("a.path = '%s'" % a_path)
+            query.where("a.value = 'Health professionals'")
+            query.group("d.id", "d.title", "b.int_val")
+            rows = query.execute(self.cursor).fetchall()
+            for doc_id, doc_version, board_id, doc_title in rows:
+                board = boards.get(board_id)
+                if not board:
+                    board = boards[board_id] = Board(self, board_id)
+                args = self, board, doc_id, doc_title
+                board.summaries[doc_id] = BoardSummary(*args)
+            self._boards = boards
+        return self._boards
+
+    @property
+    def members(self):
+        """Board members selected by the user."""
+
+        if not hasattr(self, "_members"):
+            self._members = self.fields.getlist("members") or ["all"]
+            for value in self._members:
+                if value != "all" and not value.isdigit():
+                    self.bail()
+        return self._members
+
+    @property
+    def pairs(self):
+        """Summary/board member ID pairs selected by the user.
+
+        This selection is produced by the refining step of the second
+        (cascading) form.
+        """
+
+        if not hasattr(self, "_pairs"):
+            self._pairs = self.fields.getlist("pairs")
+            for pair in self._pairs:
+                ids = pair.split("-")
+                if len(ids) != 2:
+                    self.bail()
+                for id in ids:
+                    if not id.isdigit():
+                        self.bail()
+        return self._pairs
+
+    @property
+    def selection_method(self):
+        """How the user wants to make the initial summary/member selection."""
+
+        if not hasattr(self, "_selection_method"):
+            method = self.fields.getvalue("selection_method") or "all"
+            valid = {"all", "summary", "member"}
+            if method not in valid:
+                self.bail()
+            self._selection_method = method
+        return self._selection_method
+
+    @property
+    def subtitle(self):
+        """Figure out what to display under the main banner."""
+
+        if self.request == self.SUBMIT:
+            if self.selection_method == "all" or self.pairs:
+                return "Tracker Documents Generated"
+        return self.SUBTITLE
+
+    @property
+    def summaries(self):
+        """Summaries selected by the user."""
+
+        if not hasattr(self, "_summaries"):
+            self._summaries = self.fields.getlist("summaries") or ["all"]
+            for value in self._summaries:
+                if value != "all" and not value.isdigit():
+                    self.bail()
+        return self._summaries
+
 
 class Board:
     "Holds information about a PDQ board with its summaries and board members"
 
     M_PATH = "/Summary/SummaryMetaData/PDQBoard/BoardMember/@cdr:ref"
     B_PATH = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
+    N_PATH = "/Organization/OrganizationNameInformation/OfficialName/Name"
+    O_PATH = "/Organization/OrganizationType"
 
     def __init__(self, control, doc_id):
-        """
-        Store the basic information about the board. The board's
-        summaries and board members will be populated by code outside
-        this class (see Control.collect_boards()).
-        """
-        self.control = control
-        self.id = doc_id
-        self.members = {}
-        self.summaries = {}
-        path = "/Organization/OrganizationNameInformation/OfficialName/Name"
-        query = db.Query("query_term", "value")
-        query.where(query.Condition("path", path))
-        query.where(query.Condition("doc_id", doc_id))
-        rows = query.execute(control.cursor).fetchall()
-        if not rows:
-            cdrcgi.bail("No name found for board document CDR%d" % doc_id)
-        self.name = rows[0][0]
-        org_types = ("PDQ Editorial Board", "PDQ Advisory Board")
-        query = db.Query("query_term", "value")
-        query.where(query.Condition("path", "/Organization/OrganizationType"))
-        query.where(query.Condition("value", org_types))
-        query.where(query.Condition("doc_id", doc_id))
-        if not rows:
-            cdrcgi.bail("Can't find board type for %s" % repr(self.name))
-        if len(rows) > 1:
-            cdrcgi.bail("Multiple board types found for %s" % repr(self.name))
-        if rows[0][0].upper() == 'PDQ EDITORIAL BOARD':
-            self.type = 'editorial'
-        else:
-            self.type = 'advisory'
+        """Store the basic information about the board.
 
-    def show_choices(self, form):
+        The board's summaries and board members will be populated by
+        code outside this class (see Control.collect_boards()).
+
+        Pass:
+            control - access to the database and the user's selections
+            doc_id - integer for the board's unique CDR document ID
         """
+
+        self.__control = control
+        self.__doc_id = doc_id
+
+    def __lt__(self, other):
+        "Support sorting the boards alphabetically by name."
+        return self.name < other.name
+
+    def show_choices(self, page, fieldset):
+        """Populate the cascading form with selections the user can refine.
+
         Show checkboxes the user can use to review the proposed
         combinations of summaries and board member recipients, and
         optionally refine that list by removing some of the combinations.
@@ -500,9 +521,14 @@ class Board:
         board members under their summaries. The "inner" and "outer"
         properties in the code below are used to keep track of which
         sets are nested and which are nesting.
+
+        Pass:
+            page - HTMLPage on which the choices are placed
+            fieldset - HTML element in which the checkboxes go
         """
+
         count = 0
-        if self.control.method == "member":
+        if self.control.selection_method == "member":
             selected = self.control.members
             self.outer, self.inner = self.members, self.summaries
         else:
@@ -515,34 +541,107 @@ class Board:
             for id in selected:
                 o = self.outer.get(int(id))
                 if not o:
-                    cdrcgi.bail()
+                    self.control.bail()
                 outer.append(o)
         for o in sorted(outer):
             inner = []
-            for doc_id in o.get_checkbox_ids():
+            for doc_id in o.checkbox_ids:
                 i = self.inner.get(doc_id)
                 if i:
                     inner.append(i)
             if not inner:
                 continue
             count += 1
-            form.add_checkbox("outer", o.name, str(o.id),
-                              onclick="outer_clicked(%d)" % o.id,
-                              wrapper_classes="outer-cb", checked=True)
+            opts = dict(
+                label=o.name,
+                value=o.id,
+                onclick=f"outer_clicked({o.id:d})",
+                checked=True,
+                wrapper_classes="outer-cb",
+            )
+            fieldset.append(page.checkbox("outer", **opts))
             for i in sorted(inner):
-                combo = "%d-%d" % (o.id, i.id)
-                form.add_checkbox("pairs", i.name, combo,
-                                  widget_classes="inner-%d" % o.id,
-                                  wrapper_classes="inner-cb", checked=True,
-                                  onclick="inner_clicked(%d)" % o.id)
+                opts = dict(
+                    label=i.name,
+                    value=f"{o.id:d}-{i.id:d}",
+                    classes=f"inner-{o.id:d}",
+                    wrapper_classes="inner-cb",
+                    checked=True,
+                    onclick=f"inner_clicked({o.id:d})",
+                )
+                fieldset.append(page.checkbox("pairs", **opts))
         if not count:
-            if self.control.method == "member":
+            if self.control.selection_method == "member":
                 msg = "None of the selected board members have any summaries"
             else:
                 msg = "None of the selected summaries have any board members"
-            cdrcgi.bail(msg)
+            self.control.bail(msg)
 
-    def to_script(self):
+    @property
+    def control(self):
+        """Access to the database and the user's selections."""
+        return self.__control
+
+    @property
+    def id(self):
+        """Integer for the board's unique CDR document ID."""
+        return self.__doc_id
+
+    @property
+    def members(self):
+        """Dictionary of members of this board."""
+
+        if not hasattr(self, "_members"):
+            self._members = {}
+        return self._members
+
+    @property
+    def name(self):
+        """String for the board's name."""
+
+        if not hasattr(self, "_name"):
+            query = self.control.Query("query_term", "value")
+            query.where(query.Condition("path", self.N_PATH))
+            query.where(query.Condition("doc_id", self.id))
+            rows = query.execute(self.control.cursor).fetchall()
+            if not rows:
+                message =f"No name found for board document CDR{self.id:d}"
+                self.control.bail(message)
+            self._name = rows[0][0]
+        return self._name
+
+    @property
+    def summaries(self):
+        """Dictionary of summaries managed by this board."""
+
+        if not hasattr(self, "_summaries"):
+            self._summaries = {}
+        return self._summaries
+
+    @property
+    def type(self):
+        """String for board's type (editorial or advisory)."""
+
+        if not hasattr(self, "_type"):
+            org_types = ("PDQ Editorial Board", "PDQ Advisory Board")
+            query = self.control.Query("query_term", "value")
+            query.where(query.Condition("path", self.O_PATH))
+            query.where(query.Condition("value", org_types, "IN"))
+            query.where(query.Condition("doc_id", self.id))
+            rows = query.execute(self.control.cursor).fetchall()
+            if not rows:
+                self.control.bail(f"Can't find board type for {self.name!r}")
+            if len(rows) > 1:
+                message = f"Multiple board types found for {self.name!r}"
+                self.control.bail(message)
+            if rows[0][0].upper() == 'PDQ EDITORIAL BOARD':
+                self._type = 'editorial'
+            else:
+                self._type = 'advisory'
+        return self._type
+
+    @property
+    def script(self):
         """
         Create the Javascript objects which are used at runtime to
         adjust the composition of the summary and board member picklists.
@@ -551,19 +650,16 @@ class Board:
         members = list(self.members.values())
         summaries = list(self.summaries.values())
         if members:
-            members = glue.join([m.to_script() for m in sorted(members)])
+            members = glue.join([m.script for m in sorted(members)])
             members = "\n        %s" % members
         if summaries:
-            summaries = glue.join([s.to_script() for s in sorted(summaries)])
+            summaries = glue.join([s.script for s in sorted(summaries)])
             summaries = "\n        %s" % summaries
         return """\
     '%s': new Board('%s', '%s', [%s
     ], [%s
     ])""" % (self.id, self.id, self.type, members, summaries)
 
-    def __lt__(self, other):
-        "Support sorting the boards alphabetically by name."
-        return self.name < other.name
 
 class Choice:
     """
@@ -571,17 +667,60 @@ class Choice:
     as a Javascript object, supports sorting, and supports tricky
     checkbox pages with nested options for which gets which mailer.
     """
-    def __init__(self, board, id, doc_title):
-        self.board = board
-        self.id = id
-        self.name = doc_title.split(";")[0].strip()
+
+    NAME_DELIM = ";"
+
+    def __init__(self, control, board, id, doc_title):
+        """Remember the caller's values.
+
+        Pass:
+            control - access to the database and the user's selections
+            board - Board object for the user's board selection
+            id - integer for the board's member or summary
+            doc_title - string for the member or summary title
+        """
+
+        self.__control = control
+        self.__board = board
+        self.__id = id
+        self.__doc_title = doc_title
+
     def __lt__(self, other):
+        """Sort the choices by their names."""
         return self.name < other.name
-    def to_script(self):
-        return """new Choice({}, "{}")""".format(dumps(self.name), self.id)
-    def get_checkbox_ids(self):
-        cdrcgi.bail("Internal error: "
-                    "get_checkbox_ids method must be overridden.")
+
+    @property
+    def board(self):
+        """Board object for the user's board selection."""
+        return self.__board
+
+    @property
+    def control(self):
+        """Access to the database and the user's selections."""
+        return self.__control
+
+    @property
+    def id(self):
+        """Integer for the board's member or summary."""
+        return self.__id
+
+    @property
+    def name(self):
+        """Parse the front part of the title for a name."""
+
+        if not hasattr(self, "_name"):
+            self._name = self.__doc_title.split(self.NAME_DELIM)[0].strip()
+        return self._name
+
+    @property
+    def script(self):
+        """Create JavaScript object for the choice."""
+        return f"""new Choice({dumps(self.name)}, "{self.id}")"""
+
+    @property
+    def checkbox_ids(self):
+        raise Exception("Property checkbox_ids method must be overridden.")
+
 
 class BoardMember(Choice):
     """
@@ -589,11 +728,11 @@ class BoardMember(Choice):
     trimming of the name to eliminate the '(board membership information)'
     suffix.
     """
-    def __init__(self, board, doc_id, doc_title):
-        Choice.__init__(self, board, doc_id, doc_title)
-        self.name = self.name.split("(")[0].strip()
 
-    def get_checkbox_ids(self):
+    NAME_DELIM = "("
+
+    @property
+    def checkbox_ids(self):
         """
         Find the document IDs of the summaries for which this board
         member is responsible in the context of her membership on
@@ -601,22 +740,22 @@ class BoardMember(Choice):
         the user can check or clear to customize the set of mailers
         which will be generated (see Board.show_choices() above).
         """
-        query = db.Query("query_term m", "m.doc_id").unique()
+        query = self.control.Query("query_term m", "m.doc_id").unique()
         query.join("query_term b", "b.doc_id = m.doc_id",
                    "LEFT(b.node_loc, 8) = LEFT(m.node_loc, 8)")
         query.where(query.Condition("m.path", Board.M_PATH))
         query.where(query.Condition("b.path", Board.B_PATH))
         query.where(query.Condition("m.int_val", self.id))
         query.where(query.Condition("b.int_val", self.board.id))
-        rows = query.execute(self.board.control.cursor).fetchall()
+        rows = query.execute(self.control.cursor).fetchall()
         return [row[0] for row in rows]
 
-class BoardSummary(Choice):
-    "Option for picklist of PDQ summaries for a single board"
-    def __init__(self, board, doc_id, doc_title):
-        Choice.__init__(self, board, doc_id, doc_title)
 
-    def get_checkbox_ids(self):
+class BoardSummary(Choice):
+    """Option for picklist of PDQ summaries for a single board."""
+
+    @property
+    def checkbox_ids(self):
         """
         Find the document IDs of the members of this board who are
         responsible for reviewing this summary. Used by the Board
@@ -624,14 +763,14 @@ class BoardSummary(Choice):
         to customize the set of mailers which will be generated
         (see Board.show_choices() above).
         """
-        query = db.Query("query_term m", "m.int_val").unique()
+        query = self.control.Query("query_term m", "m.int_val").unique()
         query.join("query_term b", "b.doc_id = m.doc_id",
                    "LEFT(b.node_loc, 8) = LEFT(m.node_loc, 8)")
         query.where(query.Condition("m.path", Board.M_PATH))
         query.where(query.Condition("b.path", Board.B_PATH))
         query.where(query.Condition("m.doc_id", self.id))
         query.where(query.Condition("b.int_val", self.board.id))
-        rows = query.execute(self.board.control.cursor).fetchall()
+        rows = query.execute(self.control.cursor).fetchall()
         return [row[0] for row in rows]
 
 
@@ -666,24 +805,29 @@ class Tracker:
 
     @property
     def session(self):
+        """Object for the user's CDR login session."""
         return self.__session
 
     @property
     def summary(self):
+        """CDR API `Doc` object for the tracker's PDQ Summary."""
+
         if not hasattr(self, "_summary"):
             self._summary = Tracker.summaries.get(self.__summary)
-        if not self._summary:
-            doc = Doc(self.session, id=self.__summary)
-            self._summary = Tracker.summaries[self.__summary] = doc
+            if not self._summary:
+                doc = Doc(self.session, id=self.__summary)
+                self._summary = Tracker.summaries[self.__summary] = doc
         return self._summary
 
     @property
     def reviewer(self):
+        """CDR API `Doc` object for the tracker's board member."""
+
         if not hasattr(self, "_reviewer"):
             self._reviewer = Tracker.reviewers.get(self.__reviewer)
-        if not self._reviewer:
-            doc = Doc(self.session, id=self.__reviewer)
-            self._reviewer = Tracker.summaries[self.__reviewer] = doc
+            if not self._reviewer:
+                doc = Doc(self.session, id=self.__reviewer)
+                self._reviewer = Tracker.summaries[self.__reviewer] = doc
         return self._reviewer
 
     @property
@@ -696,23 +840,25 @@ class Tracker:
         etree.SubElement(root, "Type", Mode=self.MODE).text = self.TYPE
         child = etree.Element("Recipient")
         child.text = self.reviewer.title
-        child.set("{{{}}}ref".format(self.NS), self.reviewer.cdr_id)
+        child.set(f"{{{self.NS}}}ref", self.reviewer.cdr_id)
         root.append(child)
         child = etree.Element("Document")
         child.text = self.summary.title
-        child.set("{{{}}}ref".format(self.NS), self.summary.cdr_id)
+        child.set(f"{{{self.NS}}}ref", self.summary.cdr_id)
         root.append(child)
         etree.SubElement(root, "Sent").text = self.NOW
         return etree.tostring(root, **self.OPTS)
 
     def save(self):
-        """
-        Create and store a new CDR document to track the review
+        """Create and store a new CDR document to track the review.
+
+        Return:
+            integer for the newly created mailer tracking document
         """
 
         doc = Doc(self.session, xml=self.xml, doctype="Mailer")
         doc.save(unlock=True, val_types=["links", "schema"])
-        self.id = doc.id
+        return doc.id
 
 
 if __name__ == "__main__":

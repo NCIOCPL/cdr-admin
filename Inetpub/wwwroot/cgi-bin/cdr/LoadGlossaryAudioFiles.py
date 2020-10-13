@@ -6,10 +6,10 @@ Invoked from the CDR Admin web menu.
 
 If for any reason this script will not process the correct set of
 zip files (for example, because a file name did not match the
-agreed pattern of "Week_NNN*.zip" or the file names for a batch
-do not sort in the order the files should be processed), then it
-will be necessary to have a developer load the batch from the
-bastion host using DevTools/Utilities/Request4926.py.
+agreed pattern of "Week_YYYY_WW[_RevN].zip" or the file names for
+a batch do not sort in the order the files should be processed),
+then it will be necessary to have a developer load the batch from
+the bastion host using DevTools/Utilities/Request4926.py.
 
 JIRA::OCECDR-3373
 """
@@ -32,6 +32,7 @@ class Control(Controller):
     SUBTITLE = "Load Glossary Audio Files"
     LOGNAME = "LoadGlossaryAudioFiles"
     AUDIO = "Audio_from_CIPSFTP"
+    WEEK = r"Week_\d{4}_\d\d"
     INSTRUCTIONS = (
         "Press the Submit button to create Media documents for the MP3 files "
         "contained in the archive files listed below, and have those "
@@ -159,18 +160,13 @@ class Control(Controller):
         """Most recent set of audio archive files.
 
         Collect the list of zip files representing the most recent batch
-        of audio files to be loaded into the CDR. For some reason the users
-        assign names starting with "Week_..." for the zip files, even
-        though there appears to be no correspondence between week numbers
-        embedded in the file and directory names and week numbers in the
-        calendar. A better naming convention might have used "Batch..."
-        or something along those lines, but we're working with what we're
-        given. The behavior of the software relies on some assumptions.
+        of audio files to be loaded into the CDR. The behavior of the
+        software relies on some assumptions.
 
-          1. The zip file names have a 3-digit number following "Week_"
-          2. All files in a single batch have this "Week_NNN" prefix
+          1. The zip file names all start with a "Week_YYYY_WW" prefix.
+          2. All files in a single batch have the same prefix.
           3. The names, when sorted (without regard to case) are in
-             order, representing when the zip file was given to NCI
+             order, corresponding to when the zip file was given to NCI.
           4. The users will pay attention to the list displayed, and
              either confirm if the list represents the correct set of
              files to be processed (in the correct order), or submit
@@ -189,17 +185,14 @@ class Control(Controller):
         if not hasattr(self, "_zipfiles"):
             weeks = {}
             for path in glob(f"{self.directory}/Week_*.zip"):
-                include = False
-                match = search(r"((Week_\d+).*.zip)", path, IGNORECASE)
+                match = search(f"(({self.WEEK}).*.zip)", path, IGNORECASE)
                 if match:
                     name = match.group(1)
                     week = match.group(2).upper()
-                    if len(week) == len("WEEK_999"):
-                        if week not in weeks:
-                            weeks[week] = []
-                        weeks[week].append(name)
-                        include = True
-                if not include:
+                    if week not in weeks:
+                        weeks[week] = []
+                    weeks[week].append(name)
+                else:
                     self.logger.warning("skipping %r", path)
             if not weeks:
                 self.bail("Nothing to be loaded")
@@ -395,6 +388,8 @@ class AudioFile:
 
         if not hasattr(self, "_name"):
             self._name = self.__cell(self.NAME)
+            if self._name:
+                self._name = self._name.strip()
         return self._name
 
     @property
@@ -563,8 +558,8 @@ class Linker(Job):
     """
 
     LOGNAME = "LoadGlossaryAudioFiles"
-    COMMENT = "Adding links from glossary term name docs to media docs"
-    MESSAGE = "Added link from this document to Media document CDR{:d}"
+    COMMENT = "Setting links from glossary term name docs to media docs"
+    MESSAGE = "{} link from this document to Media document CDR{:d}"
 
     def __init__(self, control):
         """Capture the caller's value and initialize the base class.
@@ -599,10 +594,12 @@ class Linker(Job):
             for mp3 in self.__control.term_docs[int_id].mp3s:
                 home = mp3.find_link_home(root)
                 if home.media_link is not None:
-                    message = f"{cdr_id} already has {mp3.language} media link"
-                    self.__control.bail(message)
-                home.node.insert(home.position, mp3.link_node)
-                message = self.MESSAGE.format(mp3.media_id)
+                    verb = "Updating"
+                    home.node.replace(home.media_link, mp3.link_node)
+                else:
+                    verb = "Adding"
+                    home.node.insert(home.position, mp3.link_node)
+                message = self.MESSAGE.format(verb, mp3.media_id)
                 self.__control.rows.append((cdr_id, message))
                 self.logger.info(message.replace("this document", cdr_id))
             return etree.tostring(root)

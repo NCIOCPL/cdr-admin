@@ -896,18 +896,26 @@ jQuery(function() {
         def english_pronunciation(self):
             """Link to the audio file for pronunciation of the English name."""
 
-            if not hasattr(self, "_english_pronunciation"):
-                self._english_pronunciation = None
+            if self.english_pronunciation_url:
+                B = builder
+                url = self.english_pronunciation_url
+                img = B.IMG(B.CLASS("sound"), src="/images/audio.png")
+                return B.A(img, B.CLASS("sound"), href=url)
+            return None
+
+        @property
+        def english_pronunciation_url(self):
+            """URL for the audio file for pronunciation of the English name."""
+
+            if not hasattr(self, "_english_pronunciation_url"):
+                self._english_pronunciation_url = None
                 node = self.doc.root.find("TermName/MediaLink/MediaID")
                 if node is not None:
                     id = node.get(f"{{{Doc.NS}}}ref")
                     if id:
-                        B = builder
-                        url=f"GetCdrBlob.py?disp=inline&id={id}"
-                        img = B.IMG(B.CLASS("sound"), src="/images/audio.png")
-                        link = B.A(img, B.CLASS("sound"), href=url)
-                        self._english_pronunciation = link
-            return self._english_pronunciation
+                        url = f"GetCdrBlob.py?disp=inline&id={id}"
+                        self._english_pronunciation_url = url
+            return self._english_pronunciation_url
 
         @property
         def replacements(self):
@@ -941,18 +949,26 @@ jQuery(function() {
         def spanish_pronunciation(self):
             """Link to the audio file for pronunciation of the Spanish name."""
 
-            if not hasattr(self, "_spanish_pronunciation"):
-                self._spanish_pronunciation = None
+            if self.spanish_pronunciation_url:
+                B = builder
+                url = self.spanish_pronunciation_url
+                img = B.IMG(B.CLASS("sound"), src="/images/audio.png")
+                return B.A(img, B.CLASS("sound"), href=url)
+            return None
+
+        @property
+        def spanish_pronunciation_url(self):
+            """URL for the audio file for pronunciation of the Spanish name."""
+
+            if not hasattr(self, "_spanish_pronunciation_url"):
+                self._spanish_pronunciation_url = None
                 node = self.doc.root.find("TranslatedName/MediaLink/MediaID")
                 if node is not None:
                     id = node.get(f"{{{Doc.NS}}}ref")
                     if id:
-                        B = builder
-                        url=f"GetCdrBlob.py?disp=inline&id={id}"
-                        img = B.IMG(B.CLASS("sound"), src="/images/audio.png")
-                        link = B.A(img, B.CLASS("sound"), href=url)
-                        self._spanish_pronunciation = link
-            return self._spanish_pronunciation
+                        url = f"GetCdrBlob.py?disp=inline&id={id}"
+                        self._spanish_pronunciation_url = url
+            return self._spanish_pronunciation_url
 
         @staticmethod
         def markup_for_name(name):
