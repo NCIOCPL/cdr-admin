@@ -24,6 +24,7 @@ class Control(Controller):
             ("Media Doc Publishing Report", "PublishedMediaDocuments.py"),
             ("Media (Images) Processing Status Report",
              "ImageMediaProcessingStatusReport.py"),
+            ("Media in Summary Report", "MediaInSummary.py"),
             ("Media Lists", "MediaLists.py"),
             ("Media Permissions Report", "MediaPermissionsReport.py"),
             ("Media Translation Job Workflow Report",
