@@ -30,7 +30,7 @@ class Control(Controller):
         """
 
         fieldset = page.fieldset("Schema")
-        fieldset.append(page.file_field("file", label="Summary File"))
+        fieldset.append(page.file_field("file", label="Schema File"))
         fieldset.append(page.text_field("comment"))
         page.form.append(fieldset)
         fieldset = page.fieldset("Action")
@@ -75,7 +75,7 @@ class Control(Controller):
 
     @property
     def document(self):
-        """Uploaded summary document to be posted."""
+        """Uploaded schema document to be posted."""
 
         if not hasattr(self, "_document"):
             self._document = None
@@ -187,7 +187,7 @@ class Control(Controller):
         cmd = r"python d:\cdr\build\CheckDtds.py"
         result = run_command(cmd, merge_output=True)
         if result.returncode:
-            raise Exception(f"DTD check failure: result.stdout")
+            raise Exception(f"DTD check failure: {result.stdout}")
         self.logger.info("DTDs updated")
         return "Running CheckDtds.py ...\n" + result.stdout
 
