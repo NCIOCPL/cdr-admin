@@ -166,7 +166,7 @@ class Control(Controller):
             rows = []
             for link in self.links[doctype]:
                 cdr_id = f"CDR{link.id:d}"
-                url = self.make_url("QcReport.py", DocId=cdr_id, DocVersion=-1)
+                url = self.make_url("QcReport.py", DocId=cdr_id)
                 row = (
                     self.Reporter.Cell(cdr_id, href=url),
                     link.title,
