@@ -268,8 +268,9 @@ class Summary:
         query.where(query.Condition("id", doc_id))
         #start = datetime.datetime.strptime(control.start, "%Y-%m-%d")
         cutoff = control.start - datetime.timedelta(365)
+        end = f"{control.end} 23:59:59"
         query.where(query.Condition("dt", str(cutoff), ">="))
-        query.where(query.Condition("dt", control.end, "<"))
+        query.where(query.Condition("dt", end, "<"))
         versions = [row[0] for row in query.execute(control.cursor).fetchall()]
         html = ""
         for version in versions:
