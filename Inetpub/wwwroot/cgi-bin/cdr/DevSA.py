@@ -26,6 +26,7 @@ class Control(Controller):
             ("Manage Configuration Files", "EditConfig.py"),
             ("Manage Control Values", "EditControlValues.py"),
             ("Manage Document Types", "EditDocTypes.py"),
+            ("Manage DTDs", "PostDTD.py"),
             ("Manage Filter Sets", "EditFilterSets.py"),
             ("Manage Filters", "EditFilters.py"),
             ("Manage Glossary Servers", "glossary-servers.py"),
