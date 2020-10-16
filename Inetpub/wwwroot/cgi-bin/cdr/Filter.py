@@ -372,16 +372,16 @@ class FilterSpec:
             self._error = None
             if self.set_name:
                 if self.set_name.upper() not in self.control.all_filter_sets:
-                    args = self.set_name, self.control.tier
+                    args = self.set_name, self.control.session.tier
                     message = "{} not found on the CDR {} server"
                     self._error = message.format(*args)
             elif self.filter_name:
                 if self.filter_name.upper() not in self.control.all_filters:
-                    args = self.filter_name, self.control.tier
+                    args = self.filter_name, self.control.session.tier
                     message = "{} is not a filter on the CDR {} server"
                     self._error = message.format(*args)
             elif self.filter_id not in self.control.all_filter_ids:
-                args = self.identifier, self.control.tier
+                args = self.identifier, self.control.session.tier
                 message = "{} is not a filter on the CDR {} server"
                 self._error = message.format(*args)
         return self._error
