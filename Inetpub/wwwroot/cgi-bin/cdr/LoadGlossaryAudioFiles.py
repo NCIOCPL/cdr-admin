@@ -232,6 +232,12 @@ class AudioFile:
     CDR_REF = f"{{{Doc.NS}}}ref"
     GLOSSARY_TERM_NAME_TAGS = dict(en="TermName", es="TranslatedName")
     MESSAGE = "{} Media doc for CDR{:d} ({!r} [{}]) from {}"
+    BEFORE_MEDIA_LINK = set(
+        "TermNameString",
+        "TermPronunciation",
+        "PronunciationResource",
+        "TranslationResource",
+    )
 
     def __init__(self, control, path, zipfile, row):
         """Remember initial values from caller.
@@ -424,6 +430,14 @@ class AudioFile:
         return self._title
 
     @property
+    def today(self):
+        """String for today's date in ISO format."""
+
+        if not hasattr(self, "_today"):
+            self._today = self.__control.started.strftime("%Y-%m-%d")
+        return self._today
+
+    @property
     def xml(self):
         """Serialized XML for a new CDR Media document for this audio file."""
 
@@ -467,48 +481,75 @@ class AudioFile:
         """Convenience method for fetching values from the spreadsheet row."""
         return Control.get_cell_value(self.__row, col)
 
-    def find_link_home(self, root):
-        """Find the node to which the link to this Media doc is appended.
+    def update_name(self, root):
+        """Make appropriate changes to GTN doc for one of its term names.
 
+        Here are the child elements in the term name blocks.
+            TermNameString [required]
+            TermPronunciation [en, optional]
+            PronunciationResource [en, optional, multiple allowed]
+            TranslationResource [es, optional, multiple allowed]
+            MediaLink [optional, but will be added here if missing]
+            TermNameSource [en, optional]
+            TranslatedNameStatus [es, required]
+            TranslatedNameStatusDate [es, optional]
+            TermNameVerificationResource [en, optional, multiple allowed]
+            Comment [optional, multiple allowed]
+            DateLastModified [optional, but will be added here if missing]
         Pass:
             root - top-level object for parsed GlossaryTermName document
 
         Return:
-            `LinkHome` object
+            string "Updating" or "Adding" as appropriate
         """
 
-        for node in root.findall(self.GLOSSARY_TERM_NAME_TAGS[self.langcode]):
-            link_home = self.LinkHome(node)
-            if link_home.name == self.name:
-                return link_home
+        node = None
+        verb = "Updating"
         error = f"unable to find home for {self.name!r} in CDR{self.term_id}"
-        raise Exception(error)
-
-
-    class LinkHome:
-        """Where we put the link to this Media document."""
-
-        BEFORE = (
-            "TranslationResource",
-            "MediaLink",
-            "TermPronunciation",
-            "PronunciationResource",
-            "TermNameString",
-        )
-
-        def __init__(self, node):
-            """Get the name and position for this node."""
-            self.node = node
-            self.name = None
-            self.media_link = None
-            self.position = 0
-            for child in node:
-                if child.tag in self.BEFORE:
-                    self.position += 1
-                    if child.tag == "MediaLink":
-                        self.media_link = child
-                if child.tag == 'TermNameString':
-                    self.name = child.text
+        path = f"{self.GLOSSARY_TERM_NAME_TAGS[self.langcode]}/TermNameString"
+        for term_name_string in root.findall(path):
+            if self.name == term_name_string.text:
+                node = name.getparent()
+                break
+        if node is None:
+            error = f"unable to find {self.name!r} in CDR{self.term_id}"
+            raise Exception(error)
+        date_last_modified = node.find("DateLastModified")
+        if date_last_modified is None:
+            date_last_modified = etree.SubElement(node, "DateLastModified")
+        date_last_modified.text = self.today
+        media_link = node.find("MediaLink")
+        if media_link is None:
+            verb = "Adding"
+            sibling = current = term_name_string
+            while current is not None:
+                next = current.getnext()
+                if next is not None:
+                    if isinstance(next.tag, str):
+                        if next.tag in self.BEFORE_MEDIA_LINK:
+                            sibling = next
+                        else:
+                            break
+                current = next
+            sibling.addnext(self.link_node)
+        else:
+            node.replace(media_link, self.link_node)
+            sibling = self.link_node
+            while sibling.tag not in ("Comment", "DateLastModified"):
+                sibling = sibling.getnext()
+            comment = etree.Element("Comment")
+            comment.text = "Approved audio re-recording linked"
+            sibling.addprevious(comment)
+            if self.langcode == "es":
+                status_date = node.find("TranslatedNameStatusDate")
+                if status_date is None:
+                    status = node.find("TranslatedNameStatus")
+                    if status is None:
+                        error = f"no TranslatedNameStatus in CDR{self.term_id}"
+                        raise Exception(error)
+                    status_date = etree.Element("TranslatedNameStatusDate")
+                    status.addnext(status_date)
+        return verb
 
 
 class TermDoc:
@@ -592,13 +633,7 @@ class Linker(Job):
         try:
             root = etree.fromstring(doc.xml)
             for mp3 in self.__control.term_docs[int_id].mp3s:
-                home = mp3.find_link_home(root)
-                if home.media_link is not None:
-                    verb = "Updating"
-                    home.node.replace(home.media_link, mp3.link_node)
-                else:
-                    verb = "Adding"
-                    home.node.insert(home.position, mp3.link_node)
+                verb = mp3.update_name(root)
                 message = self.MESSAGE.format(verb, mp3.media_id)
                 self.__control.rows.append((cdr_id, message))
                 self.logger.info(message.replace("this document", cdr_id))
