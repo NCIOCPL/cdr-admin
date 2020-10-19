@@ -540,15 +540,6 @@ class AudioFile:
             comment = etree.Element("Comment")
             comment.text = "Approved audio re-recording linked"
             sibling.addprevious(comment)
-            if self.langcode == "es":
-                status_date = node.find("TranslatedNameStatusDate")
-                if status_date is None:
-                    status = node.find("TranslatedNameStatus")
-                    if status is None:
-                        error = f"no TranslatedNameStatus in CDR{self.term_id}"
-                        raise Exception(error)
-                    status_date = etree.Element("TranslatedNameStatusDate")
-                    status.addnext(status_date)
         return verb
 
 
