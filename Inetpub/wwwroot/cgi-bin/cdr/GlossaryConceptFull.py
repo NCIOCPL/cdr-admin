@@ -563,7 +563,11 @@ jQuery(function() {
 
         @property
         def term_table(self):
-            """Table showing term names and customized definitions."""
+            """Table showing term names and customized definitions.
+
+               The definition is included via the resolve_placeholders() method
+               and by transforming the text via a XSLT filter
+            """
 
             B = builder
             table = B.TABLE(B.CLASS("name-and-def"))
