@@ -14,6 +14,7 @@ the bastion host using DevTools/Utilities/Request4926.py.
 JIRA::OCECDR-3373
 """
 
+from datetime import date
 from glob import glob
 from io import BytesIO
 from re import search, IGNORECASE
@@ -31,8 +32,10 @@ class Control(Controller):
 
     SUBTITLE = "Load Glossary Audio Files"
     LOGNAME = "LoadGlossaryAudioFiles"
+    TODAY = date.today().strftime("%Y-%m-%d")
     AUDIO = "Audio_from_CIPSFTP"
     WEEK = r"Week_\d{4}_\d\d"
+    CREATOR = "Vanessa Richardson, VR Voice"
     INSTRUCTIONS = (
         "Press the Submit button to create Media documents for the MP3 files "
         "contained in the archive files listed below, and have those "
@@ -83,6 +86,22 @@ class Control(Controller):
                 self.Reporter.Column("Processing"),
             )
         return self._columns
+
+    @property
+    def creator(self):
+        """String for the Creator element in the Media document."""
+
+        if not hasattr(self, "_creator"):
+            query = self.Query("ctl", "val")
+            query.where("grp = 'media'")
+            query.where("name = 'audio-pronunciation-creator'")
+            query.where("inactivated IS NULL")
+            rows = query.execute(self.cursor).fetchall()
+            if rows:
+                self._creator = rows[0].val
+            else:
+                self._creator = self.CREATOR
+        return self._creator
 
     @property
     def directory(self):
@@ -149,11 +168,25 @@ class Control(Controller):
 
             # Save the new or updated Media documents.
             self.logger.info("term ids: %s", sorted(self._term_docs))
+            old = {}
             for id in self._term_docs:
                 for mp3 in self._term_docs[id].mp3s:
+                    if mp3.media_id:
+                        old[mp3.media_id] = mp3
                     mp3.save()
+            if old:
+                Updater(self, old).run()
 
         return self._term_docs
+
+    @property
+    def user(self):
+        """User login name for this run."""
+
+        if not hasattr(self, "_user"):
+            user = self.session.User(self.session, id=self.session.user_id)
+            self._user = user.name
+        return self._user
 
     @property
     def zipfiles(self):
@@ -222,7 +255,6 @@ class Control(Controller):
 class AudioFile:
     """Object representing a single pronunciation audio file."""
 
-    CREATOR = "Vanessa Richardson, VR Voice"
     COMMENT = f"Saved by {Control.SUBTITLE} script"
     TERM_ID = 0
     NAME = 1
@@ -232,12 +264,12 @@ class AudioFile:
     CDR_REF = f"{{{Doc.NS}}}ref"
     GLOSSARY_TERM_NAME_TAGS = dict(en="TermName", es="TranslatedName")
     MESSAGE = "{} Media doc for CDR{:d} ({!r} [{}]) from {}"
-    BEFORE_MEDIA_LINK = set(
+    BEFORE_MEDIA_LINK = {
         "TermNameString",
         "TermPronunciation",
         "PronunciationResource",
         "TranslationResource",
-    )
+    }
 
     def __init__(self, control, path, zipfile, row):
         """Remember initial values from caller.
@@ -255,33 +287,100 @@ class AudioFile:
         self.__row = row
 
     def save(self):
-        """Create or update the Media document for this audio file."""
+        """Create the Media document for this audio file.
+
+        With changes introduced by CDR Maxwell, we also update Media
+        documents which are being recycled with a new audio pronunciation
+        recording. For those we defer the updating of those documents
+        to be done in a batch using the global change harness, and
+        only log them here. See OCECDR-4890 and other Maxwell tickets.
+        """
 
         if self.media_id:
             doc = Doc(self.__control.session, id=self.media_id)
             if doc.doctype.name != "Media":
                 raise Exception(f"CDR{self.media_id} is not a Media document")
-            doc.check_out(comment="re-using media document")
-            doc.blob = self.bytes
             action = "updated"
         else:
             opts = dict(xml=self.xml, blob=self.bytes, doctype="Media")
             doc = Doc(self.__control.session, **opts)
             action = "created"
-        opts = dict(
-            version=True,
-            publishable=True,
-            comment=self.COMMENT,
-            reason=self.COMMENT,
-            val_types=("schema", "links"),
-            unlock=True,
-        )
-        doc.save(**opts)
+            opts = dict(
+                version=True,
+                publishable=True,
+                comment=self.COMMENT,
+                reason=self.COMMENT,
+                val_types=("schema", "links"),
+                unlock=True,
+            )
+            doc.save(**opts)
+            self.media_id = doc.id
         args = action, self.term_id, self.name, self.langcode, self.__path
         message = self.MESSAGE.format(*args)
         self.__control.rows.append((f"CDR{doc.id}", message))
         self.__control.logger.info("%s as CDR%d", message, doc.id)
-        self.media_id = doc.id
+
+    def update_name(self, root):
+        """Make appropriate changes to GTN doc for one of its term names.
+
+        Here are the child elements in the term name blocks.
+            TermNameString [required]
+            TermPronunciation [en, optional]
+            PronunciationResource [en, optional, multiple allowed]
+            TranslationResource [es, optional, multiple allowed]
+            MediaLink [optional, but will be added here if missing]
+            TermNameSource [en, optional]
+            TranslatedNameStatus [es, required]
+            TranslatedNameStatusDate [es, optional]
+            TermNameVerificationResource [en, optional, multiple allowed]
+            Comment [optional, multiple allowed]
+            DateLastModified [optional, but will be added here if missing]
+        Pass:
+            root - top-level object for parsed GlossaryTermName document
+
+        Return:
+            string "Updating" or "Adding" as appropriate
+        """
+
+        node = None
+        verb = "Updating"
+        error = f"unable to find home for {self.name!r} in CDR{self.term_id}"
+        path = f"{self.GLOSSARY_TERM_NAME_TAGS[self.langcode]}/TermNameString"
+        for term_name_string in root.findall(path):
+            if self.name == term_name_string.text:
+                node = term_name_string.getparent()
+                break
+        if node is None:
+            error = f"unable to find {self.name!r} in CDR{self.term_id}"
+            raise Exception(error)
+        date_last_modified = node.find("DateLastModified")
+        if date_last_modified is None:
+            date_last_modified = etree.SubElement(node, "DateLastModified")
+        date_last_modified.text = Control.TODAY
+        media_link = node.find("MediaLink")
+        if media_link is None:
+            verb = "Adding"
+            sibling = current = term_name_string
+            while current is not None:
+                next = current.getnext()
+                if next is not None:
+                    if isinstance(next.tag, str):
+                        if next.tag in self.BEFORE_MEDIA_LINK:
+                            sibling = next
+                        else:
+                            break
+                current = next
+            sibling.addnext(self.link_node)
+        else:
+            link_node = self.link_node
+            node.replace(media_link, link_node)
+            sibling = link_node
+            while sibling.tag not in ("Comment", "DateLastModified"):
+                sibling = sibling.getnext()
+            comment = etree.Element("Comment")
+            comment.text = "Approved audio re-recording linked"
+            sibling.addprevious(comment)
+        return verb
 
     @property
     def bytes(self):
@@ -299,22 +398,6 @@ class AudioFile:
             info = self.__zipfile.getinfo(self.filename)
             self._created = "{:04d}-{:02d}-{:02d}".format(*info.date_time[:3])
         return self._created
-
-    @property
-    def creator(self):
-        """String for the Creator element in the Media document."""
-
-        if not hasattr(self, "_creator"):
-            query = self.__control.Query("ctl", "val")
-            query.where("grp = 'media'")
-            query.where("name = 'audio-pronunciation-creator'")
-            query.where("inactivated IS NULL")
-            rows = query.execute(self.__control.cursor).fetchall()
-            if rows:
-                self._creator = rows[0].val
-            else:
-                self._creator = self.CREATOR
-        return self._creator
 
     @property
     def duration(self):
@@ -359,7 +442,8 @@ class AudioFile:
         Create an element representing a link to this audio file's Media
         document, for insertion into the XML document for the linking
         GlossaryTermName document. Don't cache this, as we need a separate
-        instance for each link.
+        instance for each link. By the same token, don't reference this
+        property twice if you don't want two separate nodes.
         """
 
         element = etree.Element("MediaLink")
@@ -430,14 +514,6 @@ class AudioFile:
         return self._title
 
     @property
-    def today(self):
-        """String for today's date in ISO format."""
-
-        if not hasattr(self, "_today"):
-            self._today = self.__control.started.strftime("%Y-%m-%d")
-        return self._today
-
-    @property
     def xml(self):
         """Serialized XML for a new CDR Media document for this audio file."""
 
@@ -455,7 +531,8 @@ class AudioFile:
         # Add the source information.
         media_source = etree.SubElement(root, "MediaSource")
         original_source = etree.SubElement(media_source, "OriginalSource")
-        etree.SubElement(original_source, "Creator").text = self.creator
+        creator = self.__control.creator
+        etree.SubElement(original_source, "Creator").text = creator
         etree.SubElement(original_source, "DateCreated").text = self.created
         source_filename = etree.SubElement(original_source, "SourceFilename")
         source_filename.text = self.filename
@@ -480,67 +557,6 @@ class AudioFile:
     def __cell(self, col):
         """Convenience method for fetching values from the spreadsheet row."""
         return Control.get_cell_value(self.__row, col)
-
-    def update_name(self, root):
-        """Make appropriate changes to GTN doc for one of its term names.
-
-        Here are the child elements in the term name blocks.
-            TermNameString [required]
-            TermPronunciation [en, optional]
-            PronunciationResource [en, optional, multiple allowed]
-            TranslationResource [es, optional, multiple allowed]
-            MediaLink [optional, but will be added here if missing]
-            TermNameSource [en, optional]
-            TranslatedNameStatus [es, required]
-            TranslatedNameStatusDate [es, optional]
-            TermNameVerificationResource [en, optional, multiple allowed]
-            Comment [optional, multiple allowed]
-            DateLastModified [optional, but will be added here if missing]
-        Pass:
-            root - top-level object for parsed GlossaryTermName document
-
-        Return:
-            string "Updating" or "Adding" as appropriate
-        """
-
-        node = None
-        verb = "Updating"
-        error = f"unable to find home for {self.name!r} in CDR{self.term_id}"
-        path = f"{self.GLOSSARY_TERM_NAME_TAGS[self.langcode]}/TermNameString"
-        for term_name_string in root.findall(path):
-            if self.name == term_name_string.text:
-                node = name.getparent()
-                break
-        if node is None:
-            error = f"unable to find {self.name!r} in CDR{self.term_id}"
-            raise Exception(error)
-        date_last_modified = node.find("DateLastModified")
-        if date_last_modified is None:
-            date_last_modified = etree.SubElement(node, "DateLastModified")
-        date_last_modified.text = self.today
-        media_link = node.find("MediaLink")
-        if media_link is None:
-            verb = "Adding"
-            sibling = current = term_name_string
-            while current is not None:
-                next = current.getnext()
-                if next is not None:
-                    if isinstance(next.tag, str):
-                        if next.tag in self.BEFORE_MEDIA_LINK:
-                            sibling = next
-                        else:
-                            break
-                current = next
-            sibling.addnext(self.link_node)
-        else:
-            node.replace(media_link, self.link_node)
-            sibling = self.link_node
-            while sibling.tag not in ("Comment", "DateLastModified"):
-                sibling = sibling.getnext()
-            comment = etree.Element("Comment")
-            comment.text = "Approved audio re-recording linked"
-            sibling.addprevious(comment)
-        return verb
 
 
 class TermDoc:
@@ -589,8 +605,8 @@ class Linker(Job):
     the actual document modifications.
     """
 
-    LOGNAME = "LoadGlossaryAudioFiles"
-    COMMENT = "Setting links from glossary term name docs to media docs"
+    LOGNAME = Control.LOGNAME
+    COMMENT = f"GTN Doc MediaLink updated {Control.TODAY}"
     MESSAGE = "{} link from this document to Media document CDR{:d}"
 
     def __init__(self, control):
@@ -633,6 +649,198 @@ class Linker(Job):
             self.logger.exception(cdr_id)
             self.__control.rows.append([cdr_id, str(e)])
             return doc.xml
+
+
+class Updater(Job):
+    """Modify the reused Media documents.
+
+    Implementing enhancement for OCECDR-4890:
+      Update MediaTitle
+        For English, use the TermNameString for the English TermName
+        For Spanish, use the same (English) name with "-Spanish" appended
+      Update MediaSource/OriginalSource elements
+        Creator = "Vanessa RichardsonVanessa Richardson, VR Voice"
+        DateCreated = today (YYYY-MM-DD string)
+        SourceFilename = GTN-CDR-INTEGER-ID_e[ns]_rr.mp3 (???)
+      Update ContentDescription element:
+        text = 'Pronunciation of dictionary term "{mp3.name}"'
+      Add two new ProcessingStatus blocks
+        for value in "Processing Complete", "Audio re-recording approved":
+          ProcessingStatusValue = {value}
+          ProcessingStatusDate = today (YYYY-MM-DD string)
+          EnteredBy = self.__control.user
+
+    Implements the interface used by the ModifyDocs module, returning
+    the list of IDs for the documents to be modified, and performing
+    the actual document modifications.
+    """
+
+    LOGNAME = Control.LOGNAME
+    COMMENT = f"Media Doc updated with rerecorded audio file – {Control.TODAY}"
+    WARNING = "Multiple ContentDescription elements"
+    STATUSES = "Processing Complete", "Audio re-recording approved"
+    DESC_PATH = "MediaContent/ContentDescriptions/ContentDescription"
+    INSERT_BEFORE = {
+        "DateLastModified",
+        "RelatedDocuments",
+        "TranslationOf",
+        "Comment",
+    }
+
+    def __init__(self, control, docs):
+        """Capture the caller's value and initialize the base class.
+
+        Pass:
+            control - access to the rows for the report (to which we
+                      contribute), and the term names and their audio files
+            docs - dictionary of recycled Media Doc object, indexed by CDR ID
+        """
+
+        self.__control = control
+        self.__docs = docs
+        opts = dict(session=control.session, mode="live", console=False)
+        Job.__init__(self, **opts)
+
+    def get_blob(self, doc_id):
+        """Provide the MP3 bytes for a specific Media document.
+
+        Pass:
+            doc_id - integer for the CDR Media document ID
+
+        Return:
+            bytes for the MP3 audio file
+        """
+
+        return self.__docs[doc_id].bytes
+
+    def select(self):
+        """Provide the sorted Media document IDs."""
+        return sorted(self.__docs)
+
+    def transform(self, doc):
+        """Apply changes requested by OCECDR-4890.
+
+        Pass:
+            doc - `cdr.Doc` object
+
+        Return:
+            Possibly transformed XML
+        """
+
+        int_id = Doc.extract_id(doc.id)
+        cdr_id = f"CDR{int_id:d}"
+        mp3 = self.__docs[int_id]
+        try:
+            root = etree.fromstring(doc.xml)
+            self.__update_title(root, mp3)
+            self.__update_source(root, mp3)
+            self.__update_description(root, mp3)
+            self.__update_status(root, mp3)
+            return etree.tostring(root)
+        except Exception as e:
+            self.logger.exception(cdr_id)
+            self.__control.rows.append([cdr_id, str(e)])
+            return doc.xml
+
+    def __update_description(self, root, mp3):
+        """Set the ContentDescription element of the document.
+
+        Pass:
+            root - top-level element of the Media document
+            mp3 - AudioFile object
+        """
+
+        descriptions = [node for node in root.findall(self.DESC_PATH)]
+        if not descriptions:
+            raise Exception("required ContentDescription missing")
+        if len(descriptions) == 1:
+            description = f'Pronunciation of dictionary term "{mp3.name}"'
+            descriptions[0].text = description
+        else:
+            self.__control.rows.append((f"CDR{mp3.media_id:d}", self.WARNING))
+            self.logger.warning("%s for CDR%d", self.WARNING, mp3.media_id)
+
+    def __update_source(self, root, mp3):
+        """Set the current values for the OriginalSource block.
+
+        Pass:
+            root - top-level element of the Media document
+            mp3 - AudioFile object
+        """
+
+        parent = root.find("MediaSource/OriginalSource")
+        if parent is None:
+            grandparent = root.find("MediaSource")
+            if grandparent is None:
+                sibling = root.find("PhysicalMedia")
+                if sibling is None:
+                    sibling = root.find("MediaTitle")
+                grandparent = etree.Element("MediaSource")
+                sibling.addnext(grandparent)
+            parent = etree.Element("OriginalSource")
+            grandparent.insert(0, parent)
+        creator_node = parent.find("Creator")
+        if creator_node is None:
+            creator_node = etree.Element("Creator")
+            parent.insert(0, creator_node)
+        creator_node.text = self.__control.creator
+        created_node = parent.find("DateCreated")
+        if created_node is None:
+            created_node = etree.Element("DateCreated")
+            sibling = parent.find("SourcePublication")
+            if sibling is None:
+                sibling = [parent.findall("Creator")][-1]
+            sibling.addnext(created_node)
+        created_node.text = Control.TODAY
+        filename_node = parent.find("SourceFilename")
+        if filename_node is None:
+            filename_node = etree.Element("SourceFilename")
+            comment_node = parent.find("Comment")
+            if comment_node is None:
+                parent.append(filename_node)
+            else:
+                comment_node.addprevious(filename_node)
+        filename_node.text = f"{mp3.term_id}_{mp3.langcode}_rr.mp3"
+
+    def __update_title(self, root, mp3):
+        """Set the new title of the document in case the name changed.
+
+        Pass:
+            root - top-level element of the Media document
+            mp3 - AudioFile object
+        """
+
+        node = root.find("MediaTitle")
+        if node is None:
+            node = etree.Subtitle(root, "MediaTitle")
+        node.text = mp3.title
+
+    def __update_status(self, root, mp3):
+        """Insert a couple of new ProcessingStatus elements.
+
+        Pass:
+            root - top-level element of the Media document
+            mp3 - AudioFile object
+        """
+
+        statuses = root.find("ProcessingStatuses")
+        if statuses is None:
+            statuses = etree.Element("ProcessingStatuses")
+            sibling = None
+            for node in root.findall("*"):
+                if node.tag in self.INSERT_BEFORE:
+                    sibling = node
+                    break
+            if sibling is None:
+                root.append(statuses)
+            else:
+                sibling.addprevious(statuses)
+        for status in self.STATUSES:
+            ps = etree.Element("ProcessingStatus")
+            etree.SubElement(ps, "ProcessingStatusValue").text = status
+            etree.SubElement(ps, "ProcessingStatusDate").text = Control.TODAY
+            etree.SubElement(ps, "EnteredBy").text = self.__control.user
+            statuses.insert(0, ps)
 
 
 if __name__ == "__main__":
