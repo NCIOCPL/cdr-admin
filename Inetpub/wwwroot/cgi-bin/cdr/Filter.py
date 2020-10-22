@@ -120,7 +120,11 @@ class Control(Controller):
             except Exception:
                 self.bail("Unrecognized document ID format")
             version = self.fields.getvalue("DocVer", "0")
-            if not version.isdigit() and version not in ("last", "lastp"):
+
+            # If no version is specified the default version is the CWD
+            # which is indicated with a version=None.  Need to allow
+            # "None" as a valid value.
+            if not version.isdigit() and version not in ("None", "last", "lastp"):
                 self.bail(f"Invalid version {version!r}")
             self._doc = Doc(self.session, id=id, version=version)
         return self._doc
