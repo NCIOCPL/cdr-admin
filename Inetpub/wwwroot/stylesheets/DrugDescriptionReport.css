@@ -18,6 +18,9 @@ hr {
 .dis > th {
     padding-right: 5px;
 }
+.dis tbody > tr > th {
+    width: 175px;
+}
 .dis th, .dis td {
     color: black;
     vertical-align: top;
