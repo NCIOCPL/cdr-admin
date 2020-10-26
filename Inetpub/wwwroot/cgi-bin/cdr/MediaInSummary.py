@@ -12,7 +12,9 @@ from cdrcgi import Controller
 from cdr import URDATE, getSchemaEnumVals
 from lxml import html, etree
 from lxml.html import builder
+from cdr import exNormalize
 import sys
+
 
 
 class Control(Controller):
@@ -39,6 +41,18 @@ class Control(Controller):
         sys.exit(0)
 
 
+    def get_int_cdr_id(self, value):
+        """
+        Convert CDR ID to integer. Exit with an error message on failure.
+        """
+        if value:
+            try:
+                return exNormalize(value)[1]
+            except:
+                self.bail("Invalid format for CDR ID")
+        return None
+
+
     @property
     def report(self):
         """`HTMLPage` object for the report."""
@@ -51,7 +65,7 @@ class Control(Controller):
             head = B.HEAD(meta, B.TITLE(self.TITLE), icon, link)
             time = B.SPAN(self.today.strftime("%Y-%m-%d"))
             args = self.SUBTITLE, B.BR(), "Side-by-Side", B.BR(), time
-            cdrId = self.fields.getvalue("cdr-id")
+            cdrId = self.get_int_cdr_id(self.fields.getvalue("cdr-id"))
             orig_id = B.P(f"Summary selected: CDR{cdrId}", id="summary-id")
             wrapper = body = B.BODY(B.E("header", B.H1(*args)), orig_id)
             self._report = B.HTML(head, body)
@@ -94,7 +108,8 @@ class Control(Controller):
                                        B.SPAN(f"{media_doc.title} (CDR{media_doc.id})")))
                     image = ("/cgi-bin/cdr/GetCdrImage.py?"
                              f"id=CDR{media_doc.id}-400.jpg")
-                    wrapper.append(B.IMG(src=image))
+                    full_image = image.replace('-400', '')
+                    wrapper.append(B.A(B.IMG(src=image), href=full_image))
 
                     # keep the else block if we're asked to include video, too
                     #
@@ -541,7 +556,8 @@ class Summary:
 
         if not hasattr(self, "_media_docs"):
             if not self.media_link_ids:
-                self.bail("A valid CDR ID is required.")
+                message = "Summary selected does not contain images"
+                self.control.bail(f"ERROR: {message}")
             self._media_docs = [Media(self, id) for id in self.media_link_ids]
         return self._media_docs
 
