@@ -496,6 +496,11 @@ class AudioFile:
         return self._name_title
 
     @property
+    def path(self):
+        """Name of the zipfile fromwhich we got this MP3."""
+        return self.__path
+
+    @property
     def term_id(self):
         """CDR ID for the pronunciation's GlossaryTermName document."""
 
@@ -661,7 +666,7 @@ class Updater(Job):
       Update MediaSource/OriginalSource elements
         Creator = "Vanessa RichardsonVanessa Richardson, VR Voice"
         DateCreated = today (YYYY-MM-DD string)
-        SourceFilename = GTN-CDR-INTEGER-ID_e[ns]_rr.mp3 (???)
+        SourceFilename = WEEK_DIRECTORY/GTN-CDR-INTEGER-ID_e[ns]_rr.mp3
       Update ContentDescription element:
         text = 'Pronunciation of dictionary term "{mp3.name}"'
       Add two new ProcessingStatus blocks
@@ -678,7 +683,7 @@ class Updater(Job):
     LOGNAME = Control.LOGNAME
     COMMENT = f"Media Doc updated with rerecorded audio file – {Control.TODAY}"
     WARNING = "Multiple ContentDescription elements"
-    STATUSES = "Processing Complete", "Audio re-recording approved"
+    STATUSES = "Audio re-recording approved", "Processing Complete"
     DESC_PATH = "MediaContent/ContentDescriptions/ContentDescription"
     INSERT_BEFORE = {
         "DateLastModified",
@@ -800,7 +805,8 @@ class Updater(Job):
                 parent.append(filename_node)
             else:
                 comment_node.addprevious(filename_node)
-        filename_node.text = f"{mp3.term_id}_{mp3.langcode}_rr.mp3"
+        filename = f"{mp3.term_id}_{mp3.langcode}_rr.mp3"
+        filename_node.text = f"{mp3.path[:-4]}/{filename}"
 
     def __update_title(self, root, mp3):
         """Set the new title of the document in case the name changed.
