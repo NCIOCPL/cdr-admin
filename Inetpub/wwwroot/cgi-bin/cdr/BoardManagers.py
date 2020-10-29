@@ -27,7 +27,7 @@ class Control(Controller):
             ("Most Recent Changes to Summaries", "ChangesToSummaries.py"),
             ("History of Changes to a Single Summary", "SummaryChanges.py"),
             ("Date Last Modified", "SummaryDateLastModified.py"),
-            ("Most Recent Comprehensive Review", "SummaryCRD.py"),
+            ("Comprehensive Review Dates", "SummaryCRD.py"),
             ("Titles in Alphabetical Order", "SummariesLists.py"),
             ("Metadata", "SummaryMetaData.py"),
             ("TOC Levels", "SummariesTocReport.py"),
