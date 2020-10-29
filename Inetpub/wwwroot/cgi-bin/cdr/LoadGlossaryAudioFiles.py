@@ -387,7 +387,11 @@ class AudioFile:
         """Binary content of the audio file."""
 
         if not hasattr(self, "_bytes"):
-            self._bytes = self.__zipfile.read(self.filename)
+            try:
+                self._bytes = self.__zipfile.read(self.filename)
+            except Exception as e:
+                self.__control.logger.exception("fetching mp3 bytes")
+                self.__control.bail(e)
         return self._bytes
 
     @property
