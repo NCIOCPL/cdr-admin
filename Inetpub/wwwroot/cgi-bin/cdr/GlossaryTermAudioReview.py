@@ -575,7 +575,7 @@ class Control(Controller):
                         files.append(DiskFile(self, entry))
                     else:
                         message = f"Found file {entry.name!r}."
-                        self.control.logger.warning(message)
+                        self.logger.warning(message)
                         self.bail(message, extra=self.FIXNAME_INSTRUCTIONS)
             self._zipfiles_on_disk = sorted(files)
         return self._zipfiles_on_disk
