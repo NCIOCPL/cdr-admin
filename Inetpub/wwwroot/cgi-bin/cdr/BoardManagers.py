@@ -19,7 +19,52 @@ class Control(Controller):
         if self.GROUP not in user.groups:
             bail("User not authorized for this menu")
 
-        # Section 1: board members.
+        # Section 1: summary and module reports.
+        page.form.append(page.B.H3("Summary and Module Reports"))
+        ol = page.B.OL()
+        page.form.append(ol)
+        for display, script in (
+            ("Most Recent Changes to Summaries", "ChangesToSummaries.py"),
+            ("History of Changes to a Single Summary", "SummaryChanges.py"),
+            ("Date Last Modified", "SummaryDateLastModified.py"),
+            ("Comprehensive Review Dates", "SummaryCRD.py"),
+            ("Titles in Alphabetical Order", "SummariesLists.py"),
+            ("Metadata", "SummaryMetaData.py"),
+            ("TOC Levels", "SummariesTocReport.py"),
+            ("Type of Comments", "SummaryComments.py"),
+            ("Current Markup", "SummariesWithMarkup.py"),
+            ("Type Of Change", "SummaryTypeChangeReport.py"),
+            ("Standard Wording", "SummaryStandardWording.py"),
+            ("Citations in Alphabetical Order", "SummaryCitations.py"),
+            ("Non-Journal Article Citations Report",
+             "SummariesWithNonJournalArticleCitations.py"),
+        ):
+            ol.append(page.B.LI(page.menu_link(script, display)))
+
+        # Section 2: management reports.
+        page.form.append(page.B.H3("PCIB Management Reports"))
+        ol = page.B.OL()
+        page.form.append(ol)
+        for display, script in (
+            ("Board Meeting Dates", "BoardMeetingDates.py"),
+            ("PCIB Statistics Report", "RunPCIBStatReport.py"),
+        ):
+            ol.append(page.B.LI(page.menu_link(script, display)))
+
+        # Section 3: other reports.
+        page.body.set("class", "admin-menu")
+        page.form.append(page.B.H3("Quick Links to Other Report Menus"))
+        ol = page.B.OL()
+        page.form.append(ol)
+        for display, script in (
+            ("Drug Information", "DrugInfoReports.py"),
+            ("Glossary Terms", "GlossaryTermReports.py"),
+            ("Media", "MediaReports.py"),
+            ("General Use Reports", "GeneralReports.py"),
+        ):
+            ol.append(page.B.LI(page.menu_link(script, display)))
+
+        # Section 4: board members.
         page.body.set("class", "admin-menu")
         page.form.append(page.B.H3("Board Member Information Reports"))
         ol = page.B.OL()
@@ -32,29 +77,16 @@ class Control(Controller):
             ("Board Roster Reports", "BoardRoster.py"),
             ("Board Roster Reports (Combined)", "BoardRosterFull.py"),
             ("Invitation History Report", "BoardInvitationHistory.py"),
-            ("PDQ Board Members and Topics", "PdqBoards.py"),
+            ("Board Members and Topics", "PdqBoards.py"),
         ):
             ol.append(page.B.LI(page.menu_link(script, display)))
 
-        # Section 2: general.
-        page.form.append(page.B.H3("General Use Reports"))
-        ol = page.B.OL()
-        page.form.append(ol)
-        for display, script in (
-            ("All General Reports", "GeneralReports.py"),
-            ("Checked Out Documents Report", "CheckedOutDocs.py"),
-            ("Document Activity Report", "ActivityReport.py"),
-            ("Linked Documents Report", "LinkedDocs.py"),
-            ("Unchanged Documents Report", "UnchangedDocs.py"),
-        ):
-            ol.append(page.B.LI(page.menu_link(script, display)))
-
-        # Section 3: mailers.
+        # Section 5: mailers.
         page.form.append(page.B.H3("Mailers"))
         links = (
             page.menu_link(
                 "BoardMemberMailerReqForm.py",
-                "PDQ\xAE Board Member Correspondence Mailers"
+                "Board Member Correspondence Mailers"
             ),
             page.menu_link(
                 "SummaryMailerReport.py",
@@ -71,38 +103,14 @@ class Control(Controller):
         ol = page.B.OL(*items)
         page.form.append(ol)
 
-        # Section 4: management.
-        page.form.append(page.B.H3("Management Reports"))
-        ol = page.B.OL()
-        page.form.append(ol)
-        for display, script in (
-            ("Board Meeting Dates", "BoardMeetingDates.py"),
-            ("Changes to Summaries", "ChangesToSummaries.py"),
-            ("History of Changes to Summary", "SummaryChanges.py"),
-            ("PCIB Statistics Report", "RunPCIBStatReport.py"),
-            ("Standard Wording", "SummaryStandardWording.py"),
-            ("Summaries Citations", "SummaryCitations.py"),
-            ("Summaries Comments", "SummaryComments.py"),
-            ("Summaries Comprehensive Review Date Report", "SummaryCRD.py"),
-            ("Summaries Date Last Modified", "SummaryDateLastModified.py"),
-            ("Summaries Lists", "SummariesLists.py"),
-            ("Summaries Markup Report", "SummariesWithMarkup.py"),
-            ("Summaries Metadata", "SummaryMetaData.py"),
-            ("Summaries TOC Lists", "SummariesTocReport.py"),
-            ("Summaries Type Of Change", "SummaryTypeChangeReport.py"),
-            ("Summaries With Non-Journal Article Citations Report",
-             "SummariesWithNonJournalArticleCitations.py"),
-        ):
-            ol.append(page.B.LI(page.menu_link(script, display)))
-
-        # Section 5: miscellaneous docs.
+        # Section 6: miscellaneous docs.
         page.form.append(page.B.H3("Miscellaneous Document QC Report"))
         ol = page.B.OL()
         page.form.append(ol)
         link = page.menu_link("MiscSearch.py", "Miscellaneous Documents")
         ol.append(page.B.LI(link))
 
-        # Section 6: QC.
+        # Section 7: QC.
         page.form.append(page.B.H3("Summary QC Reports"))
         ol = page.B.OL()
         page.form.append(ol)

@@ -25,13 +25,24 @@ class Control(Controller):
     SCRIPT = "../../js/DrugDescriptionReport.js"
     REFTYPE_PATH = "/DrugInformationSummary/DrugReference/DrugReferenceType"
     METADATA = "/DrugInformationSummary/DrugInfoMetaData"
-    COMBO_PATH = METADATA + "/DrugInfoType/@Combination"
+    COMBO_PATH = f"{METADATA}/DrugInfoType/@Combination"
+    ACCEL_PATH = f"{METADATA}/FDAApproved/@Accelerated"
+    KIDS_PATH = f"{METADATA}/FDAApproved/@ApprovedInChildren"
+    TYPE_PATH = f"{METADATA}/DrugType"
     REFTYPES = "NCI", "FDA", "NLM"
     METHODS = (
         ("By Drug Name", "name"),
         ("By Date of Last Publishable Version", "date"),
         ("By Drug Reference Type", "type"),
+        ("By FDA Approval Information", "fda"),
     )
+    ACCELERATED_APPROVAL = "Accelerated approval"
+    APPROVED_IN_CHILDREN = "Approved in children"
+    FDA_APPROVAL_STATUSES = ACCELERATED_APPROVAL, APPROVED_IN_CHILDREN
+    FDA_PATHS = {
+        ACCELERATED_APPROVAL: ACCEL_PATH,
+        APPROVED_IN_CHILDREN: KIDS_PATH,
+    }
     ALL_DRUGS = "all-drugs"
     SINGLE_AGENT_DRUGS = "all-single-agent-drugs"
     DRUG_COMBOS = "all-drug-combinations"
@@ -90,6 +101,21 @@ class Control(Controller):
             checked = value == self.reftype
             opts = dict(value=value, label=value, checked=checked)
             fieldset.append(page.radio_button("reftype", **opts))
+        page.form.append(fieldset)
+
+        # Extra choices for the "FDA approval" selection method.
+        fieldset = page.fieldset("By FDA Approval Information", id="fda-block")
+        if self.selection_method != "fda":
+            fieldset.set("class", "hidden")
+        for value in self.FDA_APPROVAL_STATUSES:
+            opts = dict(value=value, label=value, checked=True)
+            fieldset.append(page.checkbox("fda-approval-status", **opts))
+        page.form.append(fieldset)
+
+        # Optionally narrow by drug type.
+        fieldset = page.fieldset("Select Drug Type(s) For Report")
+        opts = dict(options=self.drug_types, multiple=True)
+        fieldset.append(page.select("drug-type", **opts))
         page.form.append(fieldset)
 
         # Magic to make field sets appear and disappear, based on method.
@@ -154,6 +180,9 @@ class Control(Controller):
             elif self.selection_method == "date":
                 self._criteria = "with last publishable versions created "
                 self._criteria += f"{self.start}--{self.end} (inclusive)"
+            elif self.selection_method == "fda":
+                approvals = " and ".join(self.fda_approval_status)
+                self._criteria = f"with {approvals}"
         return self._criteria
 
     @property
@@ -166,6 +195,8 @@ class Control(Controller):
             end=str(self.end),
             drugs=self.selected_drugs,
             reftype=self.reftype,
+            fda=self.fda_approval_status,
+            types=self.drug_type,
         )
         return dumps(vals)
 
@@ -181,6 +212,25 @@ class Control(Controller):
                 options.append((drug.id, drug.name))
             self._drug_picklist_options = options
         return self._drug_picklist_options
+
+    @property
+    def drug_type(self):
+        """Narrow report to these drug types if any selected."""
+
+        if not hasattr(self, "_drug_type"):
+            self._drug_type = self.fields.getlist("drug-type")
+        return self._drug_type
+
+    @property
+    def drug_types(self):
+        """Valid values for the drug type picklist."""
+
+        if not hasattr(self, "_drug_types"):
+            query = self.Query("query_term_pub", "value").unique().order(1)
+            query.where(f"path = '{self.TYPE_PATH}'")
+            rows = query.execute(self.cursor)
+            self._drug_types = [row.value for row in rows]
+        return self._drug_types
 
     @property
     def drugs(self):
@@ -217,6 +267,18 @@ class Control(Controller):
             if not self._end:
                 self._end = date.today()
         return self._end
+
+    @property
+    def fda_approval_status(self):
+        """Which approval status filters (if any) have been chosen."""
+
+        if not hasattr(self, "_fda_approval_status"):
+            statuses = self.fields.getlist("fda-approval-status")
+            for status in statuses:
+                if status not in self.FDA_APPROVAL_STATUSES:
+                    self.bail()
+            self._fda_approval_status = statuses
+        return self._fda_approval_status
 
     @property
     def selection_method(self):
@@ -320,16 +382,22 @@ class Control(Controller):
                 cols = "v.id", "MAX(v.num) AS num"
                 query = self.Query("doc_version v", *cols)
                 query.group("v.id")
+            if self.drug_type:
+                query.join("query_term t", "t.doc_id = v.id")
+                query.where(f"t.path = '{self.TYPE_PATH}'")
+                query.where(query.Condition("t.value", self.drug_type, "IN"))
             if self.selection_method == "name":
                 self.logger.info("selected drugs: %s", self.selected_drugs)
                 if self.ALL_DRUGS in self.selected_drugs:
-                    query.join("doc_type t", "t.id = v.doc_type")
-                    query.join("document d", "d.id = v.id")
-                    query.where("t.name = 'DrugInformationSummary'")
+                    if not self.drug_type:
+                        query.join("doc_type t", "t.id = v.doc_type")
+                        query.join("document d", "d.id = v.id")
+                        query.where("t.name = 'DrugInformationSummary'")
                 elif self.SINGLE_AGENT_DRUGS in self.selected_drugs:
-                    query.join("doc_type t", "t.id = v.doc_type")
-                    query.join("document d", "d.id = v.id")
-                    query.where("t.name = 'DrugInformationSummary'")
+                    if not self.drug_type:
+                        query.join("doc_type t", "t.id = v.doc_type")
+                        query.join("document d", "d.id = v.id")
+                        query.where("t.name = 'DrugInformationSummary'")
                     subquery = self.Query("query_term", "doc_id")
                     subquery.where(f"path = '{self.COMBO_PATH}'")
                     subquery.where("value = 'Yes'")
@@ -346,6 +414,18 @@ class Control(Controller):
                 subquery.where(query.Condition("path", self.REFTYPE_PATH))
                 subquery.where(query.Condition("value", self.reftype))
                 query.where(query.Condition("v.id", subquery, "IN"))
+            elif self.selection_method == "fda":
+                if not self.fda_approval_status:
+                    self.bail("No FDA approval options selected")
+                paths = []
+                for key in self.fda_approval_status:
+                    if key in self.FDA_PATHS:
+                        paths.append(self.FDA_PATHS[key])
+                    else:
+                        self.bail()
+                query.join("query_term f", "f.doc_id = v.id")
+                query.where(query.Condition("f.path", paths, "IN"))
+                query.where("f.value = 'Yes'")
             query.log(label="huh?")
             try:
                 rows = query.execute(timeout=300).fetchall()
@@ -364,6 +444,8 @@ class DrugInfoSummary:
     PARMS = {"suppress-nbsp": "true"}
     PARSER = html.HTMLParser()
     URL = "QcReport.py?Session=guest&DocId={}&DocVersion=-1"
+    FDA_PATH = "DrugInfoMetaData/FDAApproved"
+    DRUG_TYPE_PATH = "DrugInfoMetaData/DrugType"
 
     def __init__(self, control, row):
         """Remember the caller's values.
@@ -380,17 +462,40 @@ class DrugInfoSummary:
         return self.key < other.key
 
     @property
-    def key(self):
-        """Use lowercase names for sorting."""
+    def accelerated_approval(self):
+        """True if this drug has been given accelerated approval."""
 
-        if not hasattr(self, "_key"):
-            self._key = self.name.lower()
-        return self._key
+        if not hasattr(self, "_accelerated_approval"):
+            self._accelerated_approval = False
+            if self.fda_approved_node is not None:
+                if self.fda_approved_node.get("Accelerated") == "Yes":
+                    self._accelerated_approval = True
+        return self._accelerated_approval
+
+    @property
+    def approved_in_children(self):
+        """True if this drug has been approved for pediatric applications."""
+
+        if not hasattr(self, "_approved_in_children"):
+            self._approved_in_children = False
+            if self.fda_approved_node is not None:
+                if self.fda_approved_node.get("ApprovedInChildren") == "Yes":
+                    self._approved_in_children = True
+        return self._approved_in_children
 
     @property
     def control(self):
         """Access to the current login session and report creation tools."""
         return self.__control
+
+    @property
+    def description(self):
+        """String description of the drug summary page."""
+
+        if not hasattr(self, "_description"):
+            for node in self.doc.root.iter("Description"):
+                self._description = "".join(self.fetch_text(node)).strip()
+        return self._description
 
     @property
     def doc(self):
@@ -402,13 +507,32 @@ class DrugInfoSummary:
         return self._doc
 
     @property
-    def description(self):
-        """String description of the drug summary page."""
+    def drug_types(self):
+        """Sequence of strings for drug type names used for this drug."""
 
-        if not hasattr(self, "_description"):
-            for node in self.doc.root.iter("Description"):
-                self._description = "".join(self.fetch_text(node)).strip()
-        return self._description
+        if not hasattr(self, "_drug_types"):
+            self._drug_types = []
+            for node in self.doc.root.findall(self.DRUG_TYPE_PATH):
+                value = Doc.get_text(node, "").strip()
+                if value:
+                    self._drug_types.append(value)
+        return self._drug_types
+
+    @property
+    def fda_approved_node(self):
+        """Required node for FDA approval information."""
+
+        if not hasattr(self, "_fda_approved_node"):
+            self._fda_approved_node = self.doc.root.find(self.FDA_PATH)
+        return self._fda_approved_node
+
+    @property
+    def key(self):
+        """Use lowercase names for sorting."""
+
+        if not hasattr(self, "_key"):
+            self._key = self.name.lower()
+        return self._key
 
     @property
     def link(self):
@@ -448,9 +572,15 @@ class DrugInfoSummary:
 
         if not hasattr(self, "_table"):
             B = self.control.HTMLPage.B
+            ok_for_kids = "Yes" if self.approved_in_children else "No"
+            accelerated = "Yes" if self.accelerated_approval else "No"
+            types = ", ".join(self.drug_types)
             self._table = B.TABLE(
                 B.TR(B.TH("CDR ID"), B.TD(self.link)),
                 B.TR(B.TH("Drug Name"), B.TD(self.name)),
+                B.TR(B.TH("Drug Type(s)"), B.TD(types)),
+                B.TR(B.TH("Accelerated Approval"), B.TD(accelerated)),
+                B.TR(B.TH("Approved in Children"), B.TD(ok_for_kids)),
                 B.TR(B.TH("Description"), B.TD(self.description)),
                 B.TR(B.TH("Summary"), self.summary),
                 B.CLASS("dis"),
