@@ -1,0 +1,32 @@
+body { font-family: sans-serif; }
+header h1, header h2 
+    { text-align: center; }
+h1, #media-id 
+    { 
+      font-size: 14pt; 
+      font-weight: bold; 
+    }
+.section-hdr
+    { font-size: 14pt;
+      font-weight: bold }
+
+h1 span { font-size: 12pt; }
+h2 { font-size: 13pt; margin-top: 50px; }
+img { width: 300px; }
+table { width: 100%; }
+td { vertical-align: top; word-break: break-word; }
+td:first-child { width: 20%; }
+.attribute { font-style: italic; }
+.blocked, .special { color: red; font-weight: bold; }
+.deleteapproved { text-decoration: line-through; }
+.indent { padding-left: 30px; }
+.insertapproved { color: red; }
+.name { color: blue; font-weight: bold; background: #EEE; }
+.name-and-def td { border: 1px solid black; }
+.name-and-def { border-collapse: collapse; }
+.term-type-table td:first-child,
+.definition-info td:first-child,
+.related-info-table td:first-child { font-weight: bold; }
+.term-normal { background-color: yellow; }
+.term-name { color: blue; font-weight: bold; }
+.lang-wrapper { float: left; width: 48%; margin: 0 5px; }
