@@ -390,7 +390,7 @@ class Control(Controller):
 
         if not hasattr(self, "_supported_parameters"):
             if "scheduler" not in str(path).lower():
-                path.insert("d:/cdr/Scheduler")
+                path.insert(1, "d:/cdr/Scheduler")
             self._supported_parameters = None
             try:
                 module_name, class_name = self.job_class.split(".", 1)
