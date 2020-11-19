@@ -53,12 +53,15 @@ class Control(Controller):
 
         # Section 3: other reports.
         page.body.set("class", "admin-menu")
-        page.form.append(page.B.H3("Quick Links to Other Report Menus"))
+        name = "Quick Links to Other Reports and Report Menus"
+        page.form.append(page.B.H3(name))
         ol = page.B.OL()
         page.form.append(ol)
         for display, script in (
+            ("Checked Out Documents", "CheckedOutDocs.py"),
             ("Drug Information", "DrugInfoReports.py"),
             ("Glossary Terms", "GlossaryTermReports.py"),
+            ("Linked Documents", "LinkedDocs.py"),
             ("Media", "MediaReports.py"),
             ("General Use Reports", "GeneralReports.py"),
         ):
