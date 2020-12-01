@@ -28,6 +28,16 @@ class Control(Controller):
     BY_SUMMARY = "One table for all drug info summaries and changes"
     BY_CHANGE_TYPE = "One table for each type of change"
     REPORT_ORGANIZATIONS = BY_SUMMARY, BY_CHANGE_TYPE
+    INSTRUCTIONS = (
+        "To run this report for multiple drug information summaries, select "
+        "'By CDR ID' and enter multiple CDR IDs separated by a comma. "
+        "To run the report for all "
+        "drug information summaries, refer to the ad-hoc query "
+        "'DIS CDR IDs for Type of Change Report' on the following page: ",
+        "CDR Stored Database Queries",
+        "/cgi-bin/cdr/CdrQueries.py",
+        "Copy and paste the complete set of CDR IDs into the CDR ID field."
+    )
 
 
     def build_tables(self):
@@ -95,6 +105,13 @@ class Control(Controller):
                      from multiple matches with the user's title fragment;
                      otherwise, show the report's main request form
         """
+
+        fieldset = page.fieldset("Instructions")
+        fieldset.append(page.B.P(self.INSTRUCTIONS[0],
+                        page.B.BR(),
+                        page.B.A(self.INSTRUCTIONS[1], href=self.INSTRUCTIONS[2]),
+                        page.B.BR(), self.INSTRUCTIONS[3]))
+        page.form.append(fieldset)
 
         page.form.append(page.hidden_field("debug", self.debug or ""))
         opts = { "titles": titles, "id-label": "CDR ID(s)" }
