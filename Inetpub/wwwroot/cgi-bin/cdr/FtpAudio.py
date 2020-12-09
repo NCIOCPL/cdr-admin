@@ -10,6 +10,8 @@ import paramiko
 from cdrcgi import Controller
 from cdrapi.settings import Tier
 from cdr import run_command
+from zipfile import ZipFile
+from pathlib import Path
 
 class Control(Controller):
     """Processing logic."""
@@ -18,6 +20,8 @@ class Control(Controller):
     SUBTITLE = "Retrieve Audio Files From CIPSFTP Server"
     LOGNAME = "FtpAudio"
     USER = "cdroperator"
+    WEEK = r"^Week_\d{4}_\d\d(_Rev\d)?"
+    FILE = r"\d+_e[ns]\d*"
     SSH_KEY = r"\etc\cdroperator_rsa"
     CDRSTAGING = "/sftp/sftphome/cdrstaging"
     AUDIO_DIR = f"{CDRSTAGING}/ciat/{TIER.name.lower()}/Audio"
@@ -25,8 +29,8 @@ class Control(Controller):
     TARGET_DIR = f"{TIER.basedir}/Audio_from_CIPSFTP"
     TRANSFERRED_DIR = f"{AUDIO_DIR}/Audio_Transferred"
     INSTRUCTIONS = (
-        "Files which match the pattern Week_NNN.zip or Week_NNN_RevN.zip "
-        "(where N is a decimal digit) will be retrieved from the source "
+        "Files which match the pattern Week_YYYY_WW.zip (or, for correction "
+        "batches, Week_YYYY_WW_RevN.zip) will be retrieved from the source "
         "directory on the NCI SFTP server and placed in the target "
         "directory on the Windows CDR server. Then they will be moved "
         "on the SFTP server to the a separate directory for zip files "
@@ -114,6 +118,7 @@ class Control(Controller):
         else:
             line = f"Retrieved {name}"
         failed = False
+
         if retrieve:
             try:
                 with self.connection.open_sftp() as sftp:
@@ -122,21 +127,29 @@ class Control(Controller):
                 self.logger.exception("Retrieving %s", source)
                 line = f"Failed retrieval of {name}: {e}"
                 failed = True
+
             process = run_command(f"fix-permissions {target}")
             if process.stderr:
                 self.bail(f"Unable to fix permissions for {target}",
                           extra=[process.stderr])
+
+            # Testing if zipfile members follow proper naming convention
+            if not self.members_ok(name):
+                # Renaming the bad zip file
+                source = Path(self.TARGET_DIR, name)
+                new_name = name.replace(source.suffix, f".{self.stamp}")
+                source.rename(new_name)
+                self.logger.info(f"Zip file renamed to: {new_name}")
+                message = "ERROR - Audio zip file contains file(s) with "
+                message += "invalid file name"
+                self.bail(message)
+
         lines = [line]
         if not failed and not self.keep:
             target = f"{self.transferred_dir}/{name}"
             program = "cp" if self.test else "mv"
-            verb = "Moved"
-            gerund = "moving"
             if self.test:
                 target += f"-{self.stamp}"
-            command = "cp"
-            verb = "Copied"
-            gerund = "running"
             cmd = f"{program} {source} {target}"
             stdin, stdout, stderr = self.connection.exec_command(cmd)
             errors = stderr.readlines()
@@ -144,13 +157,37 @@ class Control(Controller):
                 if self.test:
                     lines.append(f"Errors copying {name} to {target}")
                 else:
-                    lines.append(f"Errors copying {name} to {target}")
+                    lines.append(f"Errors moving {name} to {target}")
                 lines += errors
             elif self.test:
                 lines.append(f"Copied {name} to {target}")
             else:
                 lines.append(f"Moved {name} to {target}")
         return lines
+
+
+    def members_ok(self, filename):
+        """Check for compliance of zip file members with file pattern.
+
+        Pass:
+           filename - string for the name of the zipfile to inspect
+
+        Return:
+           True/False - based on proper file names for member files
+        """
+
+        path = f"{self.TARGET_DIR}/{filename}"
+        self.logger.info("Testing members in %s", path)
+        zipfile = ZipFile(path)
+
+        for name in zipfile.namelist():
+            if "MACOSX" not in name and name.endswith(".mp3"):
+                if not self.member_pattern.match(name):
+                    template = "%s - Invalid member name format: %s"
+                    self.logger.info(template, filename, name)
+                    return False
+        return True
+
 
     @property
     def connection(self):
@@ -231,11 +268,19 @@ class Control(Controller):
 
     @property
     def pattern(self):
-        """Files we want match this regular expression."""
+        """Files we want will match this regular expression."""
 
         if not hasattr(self, "_pattern"):
-            self._pattern = re.compile(r"^Week_\d\d\d(_Rev\d)?.zip$")
+            self._pattern = re.compile(f"^{self.WEEK}.zip$")
         return self._pattern
+
+    @property
+    def member_pattern(self):
+        """Members of zip files must match this regular expression."""
+
+        if not hasattr(self, "_member_pattern"):
+            self._member_pattern = re.compile(f"^{self.WEEK}/{self.FILE}.mp3$")
+        return self._member_pattern
 
     @property
     def rejected(self):

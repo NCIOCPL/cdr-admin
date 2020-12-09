@@ -175,11 +175,11 @@ class Concept:
         if not hasattr(self, "_definitions"):
             self._definitions = {}
             for langcode in self.LANGUAGES:
-                self._definitions[langcode] = []
+                self._definitions[langcode] = {}
             for name in self.DEFINITION_ELEMENTS:
                 for node in self.doc.root.findall(name):
                     definition = self.Definition(self, node)
-                    self._definitions[definition.langcode].append(definition)
+                    self._definitions[definition.langcode].update({definition.audience : definition})
         return self._definitions
 
     @property
@@ -286,7 +286,8 @@ class Concept:
             meta = B.META(charset="utf-8")
             link = B.LINK(href=self.CSS, rel="stylesheet")
             icon = B.LINK(href="/favicon.ico", rel="icon")
-            head = B.HEAD(meta, B.TITLE(self.TITLE), icon, link)
+            jqry = B.SCRIPT(src=self.control.HTMLPage.JQUERY)
+            head = B.HEAD(meta, B.TITLE(self.TITLE), icon, link, jqry)
             time = B.SPAN(self.control.started.ctime())
             args = self.SUBTITLE, B.BR(), "QC Report", B.BR(), time
             concept_id = B.P(f"CDR{self.doc.id}", id="concept-id")
@@ -297,17 +298,31 @@ class Concept:
                 if self.parallel:
                     wrapper = B.DIV(B.CLASS("lang-wrapper"))
                     body.append(wrapper)
-                for definition in self.definitions[langcode]:
-                    section = f"{language} - {definition.audience}"
+                for audience in sorted(self.definitions[langcode], reverse=True):
+                    aud = self.definitions[langcode][audience].audience
+                    section = f"{language} - {aud.title()}"
                     wrapper.append(B.H2(section))
-                    wrapper.append(definition.term_table)
-                    wrapper.append(definition.info_table)
+                    wrapper.append(self.definitions[langcode][audience].term_table)
+                    wrapper.append(self.definitions[langcode][audience].info_table)
             if self.media_table is not None:
                 body.append(self.media_table)
             body.append(self.term_type_table)
             if self.related_info_table is not None:
                 body.append(B.H2("Related Information"))
                 body.append(self.related_info_table)
+            body.append(B.SCRIPT("""\
+jQuery(function() {
+    jQuery("a.sound").click(function() {
+        var url = jQuery(this).attr("href");
+        var audio = document.createElement("audio");
+        audio.setAttribute("src", url);
+        audio.load();
+        audio.addEventListener("canplay", function() {
+            audio.play();
+        });
+        return false;
+    });
+});"""))
         return self._report
 
     @property
@@ -512,7 +527,8 @@ class Concept:
                 self.__add_row(rows, "dictionaries", "Dictionary")
                 self.__add_row(rows, "status", self.STATUSES[self.langcode])
                 self.__add_row(rows, "status_date", "Status Date")
-                for comment in self.comments:
+                # Only include the topmost comment
+                for comment in self.comments[:1]:
                     rows.append(comment.row)
                 self.__add_row(rows, "last_modified", "Date Last Modified")
                 self.__add_row(rows, "last_reviewed", "Date Last Reviewed")
@@ -547,7 +563,11 @@ class Concept:
 
         @property
         def term_table(self):
-            """Table showing term names and customized definitions."""
+            """Table showing term names and customized definitions.
+
+               The definition is included via the resolve_placeholders() method
+               and by transforming the text via a XSLT filter
+            """
 
             B = builder
             table = B.TABLE(B.CLASS("name-and-def"))
@@ -563,6 +583,9 @@ class Concept:
                     markup.tag = "span"
                 args = [markup, f" (CDR{name.id})"]
                 if self.langcode == "es":
+                    if name.spanish_pronunciation is not None:
+                        args.append(" ")
+                        args.append(name.spanish_pronunciation)
                     if name.spanish_name is None:
                         markup = B.SPAN(" (en ingl\xe9s)", B.CLASS("special"))
                         args.append(markup)
@@ -578,6 +601,9 @@ class Concept:
                                 markup.tag = "span"
                             args.append(markup)
                         args.append("]")
+                elif name.english_pronunciation is not None:
+                    args.append(" ")
+                    args.append(name.english_pronunciation)
                 if name.blocked:
                     args = ["BLOCKED - "] + args + [B.CLASS("blocked")]
                 table.append(B.TR(B.TD("Name"), B.TD(*args), B.CLASS("name")))
@@ -871,6 +897,31 @@ class Concept:
             return self._english_name
 
         @property
+        def english_pronunciation(self):
+            """Link to the audio file for pronunciation of the English name."""
+
+            if self.english_pronunciation_url:
+                B = builder
+                url = self.english_pronunciation_url
+                img = B.IMG(B.CLASS("sound"), src="/images/audio.png")
+                return B.A(img, B.CLASS("sound"), href=url)
+            return None
+
+        @property
+        def english_pronunciation_url(self):
+            """URL for the audio file for pronunciation of the English name."""
+
+            if not hasattr(self, "_english_pronunciation_url"):
+                self._english_pronunciation_url = None
+                node = self.doc.root.find("TermName/MediaLink/MediaID")
+                if node is not None:
+                    id = node.get(f"{{{Doc.NS}}}ref")
+                    if id:
+                        url = f"GetCdrBlob.py?disp=inline&id={id}"
+                        self._english_pronunciation_url = url
+            return self._english_pronunciation_url
+
+        @property
         def replacements(self):
             """The name's replacement strings for definition placeholders."""
 
@@ -897,6 +948,31 @@ class Concept:
                 if not hasattr(self, "_alternate_spanish_names"):
                     self._alternate_spanish_names = alternates
             return self._spanish_name
+
+        @property
+        def spanish_pronunciation(self):
+            """Link to the audio file for pronunciation of the Spanish name."""
+
+            if self.spanish_pronunciation_url:
+                B = builder
+                url = self.spanish_pronunciation_url
+                img = B.IMG(B.CLASS("sound"), src="/images/audio.png")
+                return B.A(img, B.CLASS("sound"), href=url)
+            return None
+
+        @property
+        def spanish_pronunciation_url(self):
+            """URL for the audio file for pronunciation of the Spanish name."""
+
+            if not hasattr(self, "_spanish_pronunciation_url"):
+                self._spanish_pronunciation_url = None
+                node = self.doc.root.find("TranslatedName/MediaLink/MediaID")
+                if node is not None:
+                    id = node.get(f"{{{Doc.NS}}}ref")
+                    if id:
+                        url = f"GetCdrBlob.py?disp=inline&id={id}"
+                        self._spanish_pronunciation_url = url
+            return self._spanish_pronunciation_url
 
         @staticmethod
         def markup_for_name(name):

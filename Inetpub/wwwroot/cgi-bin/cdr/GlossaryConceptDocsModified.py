@@ -18,7 +18,7 @@ class Control(Controller):
     """Access to database, session, and report/form building."""
 
     SUBTITLE = "Glossary Concept Documents Modified Report"
-    AUDIENCES = ("Patient", "Health Professional")
+    AUDIENCES = ("Patient", "Health professional")
     LANGUAGES = (("en", "English"), ("es", "Spanish"))
 
     def build_tables(self):
@@ -68,6 +68,13 @@ class Control(Controller):
         return self.fields.getvalue("audience")
 
     @property
+    def audience_display(self):
+        """Audience display for the comment column."""
+        display = {'Patient':'PT', 
+                   'Health professional': 'HP'}
+        return display[self.audience]
+
+    @property
     def columns(self):
         """Column headers for the report."""
 
@@ -76,7 +83,7 @@ class Control(Controller):
             self.Reporter.Column("Date Last Modified", width="100px"),
             self.Reporter.Column("Publishable?", width="100px"),
             self.Reporter.Column("Date First Published (*)", width="100px"),
-            self.Reporter.Column("Last Comment", width="450px")
+            self.Reporter.Column(f"Last {self.audience_display} Comment", width="450px")
         )
 
     @property

@@ -1,6 +1,16 @@
 body { font-family: sans-serif; }
-header h1, header h2 { text-align: center; }
-h1, #concept-id { font-size: 14pt; font-weight: bold; }
+header h1, header h2 
+    { text-align: center; }
+h1, #summary-id, #summary-english, #summary-spanish, 
+    .summary-title
+    { 
+      font-size: 14pt; 
+      font-weight: bold; 
+    }
+.section-hdr
+    { font-size: 14pt;
+      font-weight: bold }
+
 h1 span { font-size: 12pt; }
 h2 { font-size: 13pt; margin-top: 50px; }
 img { width: 300px; }
@@ -21,5 +31,3 @@ td:first-child { width: 20%; }
 .term-normal { background-color: yellow; }
 .term-name { color: blue; font-weight: bold; }
 .lang-wrapper { float: left; width: 48%; margin: 0 5px; }
-a.sound { text-decoration: none; color: blue; }
-img.sound { height: 13.34px; width: 15px; border: none; }

@@ -18,7 +18,7 @@ class Control(Controller):
     jobs in bulk.
     """
 
-    SUBTITLE = "Media Translation Job Queue"
+    SUBTITLE = "Glossary Translation Job Queue"
     ADD = "Add"
     ASSIGN = "Assign"
     PURGE = "Purge"

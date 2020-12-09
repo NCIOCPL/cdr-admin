@@ -32,6 +32,7 @@ class Control(Controller):
             ("Documents Modified Since Last Publishable Version",
              "ModWithoutPubVersion.py"),
             ("Show CDR Document XML", "ShowCdrDocument.py"),
+            ("Show DIS Elements", "ShowDISIncludes.py"),
             ("Show Summary Elements", "ShowSummaryIncludes.py"),
             ("URL Check", "CheckUrls.py"),
             ("URL List Report", "UrlListReport.py"),

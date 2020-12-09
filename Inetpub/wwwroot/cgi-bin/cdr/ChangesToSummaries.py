@@ -38,8 +38,11 @@ class Control(Controller):
         fieldset.append(page.select("board", options=["All"]+self.boards))
         page.form.append(fieldset)
         fieldset = page.fieldset("Select Audience")
+        checked = True
         for value in self.AUDIENCES:
-            fieldset.append(page.radio_button("audience", value=value))
+            opts = dict(value=value, checked=checked)
+            fieldset.append(page.radio_button("audience", **opts))
+            checked = False
         page.form.append(fieldset)
         fieldset = page.fieldset("Included Documents")
         for value, label, checked in self.INCLUDE:
@@ -84,12 +87,48 @@ class Control(Controller):
         self.logger.debug("collected %d boards", len(boards))
         args = Summary.VERSIONS_EXAMINED, Summary.SUMMARIES_EXAMINED
         self.logger.debug("examined %d versions in %d summaries", *args)
+        non_modules = available_as_module = module_only = 0
+        boards_with_summaries = 0
         for board in boards:
-            board.show(body)
+            if board.summaries:
+                boards_with_summaries += 1
+            non_modules += board.non_modules
+            available_as_module += board.available_as_module
+            module_only += board.module_only
+        self.add_totals(body, non_modules, available_as_module, module_only)
+        show_subtotals = boards_with_summaries > 1
+        for board in boards:
+            board.show(body, show_subtotals)
         stdout.buffer.write(b"Content-type: text/html; charset=utf-8\n\n")
         page = B.HTML(head, body)
         page = lxml.html.tostring(page, pretty_print=True, encoding="unicode")
         stdout.buffer.write(page.encode("utf-8"))
+
+    def add_totals(self, body, non_modules, available_as_module, module_only):
+        """Add a table with totals (OCECDR-4872)."""
+
+        totals = non_modules + available_as_module + module_only
+        B = self.HTMLPage.B
+        table = B.TABLE(
+            B.TR(
+                B.TH("Only usable as standalone summaries:"),
+                B.TD(str(non_modules)),
+            ),
+            B.TR(
+                B.TH("Only usable as summary modules:"),
+                B.TD(str(module_only)),
+            ),
+            B.TR(
+                B.TH("Can be used standalone or as modules:"),
+                B.TD(str(available_as_module)),
+            ),
+            B.TR(
+                B.TH("Total summaries:"),
+                B.TD(str(totals)),
+            ),
+            B.CLASS("totals-table"),
+        )
+        body.append(table)
 
     @property
     def audience(self):
@@ -162,6 +201,7 @@ class Board:
         self.doc_id = doc_id
         self.name = name
         self.summaries = []
+        self.non_modules = self.available_as_module = self.module_only = 0
         a_path = "/Summary/SummaryMetaData/SummaryAudience"
         b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
         query = control.Query("query_term a", "a.doc_id")
@@ -182,10 +222,16 @@ class Board:
             summary = Summary(control, row[0])
             if summary.changes is not None:
                 self.summaries.append(summary)
+                if summary.module_only:
+                    self.module_only += 1
+                elif summary.available_as_module:
+                    self.available_as_module += 1
+                else:
+                    self.non_modules += 1
         args = len(self.summaries), name
         control.logger.debug("Collected %d summaries for %s", *args)
 
-    def show(self, body):
+    def show(self, body, show_subtotals):
         "If the board has summaries with changes in the date range, show them"
 
         if self.summaries:
@@ -194,6 +240,10 @@ class Board:
             audience = B.BR()
             audience.tail = self.control.audience
             body.append(B.H2(self.name, audience, B.CLASS("left board")))
+            if show_subtotals:
+                self.control.add_totals(body, self.non_modules,
+                                        self.available_as_module,
+                                        self.module_only)
             for summary in sorted(self.summaries):
                 summary.show(body)
                 self.control.logger.debug("showing CDR%s", summary.doc_id)
@@ -218,8 +268,9 @@ class Summary:
         query.where(query.Condition("id", doc_id))
         #start = datetime.datetime.strptime(control.start, "%Y-%m-%d")
         cutoff = control.start - datetime.timedelta(365)
+        end = f"{control.end} 23:59:59"
         query.where(query.Condition("dt", str(cutoff), ">="))
-        query.where(query.Condition("dt", control.end, "<"))
+        query.where(query.Condition("dt", end, "<"))
         versions = [row[0] for row in query.execute(control.cursor).fetchall()]
         html = ""
         for version in versions:
@@ -254,6 +305,34 @@ class Summary:
         doc_id.tail = cdr.normalize(self.doc_id)
         page.append(B.H2(self.title, doc_id, B.CLASS("summary")))
         page.append(self.changes)
+
+    @property
+    def available_as_module(self):
+        """True if this summary can be used as a module."""
+
+        if not hasattr(self, "_available_as_module"):
+            self._available_as_module = False
+            query = self.control.Query("query_term", "value")
+            query.where("path = '/Summary/@AvailableAsModule'")
+            query.where(query.Condition("doc_id", self.doc_id))
+            rows = query.execute(self.control.cursor).fetchall()
+            if rows and rows[0].value.lower() == 'yes':
+                self._available_as_module = True
+        return self._available_as_module
+
+    @property
+    def module_only(self):
+        """True if this summary can be used as a module."""
+
+        if not hasattr(self, "_module_only"):
+            self._module_only = False
+            query = self.control.Query("query_term", "value")
+            query.where("path = '/Summary/@ModuleOnly'")
+            query.where(query.Condition("doc_id", self.doc_id))
+            rows = query.execute(self.control.cursor).fetchall()
+            if rows and rows[0].value.lower() == 'yes':
+                self._module_only = True
+        return self._module_only
 
     def __lt__(self, other):
         "Support intelligent sorting of the summaries"

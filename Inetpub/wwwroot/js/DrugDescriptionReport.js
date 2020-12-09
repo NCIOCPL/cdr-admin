@@ -1,5 +1,5 @@
 function check_method(method) {
-    jQuery.each(['name', 'date', 'type'], function(i, block) {
+    jQuery.each(['name', 'date', 'type', 'fda'], function(i, block) {
         if (block == method)
             jQuery('#' + block + '-block').show();
         else

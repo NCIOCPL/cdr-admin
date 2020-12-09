@@ -159,14 +159,14 @@ class Control(Controller):
 
         if not self.links:
             nada = "No link to this document found."
-            column = cdrcgi.Report.Column(nada, width="500px")
+            column = self.Reporter.Column(nada, width="500px")
             return [self.Reporter.Table([], columns=[column])]
         tables = []
         for doctype in sorted(self.links):
             rows = []
             for link in self.links[doctype]:
                 cdr_id = f"CDR{link.id:d}"
-                url = self.make_url("QcReport.py", DocId=cdr_id, DocVersion=-1)
+                url = self.make_url("QcReport.py", DocId=cdr_id)
                 row = (
                     self.Reporter.Cell(cdr_id, href=url),
                     link.title,

@@ -30,7 +30,7 @@ class Control(Controller):
         """
 
         fieldset = page.fieldset("Schema")
-        fieldset.append(page.file_field("file", label="Summary File"))
+        fieldset.append(page.file_field("file", label="Schema File"))
         fieldset.append(page.text_field("comment"))
         page.form.append(fieldset)
         fieldset = page.fieldset("Action")
@@ -75,7 +75,7 @@ class Control(Controller):
 
     @property
     def document(self):
-        """Uploaded summary document to be posted."""
+        """Uploaded schema document to be posted."""
 
         if not hasattr(self, "_document"):
             self._document = None
@@ -109,15 +109,16 @@ class Control(Controller):
         if not hasattr(self, "_file_bytes"):
             self._file_bytes = None
             if self.file_field is not None:
-                segments = []
-                while True:
-                    more_bytes = self.file_field.file.read()
-                    if not more_bytes:
-                        break
-                    segments.append(more_bytes)
-            else:
-                segments = [self.file_field.value]
-            self._file_bytes = b"".join(segments)
+                if self.file_field.file:
+                    segments = []
+                    while True:
+                        more_bytes = self.file_field.file.read()
+                        if not more_bytes:
+                            break
+                        segments.append(more_bytes)
+                else:
+                    segments = [self.file_field.value]
+                self._file_bytes = b"".join(segments)
         return self._file_bytes
 
     @property
@@ -186,7 +187,7 @@ class Control(Controller):
         cmd = r"python d:\cdr\build\CheckDtds.py"
         result = run_command(cmd, merge_output=True)
         if result.returncode:
-            raise Exception(f"DTD check failure: result.stdout")
+            raise Exception(f"DTD check failure: {result.stdout}")
         self.logger.info("DTDs updated")
         return "Running CheckDtds.py ...\n" + result.stdout
 

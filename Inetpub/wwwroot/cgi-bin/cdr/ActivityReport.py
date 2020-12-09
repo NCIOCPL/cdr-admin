@@ -7,10 +7,10 @@ BZIssue::1283 - add support for searching by user
 
 import datetime
 import cdr
-import cdrcgi
+from cdrcgi import Controller
 from cdrapi import db
 
-class ActivityReport(cdrcgi.Controller):
+class ActivityReport(Controller):
 
     SUBTITLE = "Document Activity Report"
     COLS = "Who", "When", "Action", "DocType", "DocID", "DocTitle", "Comment"
@@ -62,12 +62,12 @@ class ActivityReport(cdrcgi.Controller):
             cdrid = f"{id:010d}"
             url = f"QcReport.py?DocId={cdrid}&Session={self.session}"
             url += "&DocVersion=-1"
-            link = cdrcgi.Reporter.Cell(cdrid, href=url)
+            link = self.Reporter.Cell(cdrid, href=url)
             title = f"{title[:20]} ..."
             row = who, when, action, dt, link, title, cmt
             rows.append(row)
         caption = [caption, date_range]
-        return cdrcgi.Reporter.Table(rows, caption=caption, columns=self.COLS)
+        return self.Reporter.Table(rows, caption=caption, columns=self.COLS)
 
     def show_report(self):
         """Override to provide a hook for some custom style rules."""

@@ -44,8 +44,8 @@ aufio file sets at various stages of processing:
         tables. It has no information about the individual audio files,
         but just the information needed for the first page, including
         the date and name for the zipfile, and whether the review of
-        the set has finished. This catalog will contiain zipfiles which
-        or no longer available on disk in the audio files directory,
+        the set has finished. This catalog will contain zipfiles which
+        are no longer available on disk in the audio files directory,
         because they have been archived by the scheduled Files Sweeper
         job. Only those zipfiles which are still in the audio files
         directory are shown on the landing page for this script.
@@ -63,6 +63,7 @@ aufio file sets at various stages of processing:
         review dispositions.
 """
 
+from cdr import run_command
 from cdrcgi import Controller, Excel
 from cdrapi.settings import Tier
 from datetime import datetime
@@ -84,8 +85,8 @@ class Control(Controller):
     REVDIR = f"{ZIPDIR}/GeneratedRevisionSheets"
     IGNORE = "__MACOSX"
     NOTEPAT = compile(r"[\r\n]+")
-    NAMEPAT = compile(r"(?i)(?P<base>Week_\d{3})(?P<rev>_Rev\d)*.zip")
-    REVPAT = compile(r"(?i)_Rev(?P<num>\d{3})")
+    NAMEPAT = compile(r"(?i)(?P<base>Week_\d{4}_\d\d)(?P<rev>_Rev\d)*.zip")
+    REVPAT = compile(r"(?i)_Rev(?P<num>\d+)")
     MAXNOTE = 2040
     MAXFILE = 250
     MAXTERM = 250
@@ -94,8 +95,8 @@ class Control(Controller):
     FIXNAME_INSTRUCTIONS = [
         "Please correct the name to reflect one of the following formats "
         "or contact programming support staff for assistance.",
-        "Week_NNN.zip or Week_NNN_RevN.zip",
-        "... where 'N' is a decimal digit.",
+        "Week_YYYY_WW.zip or Week_YYYY_WW_RevN.zip",
+        "... where 'Y', 'W', and 'N' represent decimal digits.",
     ]
 
     def run(self):
@@ -119,7 +120,7 @@ class Control(Controller):
         """Show the review form for a set, or the set list if none selected.
 
         The landing page for this script shows the list of audio file sets
-        on the disk. If the users selects one of the sets, we draw the
+        on the disk. If the user selects one of the sets, we draw the
         form for rewviewing the audio files in that set.
 
         Pass:
@@ -152,7 +153,7 @@ class Control(Controller):
             rules += (
                 "td, th { border-color:#888; }",
                 "fieldset{ width: 900px; }",
-                ".status-buttons { width: 86px; }",
+                ".status-buttons { width: 86px; white-space: nowrap; }",
                 ".status-buttons input { padding-left: 10px; }",
                 "td:last-child: padding: 0 2px; }",
             )
@@ -327,6 +328,18 @@ class Control(Controller):
         return self.fields.getvalue("name")
 
     @property
+    def name_counts(self):
+        """Index of integers for new MP3 names.
+
+        This is used to prevent name collisions in the event there
+        are multiple Spanish names for the same term.
+        """
+
+        if not hasattr(self, "_name_counts"):
+            self._name_counts = dict()
+        return self._name_counts
+
+    @property
     def subtitle(self):
         """String to be displayed under the main banner."""
 
@@ -407,10 +420,6 @@ class Control(Controller):
                         names = dict([(f.filename, f) for f in self.files])
                         self._names = names
                     return self._names
-
-                @property
-                def table(self):
-                    """HTML table object for display on the landing page."""
 
 
                 class ZipFile:
@@ -562,10 +571,12 @@ class Control(Controller):
             for entry in scandir(self.ZIPDIR):
                 key = entry.name.lower()
                 if key.startswith("week") and key.endswith(".zip"):
-                    if not self.NAMEPAT.match(entry.name):
+                    if self.NAMEPAT.match(entry.name):
+                        files.append(DiskFile(self, entry))
+                    else:
                         message = f"Found file {entry.name!r}."
+                        self.logger.warning(message)
                         self.bail(message, extra=self.FIXNAME_INSTRUCTIONS)
-                    files.append(DiskFile(self, entry))
             self._zipfiles_on_disk = sorted(files)
         return self._zipfiles_on_disk
 
@@ -583,11 +594,12 @@ class AudioSet:
         "mp3_name",
         "reader_note",
         "reviewer_note",
+        "reuse_media_id",
         "reviewer_id",
         "review_date",
     )
     HEADERS = (
-        "Approve / Reject / None",
+        "Appr/Rej/None",
         "CDR ID",
         "Term name",
         "Lang",
@@ -604,6 +616,7 @@ class AudioSet:
         ("Filename", 30),
         ("Notes (Vanessa)", 20),
         ("Notes (NCI)", 30),
+        ("Reuse Media ID", 15),
     )
     FIELD_LIST = ", ".join(FIELDS)
     PLACEHOLDERS = ", ".join(["?"] * len(FIELDS))
@@ -633,7 +646,11 @@ class AudioSet:
         self.cursor.execute(self.UPDATE, self.id)
         self.control.conn.commit()
         if self.rejects:
-            self.new_workbook.save(Control.REVDIR)
+            path = self.new_workbook.save(Control.REVDIR).replace("/", "\\")
+            process = run_command(f"fix-permissions {path}")
+            if process.stderr:
+                self.control.bail(f"Unable to fix permissions for {path}",
+                                  extra=[process.stderr])
             return self.new_name
         return None
 
@@ -642,7 +659,8 @@ class AudioSet:
         """Sequence of `MP3` files in this set."""
 
         if "audio_files" not in self.__cache:
-            query = self.control.Query("term_audio_mp3", "*").order("cdr_id")
+            query = self.control.Query("term_audio_mp3", "*")
+            query.order("cdr_id", "mp3_name")
             query.where(query.Condition("zipfile_id", self.id))
             rows = query.execute(self.cursor).fetchall()
             audio_files = [self.MP3(self.control, row) for row in rows]
@@ -723,6 +741,8 @@ class AudioSet:
                 book.write(row, 5, mp3.new_mp3_name)
                 book.write(row, 6, mp3.reader_note)
                 book.write(row, 7, mp3.reviewer_note)
+                if mp3.reuse_media_id:
+                    book.write(row, 8, mp3.reuse_media_id)
                 row += 1
         return self._new_workbook
 
@@ -800,7 +820,7 @@ class AudioSet:
         sheet = book.sheet_by_index(0)
         args = sheet.nrows, sheet.ncols
         self.control.logger.info("sheet has %d rows and %d columns", *args)
-        args = diskfile.name, diskfile.datetime #str(diskfile.datetime)[:23]
+        args = diskfile.name, diskfile.datetime
         self.control.logger.info("inserting %s, %s", *args)
         self.cursor.execute(
             "INSERT INTO term_audio_zipfile (filename, filedate, complete) "
@@ -817,9 +837,9 @@ class AudioSet:
             try:
                 values = [set_id, int(value)]
             except:
-                self.control.logger.warning("row %d has %s", row, value)
+                self.control.logger.warning("row %d has %r", row, value)
                 continue
-            for col in range(1, 7):
+            for col in range(1, 8):
                 values.append(sheet.cell(row, col).value)
             if values[self.LANGUAGE_COL] not in self.LANGUAGES:
                 args = value[self.LANGUAGE_COL], row
@@ -836,7 +856,7 @@ class AudioSet:
 
         for name in zipfile.namelist():
             if "MACOSX" not in name:
-                if name.endswith(".xls") or name.endswith(".xlsx"):
+                if name.endswith(".xlsx"):
                     return name
         return None
 
@@ -910,8 +930,14 @@ class AudioSet:
 
             if not hasattr(self, "_new_mp3_name"):
                 book_name = self.control.audio_set.new_name
-                name = f"{book_name}/{self.cdr_id:d}_{self.langcode}.mp3"
-                self._new_mp3_name = name
+                name = f"{self.cdr_id:d}_{self.langcode}"
+                n = ""
+                if name in self.control.name_counts:
+                    self.control.name_counts[name] += 1
+                    n = self.control.name_counts[name]
+                else:
+                    self.control.name_counts[name] = 1
+                self._new_mp3_name = f"{book_name}/{name}{n}.mp3"
             return self._new_mp3_name
 
         @property
@@ -952,7 +978,12 @@ class AudioSet:
 
             if not hasattr(self, "_sortkey"):
                 status_order = self.STATUS_ORDER[self.review_status]
-                self._sortkey = status_order, self.cdr_id, self.language
+                self._sortkey = (
+                    status_order,
+                    self.cdr_id,
+                    self.language,
+                    self.mp3_name,
+                )
             return self._sortkey
 
 

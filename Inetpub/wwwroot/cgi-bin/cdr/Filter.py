@@ -120,7 +120,11 @@ class Control(Controller):
             except Exception:
                 self.bail("Unrecognized document ID format")
             version = self.fields.getvalue("DocVer", "0")
-            if not version.isdigit() and version not in ("last", "lastp"):
+
+            # If no version is specified the default version is the CWD
+            # which is indicated with a version=None.  Need to allow
+            # "None" as a valid value.
+            if not version.isdigit() and version not in ("None", "last", "lastp"):
                 self.bail(f"Invalid version {version!r}")
             self._doc = Doc(self.session, id=id, version=version)
         return self._doc
@@ -372,16 +376,16 @@ class FilterSpec:
             self._error = None
             if self.set_name:
                 if self.set_name.upper() not in self.control.all_filter_sets:
-                    args = self.set_name, self.control.tier
+                    args = self.set_name, self.control.session.tier
                     message = "{} not found on the CDR {} server"
                     self._error = message.format(*args)
             elif self.filter_name:
                 if self.filter_name.upper() not in self.control.all_filters:
-                    args = self.filter_name, self.control.tier
+                    args = self.filter_name, self.control.session.tier
                     message = "{} is not a filter on the CDR {} server"
                     self._error = message.format(*args)
             elif self.filter_id not in self.control.all_filter_ids:
-                args = self.identifier, self.control.tier
+                args = self.identifier, self.control.session.tier
                 message = "{} is not a filter on the CDR {} server"
                 self._error = message.format(*args)
         return self._error

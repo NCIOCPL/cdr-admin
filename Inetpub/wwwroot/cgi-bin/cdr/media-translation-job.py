@@ -115,12 +115,15 @@ jQuery(function() {{
 }});""")
         action = "Edit" if self.job and not self.job.new else "Create"
         legend = f"{action} Translation Job"
-        fieldset = page.fieldset(legend)
         if self.english_id:
             page.form.append(page.hidden_field("english_id", self.english_id))
-        else:
+            legend += f" for {self.english_doc.cdr_id}"
+        fieldset = page.fieldset(legend)
+        if not self.english_id:
             fieldset.append(page.text_field("english_id", label="English ID"))
         user = self.job.assigned_to if self.job else self.lead_translator
+        if not user:
+            user = self.lead_translator
         opts = dict(options=self.translators, default=user)
         fieldset.append(page.select("assigned_to", **opts))
         states = self.states.values
@@ -372,10 +375,7 @@ class Job:
 
     @property
     def spanish_id(self):
-        """CDR ID for the translated summary document (if it exists).
-
-        TODO: remove?
-        """
+        """CDR ID for the translated summary document (if it exists)."""
 
         if not hasattr(self, "_spanish_id"):
             query = self.__control.Query("query_term", "doc_id")
@@ -387,16 +387,13 @@ class Job:
 
     @property
     def spanish_title(self):
-        """Title for translated summary document (if it exists).
-
-        TODO: remove?
-        """
+        """Title for translated summary document (if it exists)."""
 
         if not hasattr(self, "_spanish_title"):
             self._spanish_title = None
             if self.spanish_id:
                 query = self.__control.Query("document", "title")
-                query.where(query.Condition("doc_id", self.spanish_id))
+                query.where(query.Condition("id", self.spanish_id))
                 row = query.execute(self.__control.cursor).fetchone()
                 self._spanish_title = row.title.split(";")[0].strip()
         return self._spanish_title
@@ -411,11 +408,16 @@ class Job:
         """Override for string below banner."""
 
         if not hasattr(self, "_subtitle"):
-            doc = self.__control.english_doc
-            title = doc.title.split(";")[0].strip()
+            if self.spanish_id:
+                id = f"CDR{self.spanish_id:010}"
+                title = self.spanish_title
+            else:
+                doc = self.__control.english_doc
+                id = doc.cdr_id
+                title = doc.title.split(";")[0].strip()
             if len(title) > 40:
                 title = f"{title[:40]} ..."
-            self._subtitle = f"Translation job for {doc.cdr_id} ({title})"
+            self._subtitle = f"{id} ({title})"
         return self._subtitle
 
 

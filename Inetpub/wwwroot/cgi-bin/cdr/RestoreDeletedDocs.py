@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""Delete CDR documents.
+"""Restore deleted CDR documents.
 
 The documents aren't actually deleted, but instead their active_status
 column is set to 'D'.
@@ -12,17 +12,11 @@ from cdrapi.docs import Doc
 
 class Control(Controller):
 
-    SUBTITLE = "CDR Document Deletion"
-    LOGNAME = "del-some-docs"
-    LEGEND = "Select Documents To Delete (with optional comment)"
-    REASON = "Deleted using the CDR Admin interface"
-    INSTRUCTIONS = (
-        "Enter document IDs separated by spaces and/or line breaks. "
-        "If you check the 'Validate' box below, documents which would "
-        "introduce link validation errors if deleted will not be deleted. "
-        "If you uncheck this box, the validation errors will still be "
-        "displayed, but the document deletion will be processed."
-    )
+    SUBTITLE = "CDR Document Restoration"
+    LOGNAME = "DocumentRestoration"
+    LEGEND = "Select Documents To Restore (with optional comment)"
+    REASON = "Restored using the CDR Admin interface"
+    INSTRUCTIONS = "Enter document IDs separated by spaces and/or line breaks."
 
     def populate_form(self, page):
         """Add fields to the form.
@@ -33,21 +27,16 @@ class Control(Controller):
 
         fieldset = page.fieldset("Instructions")
         fieldset.append(page.B.P(self.INSTRUCTIONS))
-        prefix = "It is recommended that you run the "
-        suffix = " to check for links to the documents you plan to delete."
-        opts = dict(href="LinkedDocs.py", target="_blank")
-        link = page.B.A("linked-docs report", **opts)
-        warning = page.B.P(prefix, link, suffix, page.B.CLASS("warning"))
-        fieldset.append(warning)
         page.form.append(fieldset)
         fieldset = page.fieldset(self.LEGEND)
         fieldset.append(page.textarea("ids", label="CDR IDs", rows=3))
         fieldset.append(page.textarea("reason", label="Comment"))
         page.form.append(fieldset)
-        fieldset = page.fieldset("Options")
-        label = "Validate? (Please read the instructions above)"
-        opts = dict(value="validate", label=label, checked=True)
-        fieldset.append(page.checkbox("options", **opts))
+        fieldset = page.fieldset("New Status")
+        opts = dict(value="I", label="Inactive", checked=True)
+        fieldset.append(page.radio_button("status", **opts))
+        opts = dict(value="A", label="Active", checked=False)
+        fieldset.append(page.radio_button("status", **opts))
         page.form.append(fieldset)
         if self.results is not None:
             fieldset = page.fieldset("Processing Results")
@@ -65,7 +54,7 @@ class Control(Controller):
 
     @property
     def ids(self):
-        """CDR IDs of documents which are to be marked as deleted."""
+        """CDR IDs of documents which are to be marked as restored."""
 
         if not hasattr(self, "_ids"):
             self._ids = []
@@ -93,25 +82,25 @@ class Control(Controller):
         if not hasattr(self, "_results"):
             self._results = None
             if self.ids:
+                status = "Active" if self.status == "A" else "Blocked"
                 self.logger.info(" session: %r", self.session)
                 self.logger.info("    user: %r", self.session.user_name)
-                self.logger.info("validate: %r", self.validate)
+                self.logger.info("  status: %r", status)
                 self.logger.info("  reason: %r", self.reason)
                 B = self.HTMLPage.B
                 items = []
-                opts = dict(reason=self.reason, validate=self.validate)
                 for id in self.ids:
                     doc = Doc(self.session, id=id)
                     cdr_id = doc.cdr_id
-                    if doc.active_status == Doc.DELETED:
-                        message = f"{cdr_id} already deleted"
+                    if doc.active_status != Doc.DELETED:
+                        message = f"{cdr_id} already restored"
                         self.logger.warning(message)
                         items.append(B.LI(message, B.CLASS("error")))
                         continue
                     try:
-                        doc.delete(**opts)
-                        self.logger.info("Deleted %s", cdr_id)
-                        message = f"{cdr_id} deleted successfully"
+                        doc.set_status(self.status, comment=self.reason)
+                        self.logger.info("Restored %s", cdr_id)
+                        message = f"{cdr_id} restored successfully"
                         items.append(B.LI(message, B.CLASS("info")))
                         for error in doc.errors:
                             message = f"{cdr_id}: {error}"
@@ -124,9 +113,13 @@ class Control(Controller):
         return self._results
 
     @property
-    def validate(self):
-        """Whether deletions should be blocked for docs that are linked."""
-        return "validate" in self.fields.getlist("options")
+    def status(self):
+        """New status for the documents (Active or Inactive)."""
+        if not hasattr(self, "_status"):
+            self._status = self.fields.getvalue("status", "I")
+            if not self._status in "IA":
+                self.bail()
+        return self._status
 
 
 if __name__ == "__main__":

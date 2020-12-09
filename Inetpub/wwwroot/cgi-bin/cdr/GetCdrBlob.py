@@ -113,6 +113,7 @@ cursor = db.connect(user='CdrGuest').cursor()
 fields = cgi.FieldStorage()
 docId  = fields.getvalue('id') or cdrcgi.bail("Missing required 'id' parameter")
 docVer = fields.getvalue('ver') or ''
+disp   = fields.getvalue("disp") or "attachment"
 try:
     info = DocInfo(cursor, docId, docVer)
 except Exception as e:
@@ -142,7 +143,7 @@ if not rows:
 blob_bytes = rows[0][0]
 sys.stdout.buffer.write(f"""\
 Content-Type: {info.mimeType}
-Content-Disposition: attachment; filename={info.filename}
+Content-Disposition: {disp}; filename={info.filename}
 Content-Length: {len(blob_bytes)}
 
 """.encode("utf-8"))

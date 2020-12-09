@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 
-"""Report on the types of changes recorded in selected Summaries.
+"""
+    Report on the types of changes recorded in selected Drug Info Summaries.
+
+    (adapted from SummaryTypeChangeReport.py written by BK)
 """
 
 from datetime import date
@@ -14,55 +17,84 @@ class Control(Controller):
     Logic manager for report.
     """
 
-    SUBTITLE = "Summaries Type of Change"
-    LOGNAME = "SummaryTypeChangeReport"
+    SUBTITLE = "DIS Type of Change"
+    LOGNAME = "DISTypeChangeReport"
     INCLUDE = "include"
     EXCLUDE = "exclude"
     COMMENTS = INCLUDE, EXCLUDE
     CURRENT = "Current (most recent changes for each category of change)"
     HISTORICAL = "Historical (all changes for a given date range)"
     REPORT_TYPES = CURRENT, HISTORICAL
-    BY_SUMMARY = "One table for all summaries and changes"
+    BY_SUMMARY = "One table for all drug info summaries and changes"
     BY_CHANGE_TYPE = "One table for each type of change"
     REPORT_ORGANIZATIONS = BY_SUMMARY, BY_CHANGE_TYPE
-    MODULES = (
-        ("both", "Summaries and Modules"),
-        ("summaries", "Summaries Only"),
-        ("modules", "Modules Only"),
+    INSTRUCTIONS = (
+        "To run this report for multiple drug information summaries, select "
+        "'By CDR ID' and enter multiple CDR IDs separated by a comma. "
+        "To run the report for all "
+        "drug information summaries, refer to the ad-hoc query "
+        "'DIS CDR IDs for Type of Change Report' on the following page: ",
+        "CDR Stored Database Queries",
+        "/cgi-bin/cdr/CdrQueries.py",
+        "Copy and paste the complete set of CDR IDs into the CDR ID field."
     )
+
 
     def build_tables(self):
         """Assemble the table(s) for the report.
 
         If we're ready to display the report, we have three options:
           1. a single table showing the latest changes in each
-             category of change for each selected summary
+             category of change for each selected drug info summary
           2. an historical report with a single table showing
              all changes falling within the specified date range
-             for all selected summaries
+             for all selected drug info summaries
           3. multiple tables, one for each type of change,
              showing all changes occurring withing the specified
-             date range for all selected summaries
+             date range for all selected drug info summaries
         """
 
         tables = None
         if self.type == self.CURRENT:
             caption = "Type of Change Report (Most Recent Change)"
         elif self.organization == self.BY_SUMMARY:
-            caption = "Type of Change Report (All Changes by Summary)"
+            caption = "Type of Change Report (All Changes by Drug Info Summary)"
             caption = caption, self.date_range
         else:
             tables = self.change_type_tables
         if tables is None:
             opts = dict(caption=caption, columns=self.columns)
             rows = []
-            for summary in sorted(self.summaries):
-                rows.extend(summary.get_rows())
-            tables = [self.Reporter.Table(rows, **opts)]
+            for dis in sorted(self.dis_docs):
+                rows.extend(dis.get_rows())
+
+            table_rows = []
+            for row in rows:
+                cells = [
+                    self.Reporter.Cell(row[0], href=f"QcReport.py?DocId={row[0]}")
+                ]
+                cells += row[1:]
+                table_rows.append(cells)
+
+            tables = [self.Reporter.Table(table_rows, **opts)]
         self.subtitle = f"Report produced {self.today}"
         if self.type == self.HISTORICAL:
             self.subtitle += f" -- {self.date_range}"
         return tables
+
+    def show_report(self):
+        """Overriding this method allows us to add CSS to the report
+
+           Overriding is not necessary if the standard report formatting
+           is working for the clients. In that case remove this method.
+        """
+
+        elapsed = self.report.page.html.get_element_by_id("elapsed", None)
+        if elapsed is not None:
+            elapsed.text = str(self.elapsed)
+        self.report.page.add_css("th { background-color: lightgrey; }")
+        self.report.send(self.format)
+
 
     def populate_form(self, page, titles=None):
         """Put the fields on the form.
@@ -74,23 +106,25 @@ class Control(Controller):
                      otherwise, show the report's main request form
         """
 
+        fieldset = page.fieldset("Instructions")
+        fieldset.append(page.B.P(self.INSTRUCTIONS[0],
+                        page.B.BR(),
+                        page.B.A(self.INSTRUCTIONS[1], href=self.INSTRUCTIONS[2]),
+                        page.B.BR(), self.INSTRUCTIONS[3]))
+        page.form.append(fieldset)
+
         page.form.append(page.hidden_field("debug", self.debug or ""))
         opts = { "titles": titles, "id-label": "CDR ID(s)" }
         opts["id-tip"] = "separate multiple IDs with spaces"
-        self.add_summary_selection_fields(page, **opts)
-        fieldset = page.fieldset("Include")
-        fieldset.set("class", "by-board-block")
-        for value, label in self.MODULES:
-            checked = value == self.modules
-            opts = dict(value=value, label=label, checked=checked)
-            fieldset.append(page.radio_button("modules", **opts))
-        page.form.append(fieldset)
+        self.add_dis_selection_fields(page, **opts)
+
         fieldset = page.fieldset("Types of Change")
-        for ct in self.all_types:
+        for ct in self.all_dis_types:
             checked = ct in self.change_types
             opts = dict(value=ct, checked=checked)
             fieldset.append(page.checkbox("change-type", **opts))
         page.form.append(fieldset)
+
         fieldset = page.fieldset("Comment Display")
         for value in self.COMMENTS:
             label = f"{value.capitalize()} Comments"
@@ -101,12 +135,14 @@ class Control(Controller):
             opts = dict(label=label, value=value, checked=checked)
             fieldset.append(page.radio_button("comments", **opts))
         page.form.append(fieldset)
+
         fieldset = page.fieldset("Type of Report")
         for value in self.REPORT_TYPES:
             checked = value == self.type
             opts = dict(value=value, checked=checked)
             fieldset.append(page.radio_button("type", **opts))
         page.form.append(fieldset)
+
         fieldset = page.fieldset("Date Range for Changes History")
         fieldset.set("class", "history")
         opts = dict(value=self.start, label="Start Date")
@@ -120,6 +156,7 @@ class Control(Controller):
             opts = dict(value=organization, checked=checked)
             fieldset.append(page.radio_button("organization", **opts))
         page.form.append(fieldset)
+
         page.add_output_options(default=self.format)
         args = "check_type", self.HISTORICAL, "history"
         page.add_script(self.toggle_display(*args))
@@ -128,55 +165,90 @@ $(function() {
     check_type($("input[name='type']:checked").val());
 });""")
 
+
+    def add_dis_selection_fields(self, page, **kwopts):
+        """
+        Display the fields used to specify which DIS should be
+        selected for a report, using one of several methods:
+
+            * by DIS document ID
+            * by DIS title
+
+        There are two branches taken by this method. If the user has
+        elected to select a drug info summary by title, and the DIS
+        title fragment matches more than one document, then a follow-up
+        page is presented on which the user selects one of the documents
+        and re-submits the report request. Otherwise, the user is shown
+        options for choosing a selection method, which in turn displays
+        the fields appropriate to that method dynamically. We also add
+        JavaScript functions to handle the dynamic control of field display.
+
+        Pass:
+            page     - Page object on which to show the fields
+            titles   - an optional array of DISTitle objects
+            id-label - optional string for the CDR ID field (defaults
+                       to "CDR ID" but can be overridden, for example,
+                       to say "CDR ID(s)" if multiple IDs are accepted)
+            id-tip   - optional string for the CDR ID field for popup
+                       help (e.g., "separate multiple IDs by spaces")
+
+        Return:
+            nothing (the form object is populated as a side effect)
+        """
+
+        #--------------------------------------------------------------
+        # Show the second stage in a cascading sequence of the form if we
+        # have invoked this method directly from build_tables(). Widen
+        # the form to accomodate the length of the title substrings
+        # we're showing.
+        #--------------------------------------------------------------
+        titles = kwopts.get("titles")
+        if titles:
+            page.form.append(page.hidden_field("selection_method", "id"))
+            #page.form.append(page.hidden_field("format", self.format))
+            fieldset = page.fieldset("Choose Drug Info Summary")
+            page.add_css("fieldset { width: 600px; }")
+            for t in titles:
+                opts = dict(label=t.display, value=t.id, tooltip=t.tooltip)
+                fieldset.append(page.radio_button("cdr-id", **opts))
+            page.form.append(fieldset)
+            self.new_tab_on_submit(page)
+
+        else:
+            # Fields for the original form.
+            fieldset = page.fieldset("Selection Method")
+            methods = "CDR ID", "Drug Info Summary Title"
+            checked = False
+            for method in methods:
+                value = method.split()[-1].lower()
+                opts = dict(label=f"By {method}", value=value, checked=checked)
+                fieldset.append(page.radio_button("selection_method", **opts))
+                checked = True
+            page.form.append(fieldset)
+
+            fieldset = page.fieldset("Drug Info Summary ID")
+            fieldset.set("class", "by-id-block")
+            label = kwopts.get("id-label", "CDR ID")
+            opts = dict(label=label, tooltip=kwopts.get("id-tip"))
+            fieldset.append(page.text_field("cdr-id", **opts))
+            page.form.append(fieldset)
+
+            fieldset = page.fieldset("Drug Info Summary Title")
+            fieldset.set("class", "by-title-block")
+            tooltip = "Use wildcard (%) as appropriate."
+            fieldset.append(page.text_field("title", tooltip=tooltip))
+            page.form.append(fieldset)
+            page.add_script(self.summary_selection_js)
+
+
     @property
-    def all_types(self):
-        """Valid type of change values parsed from the summary schema."""
+    def all_dis_types(self):
+        """Valid type of change values parsed from the Drug schema."""
 
-        if not hasattr(self, "_all_types"):
-            args = "SummarySchema.xml", "SummaryChangeType"
-            self._all_types = sorted(getSchemaEnumVals(*args))
-        return self._all_types
-
-    @property
-    def audience(self):
-        """Selecting summaries for this audience."""
-
-        if not hasattr(self, "_audience"):
-            self._audience = self.fields.getvalue("audience")
-            if self._audience:
-                if self._audience not in self.AUDIENCES:
-                    self.bail()
-            else:
-                self._audience = self.AUDIENCES[0]
-        return self._audience
-
-    @property
-    def board(self):
-        """PDQ board ID(s) selected by the user for the report."""
-
-        if not hasattr(self, "_board"):
-            boards = self.fields.getlist("board")
-            if "all" in boards:
-                self._board = ["all"]
-            else:
-                self._board = set()
-                for id in boards:
-                    try:
-                        self._board.add(int(id))
-                    except:
-                        self.bail()
-                self._board = list(self._board)
-                if not self._board:
-                    self._board = ["all"]
-        return self._board
-
-    @property
-    def boards(self):
-        """Dictionary of board names indexed by CDR Organization ID."""
-
-        if not hasattr(self, "_boards"):
-            self._boards = self.get_boards()
-        return self._boards
+        if not hasattr(self, "_all_dis_types"):
+            args = "Drug.xml", "DISChangeType"
+            self._all_dis_types = sorted(getSchemaEnumVals(*args))
+        return self._all_dis_types
 
     @property
     def cdr_ids(self):
@@ -202,8 +274,8 @@ $(function() {
             range = self.date_range
             for change_type in self.change_types:
                 rows = []
-                for summary in self.summaries:
-                    rows.extend(summary.get_rows(change_type))
+                for dis in self.dis_docs:
+                    rows.extend(dis.get_rows(change_type))
                 if not rows:
                     continue
                 count = f"{len(rows):d} change"
@@ -215,7 +287,17 @@ $(function() {
                     columns=self.columns,
                     classes="change_type_table",
                 )
-                tables.append(self.Reporter.Table(rows, **opts))
+
+                table_rows = []
+                for row in rows:
+                    cells = [
+                        self.Reporter.Cell(row[0],
+                                           href=f"QcReport.py?DocId={row[0]}")
+                    ]
+                    cells += row[1:]
+                    table_rows.append(cells)
+
+                tables.append(self.Reporter.Table(table_rows, **opts))
             self._change_type_tables = tables
         return self._change_type_tables
 
@@ -224,8 +306,8 @@ $(function() {
         """Types of change selected by the user."""
 
         if not hasattr(self, "_change_types"):
-            types = self.fields.getlist("change-type") or self.all_types
-            if set(types) - set(self.all_types):
+            types = self.fields.getlist("change-type") or self.all_dis_types
+            if set(types) - set(self.all_dis_types):
                 self.bail()
             self._change_types = sorted(types)
         return self._change_types
@@ -243,7 +325,8 @@ $(function() {
             Column = self.Reporter.Column
 
             # Leftmost column is always a doc title and ID.
-            self._columns = [Column("Summary", width="220px")]
+            self._columns = [Column("CDR-ID", width="80px"),
+                             Column("Title", width="220px")]
 
             # Basic reports need cols for types of change and comments.
             if self.type == self.CURRENT:
@@ -311,24 +394,11 @@ $(function() {
 
     @property
     def fragment(self):
-        """Title fragment for selecting a summary by title."""
+        """Title fragment for selecting a DIS by title."""
 
         if not hasattr(self, "_fragment"):
             self._fragment = self.fields.getvalue("title")
         return self._fragment
-
-    @property
-    def language(self):
-        """Selecting summaries for this language."""
-
-        if not hasattr(self, "_language"):
-            self._language = self.fields.getvalue("language")
-            if self._language:
-                if self._language not in self.LANGUAGES:
-                    self.bail()
-            else:
-                self._language = self.LANGUAGES[0]
-        return self._language
 
     @property
     def loglevel(self):
@@ -336,18 +406,8 @@ $(function() {
         return "DEBUG" if self.debug else self.LOGLEVEL
 
     @property
-    def modules(self):
-        """How to handle modules in summary selection."""
-
-        if not hasattr(self, "_modules"):
-            self._modules = self.fields.getvalue("modules", "both")
-            if self._modules not in [m[0] for m in self.MODULES]:
-                self.bail()
-        return self._modules
-
-    @property
     def organization(self):
-        """Report organization (by summary or by change types)."""
+        """Report organization (by drug info summary or by change types)."""
 
         if not hasattr(self, "_organization"):
             organization = self.fields.getvalue("organization")
@@ -379,66 +439,113 @@ $(function() {
         self._subtitle = value
 
     @property
-    def summaries(self):
-        """PDQ summaries selected for the report.
+    def dis_docs(self):
+        """PDQ Drug Info Summaries selected for the report.
 
-        If the user chooses the "by summary title" method for
-        selecting which summary to use for the report, and the
-        fragment supplied matches more than one summary document,
-        display the form a second time so the user can pick the
-        summary.
+        If the user chooses the "by drug info summary title" method for
+        selecting which document to use for the report, and the
+        fragment supplied matches more than one document, display the 
+        form a second time so the user can pick the correct document.
         """
 
-        if not hasattr(self, "_summaries"):
+        if not hasattr(self, "_dis_docs"):
             if self.selection_method == "title":
                 if not self.fragment:
                     self.bail("Title fragment is required.")
-                titles = self.summary_titles
+                titles = self.dis_titles
                 if not titles:
-                    self.bail("No summaries match that title fragment")
+                    self.bail("No DIS match that title fragment")
                 if len(titles) == 1:
-                    self._summaries = [Summary(self, titles[0].id)]
+                    self._dis_docs = [Summary(self, titles[0].id)]
                 else:
                     self.populate_form(self.form_page, titles)
                     self.form_page.send()
             elif self.selection_method == "id":
                 if not self.cdr_ids:
                     self.bail("At least one CDR ID is required.")
-                self._summaries = [Summary(self, id) for id in self.cdr_ids]
+                self._dis_docs = [Summary(self, id) for id in self.cdr_ids]
             else:
-                if not self.board:
-                    self.bail("At least one board is required.")
-                a_path = "/Summary/SummaryMetaData/SummaryAudience"
-                b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
-                l_path = "/Summary/SummaryMetaData/SummaryLanguage"
-                t_path = "/Summary/TranslationOf/@cdr:ref"
-                m_path = "/Summary/@AvailableAsModule"
-                query = self.Query("active_doc d", "d.id")
-                query.join("query_term_pub a", "a.doc_id = d.id")
-                query.where(query.Condition("a.path", a_path))
-                query.where(query.Condition("a.value", self.audience + "s"))
-                query.join("query_term_pub l", "l.doc_id = d.id")
-                query.where(query.Condition("l.path", l_path))
-                query.where(query.Condition("l.value", self.language))
-                if "all" not in self.board:
-                    if self.language == "English":
-                        query.join("query_term_pub b", "b.doc_id = d.id")
+                self.bail("Invalid selection_method")
+#               query = self.Query("active_doc d", "d.id")
+#               query.join("query_term_pub a", "a.doc_id = d.id")
+#               query.join("query_term_pub l", "l.doc_id = d.id")
+#               query.join("query_term_pub b", "b.doc_id = d.id")
+#               rows = query.unique().execute(self.cursor).fetchall()
+#               self._dis_docs = [Summary(self, row.id) for row in rows]
+        return self._dis_docs
+
+    @property
+    def dis_titles(self):
+        """Find the DIS docs that match the user's title fragment.
+
+        Note that the user is responsible for adding any non-trailing
+        SQL wildcards to the fragment string. If the title is longer
+        than 60 characters, truncate with an ellipsis, but add a
+        tooltip showing the whole title. We create a local class for
+        the resulting list.
+
+        ONLY WORKS IF YOU IMPLEMENT THE `self.fragment` PROPERTY!!!
+        """
+
+        if not hasattr(self, "_dis_titles"):
+            self._dis_titles = None
+            if hasattr(self, "fragment") and self.fragment:
+                class DISTitle:
+                    def __init__(self, doc_id, display, tooltip=None):
+                        self.id = doc_id
+                        self.display = display
+                        self.tooltip = tooltip
+                fragment = f"{self.fragment}%"
+                query = self.Query("active_doc d", "d.id", "d.title")
+                query.join("doc_type t", "t.id = d.doc_type")
+                query.where("t.name = 'DrugInformationSummary'")
+                query.where(query.Condition("d.title", fragment, "LIKE"))
+                query.order("d.title")
+                rows = query.execute(self.cursor).fetchall()
+                self._dis_titles = []
+                for doc_id, title in rows:
+                    if len(title) > 60:
+                        short_title = title[:57] + "..."
+                        dis = DISTitle(doc_id, short_title, title)
                     else:
-                        query.join("query_term_pub t", "t.doc_id = d.id")
-                        query.where(query.Condition("t.path", t_path))
-                        query.join("query_term b", "b.doc_id = t.int_val")
-                    query.where(query.Condition("b.path", b_path))
-                    query.where(query.Condition("b.int_val", self.board, "IN"))
-                if self.modules == "modules":
-                    query.join("query_term_pub m", "m.doc_id = d.id")
-                    query.where(query.Condition("m.path", m_path))
-                elif self.modules == "summaries":
-                    query.outer("query_term_pub m", "m.doc_id = d.id",
-                                f"m.path = '{m_path}'")
-                    query.where("m.doc_id IS NULL")
-                rows = query.unique().execute(self.cursor).fetchall()
-                self._summaries = [Summary(self, row.id) for row in rows]
-        return self._summaries
+                        dis = DISTitle(doc_id, title)
+                    self._dis_titles.append(dis)
+        return self._dis_titles
+
+
+#   @property
+#   def dis(self):
+#       """PDQ summaries selected for the report.
+
+#       If the user chooses the "by summary title" method for
+#       selecting which summary to use for the report, and the
+#       fragment supplied matches more than one summary document,
+#       display the form a second time so the user can pick the
+#       summary.
+#       """
+
+#       if not hasattr(self, "_dis"):
+#           if self.selection_method == "title":
+#               if not self.fragment:
+#                   self.bail("Title fragment is required.")
+#               titles = self.summary_titles
+#               if not titles:
+#                   self.bail("No DIS match that title fragment")
+#               if len(titles) == 1:
+#                   self._dis = [Summary(self, titles[0].id)]
+#               else:
+#                   self.populate_form(self.form_page, titles)
+#                   self.form_page.send()
+#           #elif self.selection_method == "id":
+#           else:
+#               if not self.cdr_ids:
+#                   self.bail("At least one CDR ID is required.")
+#               self._dis = [Summary(self, id) for id in self.cdr_ids]
+##            else:
+##                query = self.Query("active_doc d", "d.id")
+##                rows = query.execute(self.cursor).fetchall()
+##                self._summaries = [Summary(self, row.id) for row in rows]
+#       return self._summaries
 
     @property
     def today(self):
@@ -510,6 +617,7 @@ class Summary:
         if nrows < 1:
             return []
         row = [
+            self.id,
             self.control.Reporter.Cell(self.display_title, rowspan=nrows),
             changes[0].date,
         ]
@@ -519,7 +627,9 @@ class Summary:
             row.append(" / ".join(changes[0].comments))
         rows = [tuple(row)]
         for change in changes[1:]:
-            row = [change.date]
+            # First element is the CDR-ID which is suppressed for all but the
+            # first row.
+            row = ["", change.date]
             if not change_type:
                 row.append(change.type)
             if self.control.comments:
@@ -546,7 +656,7 @@ class Summary:
 
         if not hasattr(self, "_changes"):
             changes = []
-            for node in self.doc.root.findall("TypeOfSummaryChange"):
+            for node in self.doc.root.findall("TypeOfDISChange"):
                 change = self.Change(self.control, node)
                 self.control.logger.debug("CDR%d %s", self.id, change)
                 changes.append(change)
@@ -555,11 +665,11 @@ class Summary:
 
     @property
     def display_title(self):
-        if not hasattr(self, "_display_title"):
-            self._display_title = f"{self.title} ({self.id:d})"
-            if self.doc.root.get("AvailableAsModule") == "Yes":
-                self._display_title += " [Module]"
-        return self._display_title
+        return f"{self.title}"
+
+    @property
+    def cdr_id_link(self):
+        return f"{self.id:d}"
 
     @property
     def id(self):
@@ -579,7 +689,7 @@ class Summary:
         """Official title of the PDQ summary."""
 
         if not hasattr(self, "_title"):
-            self._title = Doc.get_text(self.doc.root.find("SummaryTitle"))
+            self._title = Doc.get_text(self.doc.root.find("Title"))
             if not self._title:
                 self._title = self.doc.title.split(";")[0]
         return self._title
@@ -607,7 +717,7 @@ class Summary:
                     latest_change = change_types[change.type]
                     if latest_change.date == change.date:
                         latest_change.comments.extend(change.comments)
-        row = [self.display_title]
+        row = [self.cdr_id_link, self.display_title]
         nchanges = 0
         for change_type in self.control.change_types:
             change = change_types.get(change_type)
@@ -623,7 +733,7 @@ class Summary:
 
     class Change:
         """
-        Information about a change event for a summary.
+        Information about a change event for a DIS document.
 
         Instance data:
             control - reference to the logic master object
@@ -636,7 +746,7 @@ class Summary:
             self.date = self.type = None
             self.comments = []
             for child in node:
-                if child.tag == "TypeOfSummaryChangeValue":
+                if child.tag == "TypeOfDISChangeValue":
                     self.type = Doc.get_text(child)
                 elif child.tag == "Date":
                     self.date = Doc.get_text(child)

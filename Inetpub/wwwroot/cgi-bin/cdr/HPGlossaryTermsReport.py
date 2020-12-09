@@ -43,7 +43,8 @@ class Control(Controller):
 
         fieldset = page.fieldset("Selections")
         fieldset.append(page.select("dictionary", options=self.DICTIONARIES))
-        fieldset.append(page.select("language", options=self.LANGUAGES))
+        opts = dict(options=self.LANGUAGES, multiple=True)
+        fieldset.append(page.select("language", **opts))
         default = self.TYPES[0]
         opts = dict(label="Report Type", options=self.TYPES, default=default)
         fieldset.append(page.select("type", **opts))
@@ -65,10 +66,11 @@ class Control(Controller):
         """What we display at the top of the report table."""
 
         if not hasattr(self, "_caption"):
+            languages = " and ".join(self.language)
             if self.type == self.LIST_OF_TERMS:
-                self._caption = [f"{self.language} HP Glossary Terms"]
+                self._caption = [f"{languages} HP Glossary Terms"]
             else:
-                self._caption = [f"{self.language} HP Glossary Concepts"]
+                self._caption = [f"{languages} HP Glossary Concepts"]
             if self.dictionary == self.NONE:
                 self._caption.append("Without Dictionary")
             else:
@@ -86,7 +88,7 @@ class Control(Controller):
                 self._columns = [Column(f"Terms ({len(self.rows)})")]
             else:
                 names = "Term Names"
-                if self.language == "English":
+                if "English" in self.language:
                     names += " (Pronunciations)"
                 self._columns = (
                     Column("CDR ID of GTC"),
@@ -100,12 +102,16 @@ class Control(Controller):
         """GlossaryTermConcept documents selected for the report."""
 
         if not hasattr(self, "_concepts"):
-            if self.language == "English":
+            op = "="
+            if self.language == ["English"]:
                 d_path = "/GlossaryTermConcept/TermDefinition"
-            else:
+            elif self.language == ["Spanish"]:
                 d_path = "/GlossaryTermConcept/TranslatedTermDefinition"
+            else:
+                d_path = "/GlossaryTermConcept/%TermDefinition"
+                op = "LIKE"
             query = self.Query("query_term", "doc_id").unique().order(1)
-            query.where(f"path = '{d_path}/Audience'")
+            query.where(f"path {op} '{d_path}/Audience'")
             query.where("value = 'Health Professional'")
             self._concepts = []
             for row in query.execute(self.cursor).fetchall():
@@ -128,12 +134,15 @@ class Control(Controller):
 
     @property
     def language(self):
-        """English or Spanish."""
+        """English and/or Spanish."""
 
         if not hasattr(self, "_language"):
-            self._language = self.fields.getvalue("language", "English")
-            if self._language not in self.LANGUAGES:
-                self.bail()
+            self._language = self.fields.getlist("language")
+            if not self._language:
+                self._language = list(self.LANGUAGES)
+            for language in self._language:
+                if language not in self.LANGUAGES:
+                    self.bail()
         return self._language
 
     @property
@@ -182,6 +191,10 @@ class Concept:
     """Information on a CDR GlossaryTermConcept document."""
 
     LOE = "level of evidence"
+    DEFS = dict(
+        English="TermDefinition",
+        Spanish="TranslatedTermDefinition",
+    )
 
     def __init__(self, control, id):
         """Remember the caller's values.
@@ -213,14 +226,12 @@ class Concept:
         """Definitions for the concept needed for the report."""
 
         if not hasattr(self, "_definitions"):
-            name = "TermDefinition"
-            if self.control.language == "Spanish":
-                name = f"Translated{name}"
             self._definitions = []
-            for node in self.root.findall(name):
-                definition = Definition(self, node)
-                if definition.in_scope:
-                    self._definitions.append(definition)
+            for language in self.control.language:
+                for node in self.root.findall(self.DEFS[language]):
+                    definition = Definition(self, node)
+                    if definition.in_scope:
+                        self._definitions.append(definition)
         return self._definitions
 
     @property
@@ -294,7 +305,7 @@ class Concept:
 
                 # Add rows for the extra definitions.
                 for i in range(1, len(self.definitions)):
-                    self._rows.append([Cell(self.definitions[i].text)])
+                    self._rows.append(["", Cell(self.definitions[i].text)])
             else:
                 self._rows = []
                 for name_doc in self.name_docs:
@@ -326,6 +337,11 @@ class Concept:
 
 class NameDoc:
     """Information collected from one CDR GlossaryTermName document."""
+
+    NAMES = dict(
+        English="TermName",
+        Spanish="TranslatedName",
+    )
 
     def __init__(self, concept, id):
         """Remember the caller's values.
@@ -381,13 +397,11 @@ class NameDoc:
 
         if not hasattr(self, "_names"):
             self._names = []
-            path = "TermName"
-            if self.control.language == "Spanish":
-                path = "TranslatedName"
-            for node in self.root.findall(path):
-                name = self.Name(self, node)
-                if name.string:
-                    self._names.append(name)
+            for language in self.control.language:
+                for node in self.root.findall(self.NAMES[language]):
+                    name = self.Name(self, node)
+                    if name.string:
+                        self._names.append(name)
         return self._names
 
     @property
