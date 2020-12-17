@@ -459,7 +459,7 @@ class GTN:
         "/satelliteLib-5b3dcf1f2676c378b518a1583ef5355acd83cd3d.js"
     )
     SCRIPT = (
-        ("https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js",
+        ("https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js",
          False),
         ("https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1"
          "/jquery-ui.min.js",
