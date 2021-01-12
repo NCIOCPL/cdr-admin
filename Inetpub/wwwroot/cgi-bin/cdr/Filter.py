@@ -199,7 +199,6 @@ class Control(Controller):
 
             if table_requested or not self.filter_specs:
                 columns = "Set Name", "Action", "Set Detail"
-                trows = []
                 rows = []
                 # Step through all filter sets and decide which ones need
                 # to be displayed
