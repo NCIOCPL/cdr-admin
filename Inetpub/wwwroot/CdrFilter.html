@@ -7,6 +7,11 @@
   <head>
     <meta charset="utf-8">
     <title>CDR Document Filtering</title>
+    <style>
+      .parameter { padding: 2px; }
+      .parameter label { margin-left: 15px; }
+      .parameter input { width: 160px; }
+    </style>
     <link href="/favicon.ico" rel="icon">
     <link href="/stylesheets/cdr.css?v=202001010000" rel="stylesheet">
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
@@ -16,6 +21,18 @@ function add_filter_field() {
     jQuery("#filters").append('<div class="labeled-field filter"> ' +
         '<label for="filter-' + id + '">Filter ' + id + '</label> ' +
         '<input name="filter" id="filter-' + id + '"> ' +
+        '</div>');
+}
+function add_parameter_fields() {
+    var id = jQuery(".parameter").length + 1;
+    jQuery("#parameters").append('<div class="parameter"> ' +
+        '<label class="parm-name" for="parm-name-' + id + '">Name</label> ' +
+        '<input class="parm-name" name="parm-name-' + id +
+        '" id="parm-name-' + id + '"> ' +
+        '<label class="parm-value" for="parm-value-' + id +
+        '">Value</label> ' +
+        '<input class="parm-value" name="parm-value-' + id +
+        '" id="parm-value-' + id + '"> ' +
         '</div>');
 }
 function glossary_clicked() {
@@ -56,6 +73,17 @@ function filter_doc(extra) {
             url += "&rsmarkup=false";
         if (extra)
             url += "&" + extra + "=Y";
+        var id = 0;
+        for (var i = 0; i < jQuery(".parameter").length; ++i) {
+            var name = jQuery("#parm-name-" + (i + 1)).val().trim();
+            if (name) {
+                id++;
+                var val = jQuery("#parm-value-" + (i + 1)).val();
+                url += "&parm-name-" + id + "=" + encodeURIComponent(name);
+                url += "&parm-value-" + id + "=" + encodeURIComponent(val);
+            }
+        }
+        url += "&parm-count=" + id;
         var opts = "standard=yes,scrollbars=yes,resizable=yes,status=yes,"
                  + "menubar=yes";
         var w = window.open(url, doc, opts);
@@ -199,6 +227,17 @@ function filter_doc(extra) {
         <div>
           <input type="checkbox" name="loeref" value="true" id="loeref">
           <label for="loeref" class="clickable">LOE Refs</label>
+        </div>
+      </fieldset>
+      <fieldset id="parameters">
+        <legend>Custom Parameter(s)</legend>
+        <div class="parameter">
+          <label class="parm-name" for="parm-name-1">Name</label>
+          <input class="parm-name" name="parm-name-1" id="parm-name-1">
+          <label class="parm-value" for="parm-value-1">Value</label>
+          <input class="parm-value" name="parm-value-1" id="parm-value-1">
+          <img src="images/add.gif" onclick="add_parameter_fields()"
+               title="Add another parameter" class="clickable">
         </div>
       </fieldset>
     </form>

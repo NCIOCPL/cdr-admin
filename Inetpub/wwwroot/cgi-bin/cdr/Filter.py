@@ -143,7 +143,8 @@ class Control(Controller):
             # If no version is specified the default version is the CWD
             # which is indicated with a version=None.  Need to allow
             # "None" as a valid value.
-            if not version.isdigit() and version not in ("None", "last", "lastp"):
+            allowed = "None", "last", "lastp"
+            if not version.isdigit() and version not in allowed:
                 self.bail(f"Invalid version {version!r}")
             self._doc = Doc(self.session, id=id, version=version)
         return self._doc
@@ -329,6 +330,12 @@ class Control(Controller):
             )
             if self.vendor_or_qc:
                 self._parms["vendorOrQC"] = "QC"
+            parm_count = int(self.fields.getvalue("parm-count") or "0")
+            for i in range(parm_count):
+                name = self.fields.getvalue(f"parm-name-{i+1}")
+                if name:
+                    value = self.fields.getvalue(f"parm-value-{i+1}", "")
+                    self._parms[name.strip()] = value.strip()
             self.logger.info("Filter.py(parms=%r)", self._parms)
         return self._parms
 
