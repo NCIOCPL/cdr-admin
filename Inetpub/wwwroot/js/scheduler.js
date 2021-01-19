@@ -44,7 +44,7 @@ function add_option_block(i, name, value) {
     var id = i ? i : jQuery(".opt-name").length + 1;
     var attrs = {class: "opt-block", id: "opt-block-" + id};
     var fieldset = jQuery("<fieldset>", attrs);
-    fieldset.append(jQuery("<legend>Job Option</legend>"));
+    fieldset.append(jQuery("<legend>Named Job Option</legend>"));
     fieldset.append(make_field("name", id, "Name", name));
     fieldset.append(make_field("value", id, "Value", value));
     //jQuery("form").append(fieldset);

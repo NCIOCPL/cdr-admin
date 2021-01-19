@@ -640,7 +640,8 @@ class GTN:
         """Top-level element for the document, prepared for export."""
 
         if not hasattr(self, "_root"):
-            result = self.doc.filter(self.VENDOR_FILTERS)
+            opts = dict(parms=dict(isPP="Y"))
+            result = self.doc.filter(self.VENDOR_FILTERS, **opts)
             self._root = result.result_tree.getroot()
         return self._root
 
