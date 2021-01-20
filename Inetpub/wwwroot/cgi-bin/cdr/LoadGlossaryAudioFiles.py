@@ -682,6 +682,10 @@ class Updater(Job):
     Implements the interface used by the ModifyDocs module, returning
     the list of IDs for the documents to be modified, and performing
     the actual document modifications.
+
+    Modification for OCECDR-4924: use the creation date for the MP3 file
+    from the zip info instead of the current system date for the DateCreated
+    element.
     """
 
     LOGNAME = Control.LOGNAME
@@ -800,7 +804,7 @@ class Updater(Job):
             if sibling is None:
                 sibling = [parent.findall("Creator")][-1]
             sibling.addnext(created_node)
-        created_node.text = Control.TODAY
+        created_node.text = mp3.created
         filename_node = parent.find("SourceFilename")
         if filename_node is None:
             filename_node = etree.Element("SourceFilename")
