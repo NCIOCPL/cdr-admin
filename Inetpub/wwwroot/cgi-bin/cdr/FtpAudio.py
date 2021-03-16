@@ -10,8 +10,10 @@ import paramiko
 from cdrcgi import Controller
 from cdrapi.settings import Tier
 from cdr import run_command
+from io import BytesIO
 from zipfile import ZipFile
 from pathlib import Path
+from openpyxl import load_workbook
 
 class Control(Controller):
     """Processing logic."""
@@ -43,6 +45,7 @@ class Control(Controller):
         "and the zip file will be copied to a unique (time-stamped) name "
         "(instead of moved) to the Transferred directory."
     )
+    BUFSIZE = 2**15
 
     def populate_form(self, page):
         """Add fields to the form.
@@ -88,8 +91,15 @@ class Control(Controller):
         if not self.zipfiles:
             lines.append("No zip files found to be transferred")
         else:
+            errors = []
             for name in self.zipfiles:
-                lines += self.retrieve(name)
+                errors += self.check_mp3_paths(name)
+            if errors:
+                lines += errors
+                lines.append("Retrieval aborted by failed MP3 path checks")
+            else:
+                for name in self.zipfiles:
+                    lines += self.retrieve(name)
         for name in self.rejected:
             lines.append(f"Skipped {name}")
         rows = [[line] for line in lines]
@@ -133,17 +143,6 @@ class Control(Controller):
                 self.bail(f"Unable to fix permissions for {target}",
                           extra=[process.stderr])
 
-            # Testing if zipfile members follow proper naming convention
-            if not self.members_ok(name):
-                # Renaming the bad zip file
-                source = Path(self.TARGET_DIR, name)
-                new_name = name.replace(source.suffix, f".{self.stamp}")
-                source.rename(new_name)
-                self.logger.info(f"Zip file renamed to: {new_name}")
-                message = "ERROR - Audio zip file contains file(s) with "
-                message += "invalid file name"
-                self.bail(message)
-
         lines = [line]
         if not failed and not self.keep:
             target = f"{self.transferred_dir}/{name}"
@@ -165,29 +164,60 @@ class Control(Controller):
                 lines.append(f"Moved {name} to {target}")
         return lines
 
+    def check_mp3_paths(self, filename):
+        """Make sure the spreadsheet and zip file MP3 paths match.
 
-    def members_ok(self, filename):
-        """Check for compliance of zip file members with file pattern.
+        Also ensures that the paths follow the pattern convention
+        established for the audio files.
 
         Pass:
            filename - string for the name of the zipfile to inspect
 
         Return:
-           True/False - based on proper file names for member files
+           Possibly empty sequence of error strings
         """
 
-        path = f"{self.TARGET_DIR}/{filename}"
-        self.logger.info("Testing members in %s", path)
-        zipfile = ZipFile(path)
-
+        with self.connection.open_sftp() as sftp:
+            zip_path = f"{self.source_dir}/{filename}"
+            with sftp.open(zip_path, bufsize=self.BUFSIZE) as fp:
+                zipfile = ZipFile(BytesIO(fp.read()))
+        self.logger.info("Verifying MP3 paths in %s", zip_path)
+        mp3_paths = set()
+        col_paths = set()
+        errors = []
         for name in zipfile.namelist():
-            if "MACOSX" not in name and name.endswith(".mp3"):
-                if not self.member_pattern.match(name):
-                    template = "%s - Invalid member name format: %s"
-                    self.logger.info(template, filename, name)
-                    return False
-        return True
-
+            normalized = name.lower()
+            if "macosx" not in normalized:
+                if normalized.endswith(".mp3"):
+                    mp3_paths.add(name)
+                elif normalized.endswith(".xlsx"):
+                    opts = dict(read_only=True, data_only=True)
+                    book = load_workbook(BytesIO(zipfile.read(name)), **opts)
+                    sheet = book.active
+                    headers = True
+                    for row in sheet:
+                        if headers:
+                            headers = False
+                        else:
+                            try:
+                                value = row[4].value
+                                if not isinstance(value, str):
+                                    errors.append("Missing MP3 path")
+                                else:
+                                    col_paths.add(value)
+                            except:
+                                errors.append("Missing MP3 path")
+        all_paths = mp3_paths | col_paths
+        for path in all_paths:
+            if not self.member_pattern.match(path):
+                errors.append(f"{filename} has invalid MP3 path format {path}")
+        missing = col_paths - mp3_paths
+        for path in missing:
+            errors.append(f"{filename} does not contain {path}")
+        unused = mp3_paths - col_paths
+        for path in unused:
+            errors.append(f"{filename} has unused MP3 file {path}")
+        return errors
 
     @property
     def connection(self):
