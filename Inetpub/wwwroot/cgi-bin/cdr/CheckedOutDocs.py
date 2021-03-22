@@ -42,6 +42,7 @@ class Control(Controller):
             fields = "COUNT(*) AS n", "u.id", "u.name", "u.fullname"
             query = Query("usr u", *fields)
             query.join("checkout c", "c.usr = u.id")
+            query.join("document d", "d.id = c.id")
             query.group(*fields[1:])
             query.where("c.dt_in IS NULL")
             users = []
