@@ -36,17 +36,34 @@ class Control(Controller):
         fieldset = page.fieldset("Options")
         opts = dict(label="Include CDR ID", value="show_id")
         fieldset.append(page.checkbox("options", **opts))
+        opts = dict(label="Exclude blocked documents", value="active")
+        fieldset.append(page.checkbox("options", **opts))
+        opts = dict(label="Exclude non-publishable documents", value="pub")
+        fieldset.append(page.checkbox("options", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Language")
+        fieldset.append(page.checkbox("language", label="English", value="en"))
+        fieldset.append(page.checkbox("language", label="Spanish", value="es"))
         page.form.append(fieldset)
 
     @property
     def caption(self):
         """Strings to be displayed immediately above the report table."""
 
-        return (
-            "Report Filtering",
-            f"Diagnosis: {self.diagnosis_names}",
-            f"Condition: {self.category_names}",
-        )
+        if not hasattr(self, "_caption"):
+            self._caption = [
+                "Report Filtering",
+                f"Diagnosis: {self.diagnosis_names}",
+                f"Condition: {self.category_names}",
+            ]
+            if "active" in self.options:
+                self._caption.append("Excluding blocked documents")
+            if "pub" in self.options:
+                self._caption.append("Excluding non-publishable documents")
+            if len(self.languages) == 1:
+                lang = "English" if "en" in self.languages else "Spanish"
+                self._caption.append(f"Language: {lang}")
+        return self._caption
 
     @property
     def categories(self):
@@ -129,6 +146,14 @@ class Control(Controller):
         return ", ".join(sorted(names))
 
     @property
+    def languages(self):
+        """Optional language(s) for filtering."""
+
+        if not hasattr(self, "_language"):
+            self._languages = self.fields.getlist("language")
+        return self._languages
+
+    @property
     def options(self):
         """Miscellaneous options selected by the user."""
 
@@ -141,18 +166,30 @@ class Control(Controller):
         """Values for the report table."""
 
         if not hasattr(self, "_rows"):
+            table = "query_term_pub" if "pub" in self.options else "query_term"
             fields = ["m.doc_id", "m.value"] if self.show_id else ["m.value"]
-            query = self.Query("query_term m", *fields).unique()
+            query = self.Query(f"{table} m", *fields).unique()
             query.order("m.value")
             query.where("m.path = '/Media/MediaTitle'")
+            if "active" in self.options:
+                query.join("document d", "d.id = m.doc_id")
+                query.where("d.active_status = 'A'")
             if self.category:
-                query.join("query_term c", "c.doc_id = m.doc_id")
+                query.join(f"{table} c", "c.doc_id = m.doc_id")
                 query.where(query.Condition("c.path", self.CATEGORY_PATH))
                 query.where(query.Condition("c.value", self.category, "IN"))
             if self.diagnosis:
-                query.join("query_term d", "d.doc_id = m.doc_id")
+                query.join(f"{table} d", "d.doc_id = m.doc_id")
                 query.where(query.Condition("d.path", self.DIAGNOSIS_PATH))
                 query.where(query.Condition("d.int_val", self.diagnosis, "IN"))
+            if len(self.languages) == 1:
+                if "en" in self.languages:
+                    query.outer(f"{table} t", "t.doc_id = m.doc_id",
+                                "t.path = '/Media/TranslationOf/@cdr:ref'")
+                    query.where("t.doc_id IS NULL")
+                else:
+                    query.join(f"{table} t", "t.doc_id = m.doc_id")
+                    query.where("t.path = '/Media/TranslationOf/@cdr:ref'")
             rows = query.execute(self.cursor).fetchall()
             self._rows = [tuple(row) for row in rows]
             self.logger.info("%d rows found", len(self._rows))
