@@ -602,7 +602,7 @@ class Summary:
         Pass:
           section - string for the top-level summary section's title
           regex - compiled regular expression for matching the search terms
-          string - text string to be search for matches
+          string - text string to be searched for matches
           matches - sequence of `Summary.Match` objects to which we append
         """
 
