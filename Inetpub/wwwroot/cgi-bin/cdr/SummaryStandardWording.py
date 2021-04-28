@@ -52,6 +52,8 @@ class Control(Controller):
         # Flag for including blocked summaries.
         fieldset = page.fieldset("Options")
         opts = dict(label="Include Blocked Documents", value="N")
+        if self.blocked:
+            opts["checked"] = True
         fieldset.append(page.checkbox("blocked", **opts))
         page.form.append(fieldset)
 
