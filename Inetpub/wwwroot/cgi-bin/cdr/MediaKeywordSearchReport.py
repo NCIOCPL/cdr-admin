@@ -97,7 +97,7 @@ jQuery(document).ready(function() {
                     self.bail("Invalid document ID")
                 query = self.Query("active_doc", "COUNT(*)")
                 query.where(query.Condition("id", doc_id))
-                count = query.execute(self.cursor()).fetchone()[0]
+                count = query.execute(self.cursor).fetchone()[0]
                 if count != 1:
                     self.bail(f"CDR{doc_id} is not an active CDR document")
                 self._doc_ids = [doc_id]
