@@ -37,7 +37,7 @@ class Control(Controller):
     UPDATE = "UPDATE {} SET {} WHERE {} = ?"
     DROP = "attachments-to-drop"
     QC_REPORT_INSTRUCTIONS = (
-        "The following file(s) will be attached to all all email notifications"
+        "The following file(s) will be attached to all email notifications"
         " for this translation job. To delete a file from the set to be"
         " attached, check the box next to the file name. More files can"
         " be added in the field set below."
