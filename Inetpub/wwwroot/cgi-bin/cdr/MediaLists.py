@@ -172,8 +172,7 @@ class Control(Controller):
             query.order("m.value")
             query.where("m.path = '/Media/MediaTitle'")
             if "active" in self.options:
-                query.join("document d", "d.id = m.doc_id")
-                query.where("d.active_status = 'A'")
+                query.join("active_doc a", "a.id = m.doc_id")
             if self.category:
                 query.join(f"{table} c", "c.doc_id = m.doc_id")
                 query.where(query.Condition("c.path", self.CATEGORY_PATH))

@@ -40,6 +40,7 @@ class Control(Controller):
         ol = page.B.OL()
         page.form.append(ol)
         for display, script in (
+            ("DIS By Drug Type Report", "DISByDrugType.py"),
             ("Drug Description Report", "DrugDescriptionReport.py"),
             ("Drug Indications Report", "DrugIndicationsReport.py"),
             ("Drug Information Summaries Lists", "DISLists.py"),

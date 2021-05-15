@@ -21,6 +21,10 @@ class Control(Controller):
                             "GlossaryTermLinks.py",
                         ),
                         (
+                            "Glossary Keyword Search Report",
+                            "GlossaryKeywordSearchReport.py",
+                        ),
+                        (
                             "Glossary Term and Variant Search Report",
                             "GlossaryTermPhrases.py",
                         ),
