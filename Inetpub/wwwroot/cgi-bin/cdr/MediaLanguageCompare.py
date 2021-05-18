@@ -34,13 +34,14 @@ class Control(Controller):
     def show_report(self):
         """Send the report back to the browser."""
 
+        report = self.report
         opts = dict(
             pretty_print=True,
             doctype="<!DOCTYPE html>",
             encoding="utf-8",
         )
         sys.stdout.buffer.write(b"Content-type: text/html;charset=utf-8\n\n")
-        sys.stdout.buffer.write(html.tostring(self.report, **opts))
+        sys.stdout.buffer.write(html.tostring(report, **opts))
         sys.exit(0)
 
 
@@ -80,17 +81,17 @@ class Control(Controller):
                 search_hdr = B.P("Search Criteria", id="media-id")
                 if self.category:
                     category = ",".join(x for x in self.category)
-                    search_c = B.P(B.B("Category: "), f"{category}", 
+                    search_c = B.P(B.B("Category: "), f"{category}",
                                                  id="category-id")
                 if self.diagnosis:
-                    search_d = B.P(B.B("Diagnosis: "), 
-                                                 f"{self.diagnosis_names}", 
+                    search_d = B.P(B.B("Diagnosis: "),
+                                                 f"{self.diagnosis_names}",
                                                  id="diagnosis-id")
                 if self.start and self.start is not None:
                     search_dr = B.P(B.B("Date Range: "),
-                                                 f"{self.start} - {self.end}", 
+                                                 f"{self.start} - {self.end}",
                                                  id="date-range-id")
-                wrapper = body = B.BODY(B.E("header", B.H1(*args)), 
+                wrapper = body = B.BODY(B.E("header", B.H1(*args)),
                                                  search_hdr,
                                                  search_d, search_c, search_dr)
             else:
@@ -100,7 +101,7 @@ class Control(Controller):
             self._report = B.HTML(head, body)
 
             # Users want to be able to only display the content for a single
-            # language.  For that case we created the media_docs pairs with 
+            # language.  For that case we created the media_docs pairs with
             # one of the CDR-IDs equal 0 (zero).
             # --------------------------------------------------------------
             media_docs = self.media_docs
@@ -123,9 +124,10 @@ class Control(Controller):
                     if media_doc.id == 0:
                         continue
 
-                    lang = Doc.get_text(media_doc.doc.root.find(".//TranslationOf"))
+                    path = ".//TranslationOf"
+                    lang = Doc.get_text(media_doc.doc.root.find(path))
                     lang = 'Spanish' if lang else 'English'
-                    
+
                     wrapper = B.DIV(B.CLASS("lang-wrapper"))
                     body.append(wrapper)
 
@@ -135,7 +137,7 @@ class Control(Controller):
 
                     # Display the media title
                     media_title = media_doc.title
-                    media_info = B.P(f"CDR{media_doc.id} - {media_title}", 
+                    media_info = B.P(f"CDR{media_doc.id} - {media_title}",
                                                     B.CLASS("media-title"))
                     wrapper.append(media_info)
 
@@ -148,30 +150,33 @@ class Control(Controller):
                     # ----------------------------------------
                     attributes = {}
                     if self.show_caption:
-                        captions = media_doc.doc.root.findall(".//MediaCaption")
+                        path = ".//MediaCaption"
+                        captions = media_doc.doc.root.findall(path)
                         for caption in captions:
                             attributes = caption.attrib
                             aud = 'Patient' if attributes.get('audience') \
                                                     == 'Patients' else 'HP'
-                            if attributes.get('audience') in self.show_audience:
-                                wrapper.append(B.P(B.B(f"Caption - {aud}:"),
-                                                   B.BR(),
-                                                   B.P(f"{Doc.get_text(caption)}")))
+                            if attributes.get('audience') in self.audiences:
+                                wrapper.append(B.P(
+                                    B.B(f"Caption - {aud}:")))
+                                wrapper.append(B.P(
+                                    Doc.get_text(caption, "None")))
 
                     # Displaying the media description if required
                     # --------------------------------------------
                     attributes = {}
                     if self.show_description:
-                        descriptions = media_doc.doc.root.findall(
-                                                        ".//ContentDescription")
+                        path = ".//ContentDescription"
+                        descriptions = media_doc.doc.root.findall(path)
                         for description in descriptions:
                             attributes = description.attrib
                             aud = 'Patient' if attributes.get('audience') \
                                                     == 'Patients' else 'HP'
-                            if attributes.get('audience') in self.show_audience:
-                                wrapper.append(B.P(B.B(f"Description - {aud}:"),
-                                                   B.BR(),
-                                                   B.P(f"{Doc.get_text(description)}")))
+                            if attributes.get('audience') in self.audiences:
+                                wrapper.append(B.P(
+                                    B.B(f"Description - {aud}:")))
+                                wrapper.append(B.P(
+                                    Doc.get_text(description, "None")))
 
                     if self.show_label:
                         labels = media_doc.doc.root.findall(".//LabelName")
@@ -221,40 +226,44 @@ class Control(Controller):
         # Fieldset for language selection
         # -------------------------------
         LANGUAGE = (
-                ("en", "Display English only"),
-                ("es", "Display Spanish only"),
-                ("all", "Display English and Spanish"),
+            ("en", "Display English only"),
+            ("es", "Display Spanish only"),
+            ("all", "Display English and Spanish"),
         )
         fieldset = page.fieldset("Language")
         fieldset.set("class", "by-search-block")
         for value, label in LANGUAGE:
-            opts = dict(value=value, label=label, checked=True, onclick=None)
+            opts = dict(value=value, label=label, onclick=None)
+            opts["checked"] = value == self.languages
             fieldset.append(page.radio_button("language", **opts))
         page.form.append(fieldset)
 
         # Fieldset for display options
         # ----------------------------
         DISPLAY = (
-                ("caption",     "Image Caption",       True),
-                ("description", "Content Description", True),
-                ("labels",      "Image Labels",        False),
+            ("caption", "Image Caption"),
+            ("description", "Content Description"),
+            ("labels", "Image Labels"),
         )
         fieldset = page.fieldset("Display Options")
-        for value, label, checked in DISPLAY:
-            opts = dict(value=value, label=label, checked=checked, onclick=None)
+        for value, label in DISPLAY:
+            opts = dict(value=value, label=label, onclick=None)
+            opts["checked"] = value in self.display_options
             fieldset.append(page.checkbox("show", **opts))
         page.form.append(fieldset)
 
         # Fieldset for audience options
         # -----------------------------
         AUDIENCE = (
-                ("all", "Display Patient and HP"),
-                ("Health_professionals", "Display HP only"),
-                ("Patients", "Display Patient only"),
+            ("all", "Display Patient and HP"),
+            ("Health_professionals", "Display HP only"),
+            ("Patients", "Display Patient only"),
         )
+        current = self.audiences[0] if len(self.audiences) == 1 else "all"
         fieldset = page.fieldset("Audience Display")
         for value, label in AUDIENCE:
-            opts = dict(value=value, label=label, checked=True, onclick=None)
+            opts = dict(value=value, label=label, onclick=None)
+            opts["checked"] = value == current
             fieldset.append(page.radio_button("audience", **opts))
         page.form.append(fieldset)
 
@@ -264,6 +273,7 @@ class Control(Controller):
         Display the fields used to specify which document should be
         selected for a report, using one of several methods:
 
+            * by search parameters
             * by document ID
             * by document title
 
@@ -298,13 +308,14 @@ class Control(Controller):
         titles = kwopts.get("titles")
         if titles:
             page.form.append(page.hidden_field("selection_method", "id"))
-            fieldset = page.fieldset("Choose Summary")
+            fieldset = page.fieldset("Choose Media Doc")
             page.add_css("fieldset { width: 600px; }")
             for t in titles:
                 opts = dict(label=t.display, value=t.id, tooltip=t.tooltip,
                             onclick=None)
                 fieldset.append(page.radio_button("cdr-id", **opts))
             page.form.append(fieldset)
+            page.add_script(self.media_selection_js)
             self.new_tab_on_submit(page)
 
         else:
@@ -348,6 +359,18 @@ class Control(Controller):
 
 
     @property
+    def display_options(self):
+        """Display options selected by the user (or defaulted)."""
+
+        if not hasattr(self, "_display_options"):
+            if self.request and self.request == self.SUBMIT:
+                self._display_options = self.fields.getlist("show")
+            else:
+                self._display_options = ["caption", "description"]
+        return self._display_options
+
+
+    @property
     def media_selection_js(self):
         "Local JavaScript to manage sections of the form dynamically."
 
@@ -366,7 +389,7 @@ function check_set(name, val) {
     else
         jQuery(all_selector).prop("checked", true);
 }
-function check_board(board) { check_set("board", board); }
+/* function check_board(board) { check_set("board", board); } */
 function check_selection_method(method) {
     switch (method) {
         case 'id':
@@ -388,14 +411,15 @@ function check_selection_method(method) {
 }
 jQuery(function() {
     var method = jQuery("input[name='selection_method']:checked").val();
-    check_selection_method(method);
-});"""
+    // check_selection_method(method);
+    check_selection_method('title');
+}); """
 
 
     def get_media_pair(self, doc_id):
         """Get the corresponding media id for a single document
            EN --> ES or ES --> EN
-           If the report is run for a single language only, set 
+           If the report is run for a single language only, set
            the doc_id = 0 for the other language """
 
         isSpanish = False
@@ -416,9 +440,9 @@ jQuery(function() {
             if row: isSpanish = True
         if not isSpanish: isEnglish = True
 
-        if self.show_languages == 'en' and isEnglish:
+        if self.languages == 'en' and isEnglish:
             _media_pair = (doc_id, 0)
-        elif self.show_languages == 'es' and isSpanish:
+        elif self.languages == 'es' and isSpanish:
             _media_pair = (0, doc_id)
         else:
             try:
@@ -426,7 +450,7 @@ jQuery(function() {
             except:
                 _media_pair = None
                 self.logger.info(f"No Spanish translation exists for CDR{id}"
-                                                                   "- excluded")
+                                 " - excluded")
         return _media_pair
 
 
@@ -555,23 +579,25 @@ jQuery(function() {
 
 
     @property
-    def show_languages(self):
+    def languages(self):
         """Check which languages to display """
-        if not hasattr(self, "_show_languages"):
-            self._show_languages = self.fields.getvalue("language", "")
-        return self._show_languages
+        if not hasattr(self, "_languages"):
+            self._languages = self.fields.getvalue("language", "all")
+        return self._languages
 
 
     @property
-    def show_audience(self):
+    def audiences(self):
         """Check which audience to display """
-        if not hasattr(self, "_show_audience"):
-            self._show_audience = self.fields.getvalue("audience", "")
-            if self._show_audience == 'all':
-                self._show_audience = ['Patients', 'Health_professionals']
-        if isinstance(self._show_audience, list):
-            return self._show_audience
-        return [self._show_audience]
+
+        if not hasattr(self, "_audiences"):
+            all = ["Patients", "Health_professionals"]
+            audiences = self.fields.getvalue("audience") or all[0]
+            if audiences in all:
+                self._audiences = [audiences]
+            else:
+                self._audiences = all
+        return self._audiences
 
 
     @property
@@ -579,45 +605,25 @@ jQuery(function() {
         """Check if display of caption has been selected"""
 
         if not hasattr(self, "_show_caption"):
-            show_caption = self.fields.getvalue("show", "")
-
-            if isinstance(show_caption, list) and 'caption' in show_caption:
-                self._show_caption = True
-            elif isinstance(show_caption, str) and 'caption' == show_caption:
-                self._show_caption = True
-            else:
-                self._show_caption = False
+            self._show_caption = "caption" in self.display_options
         return self._show_caption
+
 
     @property
     def show_description(self):
         """Check if display of description has been selected"""
 
         if not hasattr(self, "_show_description"):
-            show_description = self.fields.getvalue("show", "")
-            if isinstance(show_description, list) and 'description' \
-                                                        in show_description:
-                self._show_description = True
-            elif isinstance(show_description, str) and 'description' \
-                                                        == show_description:
-                self._show_description = True
-            else:
-                self._show_description = False
+            self._show_description = "description" in self.display_options
         return self._show_description
+
 
     @property
     def show_label(self):
         """Check if display of labels has been selected"""
 
         if not hasattr(self, "_show_label"):
-            show_label = self.fields.getvalue("show", "")
-
-            if isinstance(show_label, list) and 'labels' in show_label:
-                self._show_label = True
-            elif isinstance(show_label, str) and 'labels' == show_label:
-                self._show_label = True
-            else:
-                self._show_label = False
+            self._show_label = "labels" in self.display_options
         return self._show_label
 
 
@@ -661,7 +667,7 @@ jQuery(function() {
 
         If the user chooses the "by media title" method for
         selecting which document to use for the report, and the
-        fragment supplied matches more than one document, display the 
+        fragment supplied matches more than one document, display the
         form a second time so the user can pick the correct document.
 
         The user selects a single document and we're selecting the
@@ -693,11 +699,12 @@ jQuery(function() {
                 cdr_ids = self.cdr_pair
                 self._media_docs = [[Media(self, id) for id in cdr_ids]]
             else:
-                
+
                 c_path = '/Media/MediaContent/Categories/Category'
                 d_path = '/Media/MediaContent/Diagnoses/Diagnosis'
                 i_path = '/Media/PhysicalMedia/ImageData/ImageEncoding'
-                sd_path = '/Media/ProcessingStatuses/ProcessingStatus/ProcessingStatusDate'
+                s_path = '/Media/ProcessingStatuses/ProcessingStatus'
+                sd_path = f'{s_path}/ProcessingStatusDate'
                 query = self.Query("query_term q", "q.doc_id")
                 query.where(f"q.path = '{i_path}'")
                 if self.category:
@@ -713,7 +720,8 @@ jQuery(function() {
                 if self.start:
                     query.join("query_term sd", "sd.doc_id = q.doc_id")
                     query.where(query.Condition("sd.path", sd_path))
-                    query.where(query.Condition("sd.node_loc", "%000001", "LIKE"))
+                    query.where(query.Condition("sd.node_loc", "%000001",
+                                                "LIKE"))
                     query.where(query.Condition("sd.value", self.start, ">="))
                 #if control.end:
                     query.where(query.Condition("sd.value", self.end, "<="))
@@ -723,7 +731,7 @@ jQuery(function() {
                     self.bail(f"No documents exist for the given search "
                                "parameters and selected range of "
                                "{self.start} and {self.end}")
-                
+
                 # For the version of the report displaying both languages,
                 # we skip documents without Spanish translation and we only
                 # include unique pairs, i.e. if the query selected both, the
@@ -734,28 +742,28 @@ jQuery(function() {
 
                 for row, *_ in rows:
                     media_pair = self.get_media_pair(row)
-                    if media_pair and media_pair not in all_media_pairs:  
+                    if media_pair and media_pair not in all_media_pairs:
                         all_media_pairs.append(media_pair)
-                        self._media_docs.append([Media(self, id) 
+                        self._media_docs.append([Media(self, id)
                                                     for id in media_pair])
 
                 # We created a list of media object pairs, one pair for
                 # each document returned in the SQL query.  Depending on the
                 # type of report (en, es, or all) we exclude the documents
                 # without Spanish translation when running the report for
-                # both languages and we're setting the CDR-ID=0 for one of 
+                # both languages and we're setting the CDR-ID=0 for one of
                 # the languages when running for en or es only. However, the
                 # pairs not to be included are still part of this list.
-                # Here, we're stripping out those extra pairs (pairs for 
+                # Here, we're stripping out those extra pairs (pairs for
                 # which one of the CDR-ID is not 0.
                 # We then sort the remaining list by CDR-ID.
-                if self.show_languages == 'en':
+                if self.languages == 'en':
                     english_docs = [x for x in self._media_docs if x[1].id==0]
                     self._media_docs = english_docs
-                elif self.show_languages == 'es':
+                elif self.languages == 'es':
                     spanish_docs = [x for x in self._media_docs if x[0].id==0]
                     self._media_docs = spanish_docs
-                
+
         return self._media_docs
 
 
@@ -793,10 +801,11 @@ jQuery(function() {
                         self.display = display
                         self.tooltip = tooltip
                 fragment = f"{self.fragment}%"
+                q_path = "/Media/PhysicalMedia/ImageData/ImageEncoding"
                 query = self.Query("active_doc d", "d.id", "d.title")
                 query.join("doc_type t", "t.id = d.doc_type")
                 query.join("query_term q", "d.id = q.doc_id")
-                query.where("q.path = '/Media/PhysicalMedia/ImageData/ImageEncoding'")
+                query.where(query.Condition("q.path", q_path))
                 query.where("t.name = 'Media'")
                 query.where(query.Condition("d.title", fragment, "LIKE"))
                 query.order("d.title")
@@ -833,87 +842,87 @@ jQuery(function() {
 # class Summary:
 #     """
 #     Represents one CDR Summary document.
-# 
+#
 #     Attributes:
 #         id       -  CDR ID of summary document
 #         title    -  title of summary (from title column of all_docs table)
 #         control  -  object holding request parameters for report
 #         media    -  list of MediaLink IDs for the summary
 #     """
-# 
+#
 #     def __init__(self, control, doc_id):
 #         """Remember the caller's values.
-# 
+#
 #         Pass:
 #             control - access to the database and the report options
 #             doc_id - integer for the PDQ summary's unique CDR document ID
 #         """
-# 
+#
 #         self.__control = control
 #         self.__doc_id = doc_id
-# 
+#
 #     @property
 #     def control(self):
 #         """Access to the database and the report options."""
 #         return self.__control
-# 
+#
 #     @property
 #     def doc(self):
 #         """`Doc` object for the summary's CDR document."""
-# 
+#
 #         if not hasattr(self, "_doc"):
 #             self._doc = Doc(self.control.session, id=self.id)
 #         return self._doc
-# 
+#
 #     @property
 #     def display_title(self):
 #         return f"{self.title}"
-# 
+#
 #     @property
 #     def id(self):
 #         """Integer for the PDQ summary's unique CDR document ID."""
 #         return self.__doc_id
-# 
+#
 #     @property
 #     def title(self):
 #         """Official title of the PDQ summary."""
-# 
+#
 #         if not hasattr(self, "_title"):
 #             self._title = Doc.get_text(self.doc.root.find("Title"))
 #             if not self._title:
 #                 self._title = self.doc.title.split(";")[0]
 #         return self._title
-# 
+#
 #     @property
 #     def media_link_ids(self):
 #         """MediaLink IDs for the images of a summary.
-#            
+#
 #            Extracting the MediaID (ref) attribute and converting the ID to an integer
 #         """
-# 
+#
 #         if not hasattr(self, "_media_link_ids"):
 #             self._media_link_ids = Doc.get_text(self.doc.root.find("MediaID"))
 #             media_doc_ids = self.doc.root.findall(".//MediaLink/MediaID")
 #             self._media_link_ids = []
 #             for media_doc in media_doc_ids:
 #                 self._media_link_ids.append(Doc.extract_id(media_doc.values()[0]))
-# 
+#
 #         return self._media_link_ids
-# 
-# 
+#
+#
 #     @property
 #     def media_docs(self):
 #         """Media documents selected for the report.
-# 
+#
 #         """
-# 
+#
 #         if not hasattr(self, "_media_docs"):
 #             if not self.media_link_ids:
 #                 message = "Summary selected does not contain images"
 #                 self.control.bail(f"ERROR: {message}")
 #             self._media_docs = [Media(self, id) for id in self.media_link_ids]
 #         return self._media_docs
-# 
+#
 
 class Media:
     """
