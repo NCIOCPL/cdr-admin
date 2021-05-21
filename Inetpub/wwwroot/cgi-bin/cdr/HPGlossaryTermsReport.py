@@ -111,7 +111,7 @@ class Control(Controller):
                 self._columns = [Column(f"Terms ({len(self.rows)})")]
             else:
                 names = "Term Names"
-                if "English" in self.language:
+                if "English" in self.language and self.pronunciations:
                     names += " (Pronunciations)"
                 self._columns = (
                     Column("CDR ID of GTC"),
@@ -492,7 +492,7 @@ class NameDoc:
 
             if not hasattr(self, "_cell"):
                 self._cell = self.string
-                if self.pronunciation:
+                if self.__doc.control.pronunciations and self.pronunciation:
                     self._cell = f"{self._cell} ({self.pronunciation})"
                 if self.__doc.blocked:
                     B = self.__doc.control.HTMLPage.B
