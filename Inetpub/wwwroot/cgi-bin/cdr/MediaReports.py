@@ -22,6 +22,7 @@ class Control(Controller):
             ("Linked Media Documents", "MediaLinks.py"),
             ("Media Caption and Content Report", "MediaCaptionContent.py"),
             ("Media Doc Publishing Report", "PublishedMediaDocuments.py"),
+            ("Media Images Report", "MediaLanguageCompare.py"),
             ("Media (Images) Processing Status Report",
              "ImageMediaProcessingStatusReport.py"),
             ("Media in Summary Report", "MediaInSummary.py"),
