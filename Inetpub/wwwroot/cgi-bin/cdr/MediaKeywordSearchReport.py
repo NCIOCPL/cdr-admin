@@ -105,7 +105,8 @@ jQuery(document).ready(function() {
                 query = self.Query("active_doc a", "a.id", "a.title").unique()
                 if self.fragment:
                     fragment = self.fragment
-                    query.where(query.Condition("a.title", fragment, "LIKE"))
+                    query.join("query_term m", "m.doc_id = a.id")
+                    query.where(query.Condition("m.value", fragment, "LIKE"))
                 if self.language == "English":
                     query.outer("query_term t", "t.doc_id = a.id",
                                 "t.path = '/Media/TranslationOf/@cdr:ref'")
