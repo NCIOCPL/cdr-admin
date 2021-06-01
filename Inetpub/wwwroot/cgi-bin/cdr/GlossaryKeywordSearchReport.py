@@ -37,7 +37,7 @@ class Control(Controller):
         languages = "Any", "English", "Spanish"
         opts = dict(options=languages, default="Spanish")
         fieldset.append(page.select("language", **opts))
-        audiences = "Any", "Patient", "Health Professional"
+        audiences = "Any", "Patient", "Health professional"
         opts = dict(options=audiences, default="Patient")
         fieldset.append(page.select("audience", **opts))
         page.form.append(fieldset)
@@ -305,7 +305,7 @@ class GlossaryDoc:
                     definition = self.__add_highlights(text)
                     if definition != text:
                         self.matched = True
-                    definitions.append(definition)
+                        definitions.append(definition)
         return definitions
 
     def __add_highlights(self, text):
@@ -327,10 +327,8 @@ class GlossaryDoc:
             start, end = match.span()
             if start > position:
                 segments.append(text[position:start])
-            #segments.append("\u261e")
             segments.append("\u25b6")
             segments.append(text[start:end])
-            # segments.append("\u261e")
             segments.append("\u25c0")
             position = end
         if position < len(text):
@@ -354,6 +352,4 @@ class GlossaryDoc:
 
 if __name__ == "__main__":
     """Don't execute if loaded as a module."""
-    #sys.stderr.write(f"PID is {os.getpid()}\n")
-    # Control().show_report()
     Control().run()
