@@ -35,6 +35,13 @@ class Control(Controller):
     ACTION = "MANAGE TRANSLATION QUEUE"
     INSERT = "INSERT INTO {} ({}) VALUES ({})"
     UPDATE = "UPDATE {} SET {} WHERE {} = ?"
+    DROP = "attachments-to-drop"
+    QC_REPORT_INSTRUCTIONS = (
+        "The following file(s) will be attached to all email notifications"
+        " for this translation job. To delete a file from the set to be"
+        " attached, check the box next to the file name. More files can"
+        " be added in the field set below."
+    )
 
     def run(self):
         """
@@ -61,6 +68,7 @@ class Control(Controller):
         """
 
         if self.have_required_values:
+            self.process_attachments()
             if self.job.changed:
                 conn = db.connect()
                 cursor = conn.cursor()
@@ -154,7 +162,7 @@ jQuery(function() {{
         comments = (self.job.comments or "").replace("\r", "")
         action = "Create" if self.job.new else "Edit"
         legend = f"{action} Translation Job for CDR{self.english_id:d}"
-        fieldset = page.fieldset(legend, id="job-fields")
+        fieldset = page.fieldset(legend)
         opts = dict(options=types, default=change_type)
         fieldset.append(page.select("change_type", **opts))
         opts = dict(options=users, default=user)
@@ -162,6 +170,18 @@ jQuery(function() {{
         opts = dict(options=states, default=state_id)
         fieldset.append(page.select("status", **opts))
         fieldset.append(page.textarea("comments", value=comments))
+        page.form.append(page.hidden_field("english_id", self.english_id))
+        page.form.append(page.hidden_field("nfiles", "1"))
+        page.form.append(fieldset)
+        if self.attachments:
+            fieldset = page.fieldset("Attached Files")
+            fieldset.append(page.B.P(self.QC_REPORT_INSTRUCTIONS))
+            fieldset.append(page.B.P("Delete"))
+            for id in sorted(self.attachments):
+                opts = dict(label=self.attachments[id], value=id)
+                fieldset.append(page.checkbox(self.DROP, **opts))
+            page.form.append(fieldset)
+        fieldset = page.fieldset("Add QC Report Attachments", id="new-files")
         opts = dict(label="QC Report", classes="file-field")
         file = page.file_field("file-1", **opts)
         opts = {
@@ -174,12 +194,10 @@ jQuery(function() {{
         button = page.B.SPAN(image, id="add-file-button")
         file.append(button)
         fieldset.append(file)
-        page.form.append(page.hidden_field("english_id", self.english_id))
-        page.form.append(page.hidden_field("nfiles", "1"))
         page.form.append(fieldset)
         page.add_script("""\
 function add_file_field() {
-    var nfiles = jQuery("#job-fields .file-field").length + 1;
+    var nfiles = jQuery("#new-files .file-field").length + 1;
     var id = "file-" + nfiles;
     var field = jQuery("<div>", {class: "labeled-field"});
     field.append(jQuery("<label>", {for: id, text: "QC Report"}));
@@ -189,7 +207,7 @@ function add_file_field() {
         id: id,
         class: "file-field"
     }));
-    jQuery("#job-fields").append(field);
+    jQuery("#new-files").append(field);
     jQuery("input[name='nfiles']").val(nfiles);
 }""");
 
@@ -224,6 +242,8 @@ function add_file_field() {
         conn = db.connect()
         cursor = conn.cursor()
         cursor.execute(query, self.english_id)
+        query = f"DELETE FROM {Job.ATTACHMENT} WHERE english_id = ?"
+        cursor.execute(query, self.english_id)
         conn.commit()
         self.logger.info("removed translation job for CDR%d", self.english_id)
         navigateTo("translation-jobs.py", self.session.name)
@@ -235,6 +255,21 @@ function add_file_field() {
         if not hasattr(self, "_assigned_to"):
             self._assigned_to = self.get_id("assigned_to", self.users)
         return self._assigned_to
+
+    @property
+    def attachments(self):
+        """Dictionary of QC reports already attached to job.
+
+        Key is attachment ID, value is display label.
+        """
+
+        if not hasattr(self, "_attachments"):
+            self._attachments = {}
+            query = db.Query(Job.ATTACHMENT, "attachment_id", "file_name")
+            query.where(query.Condition("english_id", self.english_id))
+            for row in query.execute(self.cursor).fetchall():
+                self._attachments[row.attachment_id] = row.file_name
+        return self._attachments
 
     @property
     def banner(self):
@@ -304,29 +339,14 @@ function add_file_field() {
         """Attachments to be appended to email notification."""
 
         if not hasattr(self, "_files"):
-            nfiles = int(self.fields.getvalue("nfiles", "0"))
             self._files = []
-            keys = set(self.fields.keys())
-            for i in range(nfiles):
-                name = f"file-{i+1}"
-                if name in keys:
-                    f = self.fields[name]
-                    if f.file:
-                        file_bytes = []
-                        while True:
-                            more_bytes = f.file.read()
-                            if not more_bytes:
-                                break
-                            file_bytes.append(more_bytes)
-                        file_bytes = b"".join(file_bytes)
-                    else:
-                        file_bytes = f.value
-                    if file_bytes:
-                        self.logger.info("filename=%s", f.filename)
-                        attachment = EmailAttachment(file_bytes, f.filename)
-                        self._files.append(attachment)
-                    else:
-                        self.logger.warning("%s empty", name)
+            if self.english_id:
+                query = db.Query(Job.ATTACHMENT, "file_bytes", "file_name")
+                query.order("registered")
+                query.where(query.Condition("english_id", self.english_id))
+                for row in query.execute(self.cursor).fetchall():
+                    attachment = EmailAttachment(row.file_bytes, row.file_name)
+                    self._files.append(attachment)
         return self._files
 
     @property
@@ -603,6 +623,46 @@ function add_file_field() {
             self.bail(f"sending mail: {e}")
         self.logger.info(log_message)
 
+    def process_attachments(self):
+        """Update the attachment table from the current form information."""
+
+        conn = db.connect()
+        cursor = conn.cursor()
+        drop = self.fields.getlist(self.DROP)
+        if drop:
+            sql = f"DELETE FROM {Job.ATTACHMENT} WHERE attachment_id = ?"
+            for attachment_id in drop:
+                if int(attachment_id) not in self.attachments:
+                    bail()
+                cursor.execute(sql, (attachment_id,))
+            conn.commit()
+        nfiles = int(self.fields.getvalue("nfiles", "0"))
+        keys = set(self.fields.keys())
+        columns = "english_id, file_bytes, file_name, registered"
+        values = "?, ?, ?, GETDATE()"
+        insert = self.INSERT.format(Job.ATTACHMENT, columns, values)
+        for i in range(nfiles):
+            name = f"file-{i+1}"
+            if name in keys:
+                f = self.fields[name]
+                if f.file:
+                    file_bytes = []
+                    while True:
+                        more_bytes = f.file.read()
+                        if not more_bytes:
+                            break
+                        file_bytes.append(more_bytes)
+                    file_bytes = b"".join(file_bytes)
+                else:
+                    file_bytes = f.value
+                if file_bytes:
+                    self.logger.info("filename=%s", f.filename)
+                    values = self.english_id, file_bytes, f.filename
+                    cursor.execute(insert, values)
+                    conn.commit()
+                else:
+                    self.logger.warning("%s empty", name)
+
     @staticmethod
     def sort_dict(d):
         """
@@ -661,6 +721,7 @@ class Job:
 
     TABLE = "summary_translation_job"
     HISTORY = "summary_translation_job_history"
+    ATTACHMENT = "summary_translation_job_attachment"
     KEY = "english_id"
     FIELDS = (
         "state_id",

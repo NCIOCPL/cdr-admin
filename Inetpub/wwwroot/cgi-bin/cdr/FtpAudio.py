@@ -10,8 +10,10 @@ import paramiko
 from cdrcgi import Controller
 from cdrapi.settings import Tier
 from cdr import run_command
+from io import BytesIO
 from zipfile import ZipFile
 from pathlib import Path
+from openpyxl import load_workbook
 
 class Control(Controller):
     """Processing logic."""
@@ -29,20 +31,18 @@ class Control(Controller):
     TARGET_DIR = f"{TIER.basedir}/Audio_from_CIPSFTP"
     TRANSFERRED_DIR = f"{AUDIO_DIR}/Audio_Transferred"
     INSTRUCTIONS = (
-        "Files which match the pattern Week_YYYY_WW.zip (or, for correction "
-        "batches, Week_YYYY_WW_RevN.zip) will be retrieved from the source "
-        "directory on the NCI SFTP server and placed in the target "
-        "directory on the Windows CDR server. Then they will be moved "
-        "on the SFTP server to the a separate directory for zip files "
-        "which have already been transferred to the CDR server (referred "
-        "to below as the Transferred directory). By default, retrieval "
-        "of a zip file will be skipped if the file already exists on "
-        "the Windows CDR server (though this can be overridden). "
-        "In test mode, the retrievals will be reported as having been "
-        "performed, even though that step will not actually take place, "
-        "and the zip file will be copied to a unique (time-stamped) name "
-        "(instead of moved) to the Transferred directory."
+        "Files which match the pattern Week_YYYY_WW.zip or "
+        "Week_YYYY_WW_RevN.zip will be retrieved from the source "
+        "directory on the NCI SFTP server and placed in the destination "
+        "directory on the Windows CDR server. Then they will be copied "
+        "(if running in test mode) or moved to a backup location on the SFTP server "
+        "(referred to below as the Transferred directory). By default, "
+        "retrieval of a zip file will be skipped if the file already exists "
+        "on the Windows CDR server (though this can be overridden). "
+        "In test mode, the retrievals will be reported but not "
+        "performed. "
     )
+    BUFSIZE = 2**15
 
     def populate_form(self, page):
         """Add fields to the form.
@@ -62,12 +62,12 @@ class Control(Controller):
         fieldset.append(page.text_field("transferred", **opts))
         page.form.append(fieldset)
         fieldset = page.fieldset("Options")
-        label = "Don't move source documents to 'Transferred' directory"
+        label = "Keep documents in 'Source' directory"
         opts = dict(value="keep", label=label)
         fieldset.append(page.checkbox("options", **opts))
         opts = dict(value="test", label="Run in test mode")
         fieldset.append(page.checkbox("options", **opts))
-        label = "Overwrite files in target directory if they already exist"
+        label = "Overwrite files in 'Destination' directory if they already exist"
         opts = dict(value="overwrite", label=label)
         fieldset.append(page.checkbox("options", **opts))
         page.form.append(fieldset)
@@ -88,8 +88,16 @@ class Control(Controller):
         if not self.zipfiles:
             lines.append("No zip files found to be transferred")
         else:
+            errors = []
             for name in self.zipfiles:
-                lines += self.retrieve(name)
+                ### pass  ###
+                errors += self.check_mp3_paths(name)
+            if errors:
+                lines += errors
+                lines.append("Retrieval aborted by failed MP3 path checks")
+            else:
+                for name in self.zipfiles:
+                    lines += self.retrieve(name)
         for name in self.rejected:
             lines.append(f"Skipped {name}")
         rows = [[line] for line in lines]
@@ -111,9 +119,9 @@ class Control(Controller):
         retrieve = not self.test
         if name.lower() in self.already_transferred:
             if self.overwrite:
-                line = f"Retrieved {name}, overwriting existing file"
+                line = f"Retrieved {name}, overwriting file at destination"
             else:
-                line = f"Skipping {name}, which already exists"
+                line = f"Skipping {name}, which already exists at destination"
                 retrieve = False
         else:
             line = f"Retrieved {name}"
@@ -133,24 +141,60 @@ class Control(Controller):
                 self.bail(f"Unable to fix permissions for {target}",
                           extra=[process.stderr])
 
-            # Testing if zipfile members follow proper naming convention
-            if not self.members_ok(name):
-                # Renaming the bad zip file
-                source = Path(self.TARGET_DIR, name)
-                new_name = name.replace(source.suffix, f".{self.stamp}")
-                source.rename(new_name)
-                self.logger.info(f"Zip file renamed to: {new_name}")
-                message = "ERROR - Audio zip file contains file(s) with "
-                message += "invalid file name"
-                self.bail(message)
-
         lines = [line]
-        if not failed and not self.keep:
+
+        # Copy or move the source files to a backup location on the FTP server
+        # There are several different scenarios:
+        # a) The specific file to be copied already exists
+        #    If file already exists in transfer directory first move the
+        #    existing file to a backup location (adding time stamp to file name)
+        # b) Running in Test or Live mode
+        #    In test mode files are always copied
+        #    In live mode files are moved unless option to keep source is specified
+        # c) Setting option to keep files in source directory
+        #    In test mode files are always kept in source directory
+        #    In live mode files are moved unless option to keep source is specified
+        #
+        #    File exists   Test/Live   Keep Y/N   Action
+        #    ---------------------------------------------
+        #      N           Test           N        copy
+        #      N           Test           Y        copy
+        #      N           Live           N        move
+        #      N           Live           Y        copy
+        #
+        #      Y           Test           N        move backup, then copy
+        #      Y           Test           Y        move backup, then copy
+        #      Y           Live           N        move backup, then move
+        #      Y           Live           Y        move backup, then copy
+        # -------------------------------------------------------------------------
+        ### if not failed and not self.keep:
+        if not failed:
             target = f"{self.transferred_dir}/{name}"
-            program = "cp" if self.test else "mv"
-            if self.test:
-                target += f"-{self.stamp}"
+            program = "cp"
+
+            # Check if target file already exists. Move to backup location
+            ls_cmd = f"ls {target}"
+            stdin, stdout, stderr = self.connection.exec_command(ls_cmd)
+            ls_error = stderr.readlines()
+
+            mode_flag = "T" if self.test else "L"
+
+            # File already exists if ls command succeeds
+            if not ls_error:
+                self.logger.info(f"Found existing file {target.split('/')[-1]}")
+                backup = f"{target}-{mode_flag}-{self.stamp}"
+                self.logger.info(f"Create backup file {backup.split('/')[-1]}")
+                cmd = f"mv {target} {backup}"
+                stdin, stdout, stderr = self.connection.exec_command(cmd)
+                errors = stderr.readlines()
+                if errors:
+                    lines.append(f"Errors moving existing file {target}")
+                    self.logger.info(errors)
+
+            if not self.test and not self.keep: program = "mv"
+
             cmd = f"{program} {source} {target}"
+
             stdin, stdout, stderr = self.connection.exec_command(cmd)
             errors = stderr.readlines()
             if errors:
@@ -160,34 +204,68 @@ class Control(Controller):
                     lines.append(f"Errors moving {name} to {target}")
                 lines += errors
             elif self.test:
-                lines.append(f"Copied {name} to {target}")
+                lines.append(f"Copied {name} to Transferred directory")
+                self.logger.info(f"Copied {name} to {target}")
             else:
-                lines.append(f"Moved {name} to {target}")
+                action = "Copied" if self.keep else "Moved"
+                lines.append(f"{action} {name} to Transferred directory")
+                self.logger.info(f"{action} {name} to {target}")
         return lines
 
+    def check_mp3_paths(self, filename):
+        """Make sure the spreadsheet and zip file MP3 paths match.
 
-    def members_ok(self, filename):
-        """Check for compliance of zip file members with file pattern.
+        Also ensures that the paths follow the pattern convention
+        established for the audio files.
 
         Pass:
            filename - string for the name of the zipfile to inspect
 
         Return:
-           True/False - based on proper file names for member files
+           Possibly empty sequence of error strings
         """
 
-        path = f"{self.TARGET_DIR}/{filename}"
-        self.logger.info("Testing members in %s", path)
-        zipfile = ZipFile(path)
-
+        with self.connection.open_sftp() as sftp:
+            zip_path = f"{self.source_dir}/{filename}"
+            with sftp.open(zip_path, bufsize=self.BUFSIZE) as fp:
+                zipfile = ZipFile(BytesIO(fp.read()))
+        self.logger.info("Verifying MP3 paths in %s", zip_path)
+        mp3_paths = set()
+        col_paths = set()
+        errors = []
         for name in zipfile.namelist():
-            if "MACOSX" not in name and name.endswith(".mp3"):
-                if not self.member_pattern.match(name):
-                    template = "%s - Invalid member name format: %s"
-                    self.logger.info(template, filename, name)
-                    return False
-        return True
-
+            normalized = name.lower()
+            if "macosx" not in normalized:
+                if normalized.endswith(".mp3"):
+                    mp3_paths.add(name)
+                elif normalized.endswith(".xlsx"):
+                    opts = dict(read_only=True, data_only=True)
+                    book = load_workbook(BytesIO(zipfile.read(name)), **opts)
+                    sheet = book.active
+                    headers = True
+                    for row in sheet:
+                        if headers:
+                            headers = False
+                        else:
+                            try:
+                                value = row[4].value
+                                if not isinstance(value, str):
+                                    errors.append("Missing MP3 path")
+                                else:
+                                    col_paths.add(value)
+                            except:
+                                errors.append("Missing MP3 path")
+        all_paths = mp3_paths | col_paths
+        for path in all_paths:
+            if not self.member_pattern.match(path):
+                errors.append(f"{filename} has invalid MP3 path format {path}")
+        missing = col_paths - mp3_paths
+        for path in missing:
+            errors.append(f"{filename} does not contain {path}")
+        unused = mp3_paths - col_paths
+        for path in unused:
+            errors.append(f"{filename} has unused MP3 file {path}")
+        return errors
 
     @property
     def connection(self):
@@ -245,12 +323,12 @@ class Control(Controller):
 
     @property
     def already_transferred(self):
-        """Zipfiles which already existing in the destination directory."""
+        """Zipfiles which already exist in the destination directory."""
 
         if not hasattr(self, "_already_transferred"):
             os.chdir(self.destination_dir)
             names = glob("*.zip")
-            self.logger.info("Target dir has %s", names)
+            self.logger.info("Destination dir has %s", names)
             self._already_transferred = set([name.lower() for name in names])
         return self._already_transferred
 
@@ -263,7 +341,7 @@ class Control(Controller):
 
     @property
     def overwrite(self):
-        """Boolean indicating whether it is OK to overwrite target files."""
+        """Boolean indicating whether it is OK to overwrite destination files."""
         return "overwrite" in self.options
 
     @property
@@ -351,9 +429,10 @@ class Control(Controller):
             if not hasattr(self, "_rejected"):
                 self._rejected = rejected
             if not zipfiles:
-                self.logger.warning("No audio archive files found")
+                self.logger.warning("No audio archive files found to transfer")
             else:
-                self.logger.info("%d audio archive files found", len(zipfiles))
+                self.logger.info("%d audio archive files found to transfer",
+                                                                len(zipfiles))
             for name in zipfiles:
                 self.logger.info(name)
             if rejected:

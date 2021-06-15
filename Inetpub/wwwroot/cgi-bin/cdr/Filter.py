@@ -6,7 +6,7 @@
 from lxml import etree
 from cdrapi.docs import Doc, FilterSet
 from cdrcgi import Controller, DOCID
-from cdr import DEFAULT_DTD, PDQDTDPATH, expandFilterSets
+from cdr import DEFAULT_DTD, PDQDTDPATH, expandFilterSets, getFilterSet
 
 
 class Control(Controller):
@@ -44,6 +44,25 @@ class Control(Controller):
         if self.filter_set_table:
             self.report.page.add_css(self.CSS)
         self.report.send(self.format)
+
+
+    def current_set_members(self, current_set):
+        """Extract the names of filter sets that are member of the
+           current filter set
+
+           Returns a list of filter set names up to two levels down"""
+
+        sub_sets = []
+        for member in getFilterSet(self.session, current_set).members:
+            if isinstance(member.id, int):
+                sub_sets.append(member.name)
+                # If we're using filter sets more than 3 levels deep we
+                # need to convert this portion into a recursive call
+                for member2 in getFilterSet(self.session, member.name).members:
+                    if isinstance(member.id, int):
+                        sub_sets.append(member2.name)
+        return sub_sets
+
 
     @property
     def all_filter_ids(self):
@@ -124,7 +143,8 @@ class Control(Controller):
             # If no version is specified the default version is the CWD
             # which is indicated with a version=None.  Need to allow
             # "None" as a valid value.
-            if not version.isdigit() and version not in ("None", "last", "lastp"):
+            allowed = "None", "last", "lastp"
+            if not version.isdigit() and version not in allowed:
                 self.bail(f"Invalid version {version!r}")
             self._doc = Doc(self.session, id=id, version=version)
         return self._doc
@@ -177,19 +197,63 @@ class Control(Controller):
 
         if not hasattr(self, "_filter_set_table"):
             table_requested = self.fields.getvalue("qcFilterSets") == "Y"
+
             if table_requested or not self.filter_specs:
                 columns = "Set Name", "Action", "Set Detail"
                 rows = []
+                # Step through all filter sets and decide which ones need
+                # to be displayed
                 for filter_set in self.resolved_filter_sets:
-                    if filter_set.in_scope:
+                    # Filter IDs and filter names use the in_scope attribute
+                    if not self.contains_filter_set and filter_set.in_scope:
                         rows.append(filter_set.row)
+                    # Filter sets need to be checked differently
+                    elif self.contains_filter_set:
+                        # Stepping through the entered input. If both,
+                        # a filter name and filter set have been specified,
+                        # only the related filter sets will be included.
+                        for input_set in self.filter_specs:
+                            # Adding the filter set itself
+                            # The set name is the first element of the row content.
+                            if (input_set.set_name and
+                                  input_set.set_name == filter_set.row[0]):
+                                rows.append(filter_set.row)
+                            # Adding all filter sets containing this set
+                            elif (input_set.set_name and
+                                  input_set.set_name in
+                                  self.current_set_members(filter_set.row[0])):
+                                rows.append(filter_set.row)
+
+                # Display an error message for sets or filter names
+                # We typically won't see this error because a missing or misspelled
+                # filter or filter set will be caught prior to this.
                 if not rows:
-                    columns = ["No filter sets include all selected filters"]
+                    if self.contains_filter_set:
+                        columns = ["Filter set doesn't exist"]
+                    else:
+                        columns = ["No filter sets include all selected filters"]
                 opts = dict(columns=columns)
                 self._filter_set_table = self.Reporter.Table(rows, **opts)
             else:
                 self._filter_set_table = None
         return self._filter_set_table
+
+    @property
+    def contains_filter_set(self):
+        """Testing if the input includes a filter set (True) or
+           only filter IDs or filter names (False)."""
+
+        if not hasattr(self, "_contains_filter_set"):
+            self._contains_filter_set = True
+            if not self.filter_specs:
+                self._contains_filter_set = False
+            else:
+                for filter_spec in self.filter_specs:
+                    if filter_spec.set_name == None:
+                        self._contains_filter_set = False
+                    else:
+                        self._contains_filter_set = True
+        return self._contains_filter_set
 
     @property
     def filter_specs(self):
@@ -266,6 +330,12 @@ class Control(Controller):
             )
             if self.vendor_or_qc:
                 self._parms["vendorOrQC"] = "QC"
+            parm_count = int(self.fields.getvalue("parm-count") or "0")
+            for i in range(parm_count):
+                name = self.fields.getvalue(f"parm-name-{i+1}")
+                if name:
+                    value = self.fields.getvalue(f"parm-value-{i+1}", "")
+                    self._parms[name.strip()] = value.strip()
             self.logger.info("Filter.py(parms=%r)", self._parms)
         return self._parms
 
@@ -377,16 +447,16 @@ class FilterSpec:
             if self.set_name:
                 if self.set_name.upper() not in self.control.all_filter_sets:
                     args = self.set_name, self.control.session.tier
-                    message = "{} not found on the CDR {} server"
+                    message = "{} is not a filter set on the CDR {} server"
                     self._error = message.format(*args)
             elif self.filter_name:
                 if self.filter_name.upper() not in self.control.all_filters:
                     args = self.filter_name, self.control.session.tier
-                    message = "{} is not a filter on the CDR {} server"
+                    message = "{} is not a filter name on the CDR {} server"
                     self._error = message.format(*args)
             elif self.filter_id not in self.control.all_filter_ids:
                 args = self.identifier, self.control.session.tier
-                message = "{} is not a filter on the CDR {} server"
+                message = "{} is not a filter ID on the CDR {} server"
                 self._error = message.format(*args)
         return self._error
 
@@ -467,9 +537,13 @@ class ResolvedFilterSet:
         If any filters are specified directly by the user, then we
         only want to include sets which contain *all* of those filters.
         Otherwise, we include all sets in the system.
+
+        This property is only useful if a filter ID or filter name has
+        been specified.  It cannot be used for filter sets.
         """
 
         user_ids = self.__control.filter_ids
+
         if not user_ids:
             return True
         return False if set(user_ids) - set(self.filter_ids) else True

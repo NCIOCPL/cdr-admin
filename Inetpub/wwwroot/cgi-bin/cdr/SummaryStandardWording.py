@@ -52,6 +52,8 @@ class Control(Controller):
         # Flag for including blocked summaries.
         fieldset = page.fieldset("Options")
         opts = dict(label="Include Blocked Documents", value="N")
+        if self.blocked:
+            opts["checked"] = True
         fieldset.append(page.checkbox("blocked", **opts))
         page.form.append(fieldset)
 
@@ -602,7 +604,7 @@ class Summary:
         Pass:
           section - string for the top-level summary section's title
           regex - compiled regular expression for matching the search terms
-          string - text string to be search for matches
+          string - text string to be searched for matches
           matches - sequence of `Summary.Match` objects to which we append
         """
 

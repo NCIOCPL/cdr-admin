@@ -49,12 +49,25 @@ class Control(Controller):
         opts = dict(label="Report Type", options=self.TYPES, default=default)
         fieldset.append(page.select("type", **opts))
         page.form.append(fieldset)
+        fieldset = page.fieldset("Date Filtering")
+        fieldset.append(page.date_field("start"))
+        fieldset.append(page.date_field("end"))
+        page.form.append(fieldset)
         fieldset = page.fieldset("Options")
         for option, wrapper_id in self.OPTIONS:
             opts = dict(value=option, wrapper_id=wrapper_id)
             fieldset.append(page.checkbox("opts", **opts))
         page.form.append(fieldset)
         page.head.append(page.B.SCRIPT(src=self.SCRIPT))
+
+    def show_report(self):
+        """Override this method to add custom CSS."""
+
+        elapsed = self.report.page.html.get_element_by_id("elapsed", None)
+        if elapsed is not None:
+            elapsed.text = str(self.elapsed)
+        self.report.page.add_css(".report table { min-width: 500px; }")
+        self.report.send(self.format)
 
     @property
     def blocked(self):
@@ -76,6 +89,16 @@ class Control(Controller):
             else:
                 self._caption.append("Genetics Dictionary")
             self._caption.append(self.started.strftime("%Y-%m-%d %H:%M:%S"))
+            if self.start or self.end:
+                if self.start:
+                    if self.end:
+                        range = f"From {self.start} to {self.end}"
+                    else:
+                        range = f"On or after {self.start}"
+                else:
+                    range = f"Before or on {self.end}"
+                self._caption.append(range)
+
         return self._caption
 
     @property
@@ -88,7 +111,7 @@ class Control(Controller):
                 self._columns = [Column(f"Terms ({len(self.rows)})")]
             else:
                 names = "Term Names"
-                if "English" in self.language:
+                if "English" in self.language and self.pronunciations:
                     names += " (Pronunciations)"
                 self._columns = (
                     Column("CDR ID of GTC"),
@@ -133,6 +156,19 @@ class Control(Controller):
         return self._dictionary
 
     @property
+    def end(self):
+        """Optional date filtering range end date."""
+
+        if not hasattr(self, "_end"):
+            try:
+                self._end = self.parse_date(self.fields.getvalue("end"))
+                if self._end:
+                    self._end = str(self._end)
+            except Exception:
+                self.bail()
+        return self._end
+
+    @property
     def language(self):
         """English and/or Spanish."""
 
@@ -175,6 +211,19 @@ class Control(Controller):
                 terms = {row[0] for row in self._rows}
                 self._rows = [[term] for term in sorted(terms, key=str.lower)]
         return self._rows
+
+    @property
+    def start(self):
+        """Optional date filtering range start date."""
+
+        if not hasattr(self, "_start"):
+            try:
+                self._start = self.parse_date(self.fields.getvalue("start"))
+                if self._start:
+                    self._start = str(self._start)
+            except Exception:
+                self.bail()
+        return self._start
 
     @property
     def type(self):
@@ -246,16 +295,6 @@ class Concept:
         return True
 
     @property
-    def name_rows(self):
-        """How many rows are needed for the concept's names?"""
-
-        if not hasattr(self, "_name_rows"):
-            self._name_rows = 0
-            for name_doc in self.name_docs:
-                self._name_rows += len(name_doc.names)
-        return self._name_rows
-
-    @property
     def name_docs(self):
         """GlossaryTermName documents linked to this concept."""
 
@@ -270,6 +309,16 @@ class Concept:
                 if name_doc.in_scope:
                     self._name_docs.append(name_doc)
         return self._name_docs
+
+    @property
+    def name_rows(self):
+        """How many rows are needed for the concept's names?"""
+
+        if not hasattr(self, "_name_rows"):
+            self._name_rows = 0
+            for name_doc in self.name_docs:
+                self._name_rows += len(name_doc.names)
+        return self._name_rows
 
     @property
     def root(self):
@@ -400,7 +449,7 @@ class NameDoc:
             for language in self.control.language:
                 for node in self.root.findall(self.NAMES[language]):
                     name = self.Name(self, node)
-                    if name.string:
+                    if name.in_scope:
                         self._names.append(name)
         return self._names
 
@@ -443,13 +492,31 @@ class NameDoc:
 
             if not hasattr(self, "_cell"):
                 self._cell = self.string
-                if self.pronunciation:
+                if self.__doc.control.pronunciations and self.pronunciation:
                     self._cell = f"{self._cell} ({self.pronunciation})"
                 if self.__doc.blocked:
                     B = self.__doc.control.HTMLPage.B
                     blocked = B.SPAN("[Blocked]", B.CLASS("error"))
                     self._cell = B.SPAN(f"{self._cell} ", blocked)
             return self._cell
+
+        @property
+        def in_scope(self):
+            """Make sure this name is usable for the report."""
+
+            if not self.string:
+                return False
+            if self.__doc.concept.control.start:
+                if not self.status_date:
+                    return False
+                if self.__doc.concept.control.start > self.status_date:
+                    return False
+            if self.__doc.concept.control.end:
+                if not self.status_date:
+                    return False
+                if self.__doc.concept.control.end < self.status_date:
+                    return False
+            return True
 
         @property
         def pronunciation(self):
@@ -459,6 +526,18 @@ class NameDoc:
                 node = self.__node.find("TermPronunciation")
                 self._pronunciation = Doc.get_text(node, "").strip() or None
             return self._pronunciation
+
+        @property
+        def status_date(self):
+            """When the name's current status was set."""
+
+            if not hasattr(self, "_status_date"):
+                if self.__node.tag == "TermName":
+                    path = "../TermNameStatusDate"
+                else:
+                    path = "TranslatedNameStatusDate"
+                self._status_date = Doc.get_text(self.__node.find(path))
+            return self._status_date
 
         @property
         def string(self):

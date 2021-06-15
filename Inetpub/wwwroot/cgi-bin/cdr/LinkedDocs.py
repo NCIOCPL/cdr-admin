@@ -212,8 +212,14 @@ class Control(Controller):
             if not self.include_blocked_documents:
                 query.where("d.active_status = 'A'")
             self._links = defaultdict(list)
+            summary_types = {}
             for row in query.execute(self.cursor).fetchall():
-                self._links[row.doc_type].append(row)
+                doc_type = row.doc_type
+                if doc_type == "Summary":
+                    if row.id not in summary_types:
+                        summary_types[row.id] = self.__get_summary_type(row.id)
+                    doc_type = summary_types[row.id]
+                self._links[doc_type].append(row)
         return self._links
 
     @property
@@ -269,6 +275,29 @@ class Control(Controller):
                 for row in query.execute(self.cursor).fetchall():
                     self._titles.append(DocTitle(row))
         return self._titles
+
+    def __get_summary_type(self, doc_id):
+        """Get string showing language and audience for summary document.
+
+        Pass:
+          doc_id - integer for unique CDR document ID
+
+        Return:
+          string in the form "Summary (Language Audience)"
+        """
+
+        query = self.Query("query_term", "value")
+        query.where("path = '/Summary/SummaryMetaData/SummaryAudience'")
+        query.where(query.Condition("doc_id", doc_id))
+        rows = query.execute(self.cursor).fetchall()
+        value = rows[0][0] if rows else "Unspecified Audience"
+        audience = "HP" if value.startswith("H") else "Patient"
+        query = self.Query("query_term", "value")
+        query.where("path = '/Summary/SummaryMetaData/SummaryLanguage'")
+        query.where(query.Condition("doc_id", doc_id))
+        rows = query.execute(self.cursor).fetchall()
+        language = rows[0][0] if rows else "Unspecified Language"
+        return f"Summary ({language} {audience})"
 
 
 if __name__ == "__main__":
