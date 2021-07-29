@@ -429,7 +429,7 @@ class DIS(Summary):
 class GTN:
     """GlossaryTermName document."""
 
-    MEDIA = "/PublishedContent/Media/CDR/media/"
+    # MEDIA = "/PublishedContent/Media/CDR/media/"
     VENDOR_FILTERS = "set:Vendor GlossaryTerm Set"
     JSON_FILTER = "Glossary Term JSON"
     IMAGE_LOCATION = "[__imagelocation]"
@@ -462,23 +462,38 @@ class GTN:
         ("https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js",
          False),
         ("https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1"
-         "/jquery-ui.min.js",
-         True),
+         "/jquery-ui.min.js", True),
         ("https://cdnjs.cloudflare.com/ajax/libs/jplayer/2.9.2"
          "/jplayer/jquery.jplayer.min.js", False),
-        ("https://cancer.gov/PublishedContent/js/cdeConfig.js", False),
-        ("https://cancer.gov/PublishedContent/js/Common.js", True),
-        ("https://cancer.gov/PublishedContent/js/InnerPage.js", True),
-        ("https://cancer.gov/PublishedContent/js/DictionaryPage.js", True),
+        ("https://www.cancer.gov"
+         "/app-modules/glossary-app/glossary-app.v1.2.2"
+         "/static/js/main.js", True),
+        ("https://www.cancer.gov"
+         "/profiles/custom/cgov_site/themes/custom"
+         "/cgov/gcov_common/dist/js/Common.js", True),
     )
     CSS = (
-        "https://cancer.gov/PublishedContent/Styles/Common.css",
-        "https://cancer.gov/PublishedContent/Styles/InnerPage.css",
-        "/stylesheets/fonts.css",
+        ("https://www.cancer.gov"
+         "/profiles/custom/cgov_site/themes/custom"
+         "/cgov/cgov_common/dist/css/Common.css"),
+        ("https://www.cancer.gov"
+         "/app-modules/glossary-app/glossary-app.v1.2.2"
+         "/static/css/main.css"),
     )
     STYLE = "dl.dictionary-list figure.image-left-medium { float: none; }"
-    STYLE = "div.results { clear: both; }"
+    STYLE = """
+        div.results { clear: both; }
+        dl dt { font-size: 1.75em; } """
     NAV = "LEFT NAV GOES HERE"
+    JSFUNC = """
+        function play_en() {
+            var audio = document.getElementById('play-en');
+            audio.play();
+        }
+        function play_es() {
+            var audio = document.getElementById('play-es');
+            audio.play();
+        }"""
 
 
     def __init__(self, control):
@@ -560,10 +575,14 @@ class GTN:
                 self._head.append(self.B.LINK(href=url, rel="stylesheet"))
             for url, defer in self.SCRIPT:
                 script = self.B.SCRIPT(src=url, type="text/javascript")
+                if "main.js" in url:
+                    script.set('onload="window.GlossaryApp('
+                               'window.NCI_glossary_app_root_js_config)"')
                 if defer:
                     script.set("defer")
                 self._head.append(script)
             self._head.append(self.B.STYLE(self.STYLE))
+            self._head.append(self.B.SCRIPT(self.JSFUNC, type="text/javascript"))
         return self._head
 
     @property
@@ -600,7 +619,7 @@ class GTN:
                     self.B.DIV(
                         self.B.DIV(
                             self.B.DIV(
-                                *self.results,
+                                *self.results,  # What does '*' do here???
                                 self.B.CLASS("slot-item last-SI"),
                             ),
                             id="cgvBody",
@@ -666,7 +685,7 @@ class GTN:
             self.__language = language
 
         @property
-        def audio(self):
+        def audio_old(self):
             """Media link for the term's pronunciation in this language."""
 
             if self.audio_url:
@@ -676,6 +695,32 @@ class GTN:
                     B.CLASS("CDR_audiofile"),
                     href=self.audio_url,
                     type="ExternalLink",
+                )
+            return None
+
+        @property
+        def audio(self):
+            """Media link for the term's pronunciation in this language.
+               This needs to be an audio tag combined with a button to press"""
+
+            if self.audio_url:
+                B = self.term.B
+                return B.DIV(
+                    B.E("audio",
+                        B.CLASS("CDR_audiofile"),
+                        id=f"play-{self.langcode}",
+                        type="audio/mpeg",
+                        src=self.audio_url,
+                        ),
+                    B.E("button",
+                        B.SPAN("Listen to pronunciation",
+                        B.CLASS("show-for-sr")),
+                        " ",
+                        B.CLASS("btnAudio"),
+                        onClick=f"play_{self.langcode}()",
+                        type="button",
+                    ),
+                    B.CLASS("pronunciation__audio"),
                 )
             return None
 
@@ -820,6 +865,7 @@ class GTN:
         def pronunciation(self):
             """DD element for the term name's pronunciation (if present)."""
 
+            audio_old = self.audio_old
             audio = self.audio
             if not self.key and audio is None:
                 return None
@@ -828,7 +874,9 @@ class GTN:
             if audio is not None:
                 children = [audio]
             if self.key:
-                children.append(f" {self.key}")
+                #children.append(f" {self.key}")
+                children.append(B.DIV(f" {self.key}",
+                                      B.CLASS("pronunciation__key")))
             return B.DD(*children, B.CLASS("pronunciation"))
 
         @property
@@ -1081,7 +1129,7 @@ class GTN:
                         self._url = f"PublishPreview.py?{DOCID}={href}"
                     else:
                         url = self.__node.get("url", "")
-                        self._url = f"https://cancer.gov{url}"
+                        self._url = f"https://www.cancer.gov{url}"
                 return self._url
 
 
