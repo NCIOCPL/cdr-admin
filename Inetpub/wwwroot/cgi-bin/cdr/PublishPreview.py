@@ -756,16 +756,24 @@ class GTN:
                     # Definition with inline markup
                     # A glossary definition may contain the following inline
                     # markup elements: GeneName, ScientificName, Emphasis,
-                    # strong, or ExternalRef. We're building the individual
-                    # element objects and concatenating them to be displayed
-                    # within the DD element.
-                    # ======================================================
+                    # ForeignWord, strong, or ExternalRef. We're building the
+                    # individual element objects and concatenating them to be
+                    # displayed within the DD element.
+                    # =======================================================
                     if len(node):  # Definition includes inline markup
                         text = []
                         for element in node.iter():
-                            if element.tag in ('GeneName', 'ScientificName',
-                                               'Emphasis'):
+                            if element.tag == 'Emphasis':
                                 text.append(B.EM(element.text))
+                            elif element.tag == 'ForeignWord':
+                                text.append(B.EM(element.text, 
+                                                        B.CLASS("foreign-word")))
+                            elif element.tag == 'GeneName':
+                                text.append(B.EM(element.text, 
+                                                        B.CLASS("gene-name")))
+                            elif element.tag == 'ScientificName':
+                                text.append(B.EM(element.text, 
+                                                        B.CLASS("scientific-name")))
                             elif element.tag == 'Strong':
                                 text.append(B.B(element.text))
                             elif element.tag == 'ExternalRef':
