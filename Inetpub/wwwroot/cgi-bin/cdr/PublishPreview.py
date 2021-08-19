@@ -753,9 +753,38 @@ class GTN:
                 if self.langcode == "es":
                     name = "SpanishTermDefinition"
                 for node in self.term.root.findall(f"{name}/DefinitionText"):
-                    text = Doc.get_text(node, "").strip()
+                    # Definition with inline markup
+                    # A glossary definition may contain the following inline
+                    # markup elements: GeneName, ScientificName, Emphasis,
+                    # strong, or ExternalRef. We're building the individual
+                    # element objects and concatenating them to be displayed
+                    # within the DD element.
+                    # ======================================================
+                    if len(node):  # Definition includes inline markup
+                        text = []
+                        for element in node.iter():
+                            if element.tag in ('GeneName', 'ScientificName',
+                                               'Emphasis'):
+                                text.append(B.EM(element.text))
+                            elif element.tag == 'Strong':
+                                text.append(B.B(element.text))
+                            elif element.tag == 'ExternalRef':
+                                attributes = element.attrib
+                                text.append(B.A(element.text,
+                                                href=attributes['xref']))
+                            else:
+                                text.append(element.text)
+                            if element.tail:
+                                text.append(element.tail)
+                    # No inline markup
+                    else:          # Definition is plain text
+                        text = Doc.get_text(node, "").strip()
+
                     if text:
-                        dd = B.DD(text, B.BR(), B.CLASS("definition"))
+                        if isinstance(text, list):
+                            dd = B.DD(*text, B.BR(), B.CLASS("definition"))
+                        else:
+                            dd = B.DD(text, B.BR(), B.CLASS("definition"))
                         related = self.related
                         if related is not None:
                             dd.append(self.related)
