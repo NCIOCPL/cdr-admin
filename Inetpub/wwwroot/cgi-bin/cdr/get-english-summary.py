@@ -40,6 +40,7 @@ class Control(Controller):
         "PdqKey",
         "RelatedDocuments",
         "ReplacementFor",
+        "ResponseToComment",
         "SectMetaData",
         "TypeOfSummaryChange",
     )
