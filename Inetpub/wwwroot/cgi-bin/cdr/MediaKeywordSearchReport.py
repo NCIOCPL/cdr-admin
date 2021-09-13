@@ -95,11 +95,13 @@ jQuery(document).ready(function() {
                     doc_id = Doc.extract_id(doc_id)
                 except:
                     self.bail("Invalid document ID")
-                query = self.Query("active_doc", "COUNT(*)")
+                query = self.Query("active_doc a", "COUNT(*)")
+                query.join("query_term q", "a.id = q.doc_id")
                 query.where(query.Condition("id", doc_id))
+                query.where("q.path = '/Media/PhysicalMedia/ImageData/ImageEncoding'")
                 count = query.execute(self.cursor).fetchone()[0]
                 if count != 1:
-                    self.bail(f"CDR{doc_id} is not an active CDR document")
+                    self.bail(f"CDR{doc_id} is not an active CDR image document")
                 self._doc_ids = [doc_id]
             else:
                 query = self.Query("active_doc a", "a.id", "a.title").unique()
@@ -117,6 +119,11 @@ jQuery(document).ready(function() {
                 if self.language != "Spanish":
                     query.join("doc_type d", "d.id = a.doc_type")
                     query.where("d.name = 'Media'")
+
+                # Limiting query to images only
+                query.join("query_term j", "a.id = j.doc_id")
+                query.where("j.path = '/Media/PhysicalMedia/ImageData/ImageEncoding'")
+
                 query.order("title")
                 rows = query.execute(self.cursor).fetchall()
                 self._doc_ids = [row.id for row in rows]
