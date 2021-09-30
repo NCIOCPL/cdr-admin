@@ -17,8 +17,29 @@ class Control(Controller):
     def build_tables(self):
         """Assemble the report and return it."""
 
+        tables = []
+
+        # Getting total records by category
+        totals = self.category_count
+
+        # Only display the table with counts by category if at least
+        # one category has been selected.
+        # Add a final row with the total (total of rows displayed)
+        # ----------------------------------------------------------
+        if self.category:
+            cat_columns = "Category", "Count"
+            cat_rows = []
+
+            for cat in self.category:
+                cat_rows.append([cat, totals[cat]])
+            cat_rows.append(['Total  ========>', len(self.rows)])
+
+            cat_opts = dict(columns=cat_columns, caption="Count for Conditions")
+            tables.append(self.Reporter.Table(cat_rows, **cat_opts))
+
         opts = dict(caption=self.caption, columns=self.columns)
-        return self.Reporter.Table(self.rows, **opts)
+        tables.append(self.Reporter.Table(self.rows, **opts))
+        return tables
 
     def populate_form(self, page):
         """Ask the user for the report's parameters.
@@ -189,10 +210,49 @@ class Control(Controller):
                 else:
                     query.join(f"{table} t", "t.doc_id = m.doc_id")
                     query.where("t.path = '/Media/TranslationOf/@cdr:ref'")
+            query.log()
             rows = query.execute(self.cursor).fetchall()
             self._rows = [tuple(row) for row in rows]
             self.logger.info("%d rows found", len(self._rows))
         return self._rows
+
+
+    @property
+    def category_count(self):
+        """Count by category for the count table."""
+
+        if not hasattr(self, "_category_count"):
+            category_count = {}
+            for category in self.category:
+                table = "query_term_pub" if "pub" in self.options else "query_term"
+                fields = ["m.doc_id", "m.value"] if self.show_id else ["m.value"]
+                query = self.Query(f"{table} m", *fields).unique()
+                query.order("m.value")
+                query.where("m.path = '/Media/MediaTitle'")
+                if "active" in self.options:
+                    query.join("active_doc a", "a.id = m.doc_id")
+                if self.category:
+                    query.join(f"{table} c", "c.doc_id = m.doc_id")
+                    query.where(query.Condition("c.path", self.CATEGORY_PATH))
+                    query.where(query.Condition("c.value", category, "IN"))
+                if self.diagnosis:
+                    query.join(f"{table} d", "d.doc_id = m.doc_id")
+                    query.where(query.Condition("d.path", self.DIAGNOSIS_PATH))
+                    query.where(query.Condition("d.int_val", self.diagnosis, "IN"))
+                if len(self.languages) == 1:
+                    if "en" in self.languages:
+                        query.outer(f"{table} t", "t.doc_id = m.doc_id",
+                                    "t.path = '/Media/TranslationOf/@cdr:ref'")
+                        query.where("t.doc_id IS NULL")
+                    else:
+                        query.join(f"{table} t", "t.doc_id = m.doc_id")
+                        query.where("t.path = '/Media/TranslationOf/@cdr:ref'")
+                rows = query.execute(self.cursor).fetchall()
+                self.logger.info(f"{len(rows)} rows for {category} found")
+                category_count[category] = len(rows)
+            self._category_count = category_count
+        return self._category_count
+
 
     @property
     def show_id(self):
