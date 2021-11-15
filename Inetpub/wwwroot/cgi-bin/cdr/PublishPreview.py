@@ -10,6 +10,7 @@ from sys import stderr
 from cdrcgi import Controller, DOCID
 from cdrapi.publishing import DrupalClient
 from cdrapi.docs import Doc
+from cdrapi.users import Session
 import cdrpub
 from lxml import etree, html
 from lxml.html import builder
