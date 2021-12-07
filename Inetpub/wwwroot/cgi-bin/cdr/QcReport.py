@@ -405,10 +405,12 @@ pubImages = fields.getvalue("PubImages") or 'Y'
 citation = fields.getvalue("CitationsHP") \
              or fields.getvalue("CitationsPat") or None
 loe      = fields.getvalue("LOEs")       or None
+smdata   = fields.getvalue("SMD")        or None
 qd       = fields.getvalue("QD")         or None
 kpbox    = fields.getvalue("Keypoints")  or None
 learnmore= fields.getvalue("LearnMore")  or None
 modMarkup= fields.getvalue("ModuleMarkup")     or None
+qcOnly   = fields.getvalue("QCOnlyMod")  or None
 
 standardWording      = fields.getvalue("StandardWording") or None
 audInternComments    = fields.getvalue("AudInternalComments")  or None
@@ -850,7 +852,11 @@ if letUserPickVersion:
                        'StandardWording':
                             'Display standard wording with mark-up',
                        'ModuleMarkup':
-                            'Display Module Markup'
+                            'Display Modules Shaded',
+                       'QCOnlyMod':
+                            'Display QC-only Modules (Board Members QC Report)',
+                       'SMD':
+                            'Display Section Meta Data'
                  }
 
     radioBtnLabels = { 'PubImages':{'pubYes':'... use publishable version',
@@ -883,6 +889,10 @@ if letUserPickVersion:
                                 inputID='displayLearnMore', checked=1)
             form += addCheckbox(checkboxLabels, 'ModuleMarkup',
                                 inputID='displayModuleMarkup')
+            form += addCheckbox(checkboxLabels, 'QCOnlyMod',
+                                inputID='displayQCOnlyMod', checked=0)
+            form += addCheckbox(checkboxLabels, 'SMD',
+                                inputID='displaySectMetaData', checked=0)
 
         # End - Misc Print Options block
         # ------------------------------
@@ -1115,6 +1125,10 @@ if letUserPickVersion:
                                 inputID='displayLOEs')
             form += addCheckbox(checkboxLabels, 'ModuleMarkup',
                                 inputID='displayModuleMarkup', checked=0)
+            form += addCheckbox(checkboxLabels, 'QCOnlyMod',
+                                inputID='displayQCOnlyMod', checked=0)
+            form += addCheckbox(checkboxLabels, 'SMD',
+                                inputID='displaySectMetaData', checked=0)
 
         # End - Misc Print Options block
         # ------------------------------
@@ -1680,6 +1694,8 @@ if docType.startswith('Summary'):
     filterParm.append(['IncludeExtPerm', includeExtPerm ])
     filterParm.append(['IncludeIntAdv', includeIntAdv ])
     filterParm.append(['DisplayModuleMarkup', modMarkup and 'Y' or 'N'])
+    filterParm.append(['DisplaySectMetaData', smdata and 'Y' or 'N'])
+    filterParm.append(['DisplayQcOnlyMod', qcOnly and 'Y' or 'N'])
 
     # Patient Summaries are displayed like editorial board markup
     # -----------------------------------------------------------
