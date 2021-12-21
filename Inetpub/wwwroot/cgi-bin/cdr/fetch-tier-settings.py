@@ -9,13 +9,13 @@ import hashlib
 import json
 import os
 import sys
-import pkg_resources
 import lxml.etree as etree
 import requests
 import cdr
 import cdrcgi
 from cdrapi import db
 from cdrapi.settings import Tier
+from importlib.metadata import packages_distributions, version
 
 class Settings:
     TIER = Tier()
@@ -24,7 +24,7 @@ class Settings:
     WD = cdr.WORK_DRIVE
     WEBCONFIG_ROOT = f"{WD}:/Inetpub/wwwroot/web.config"
     WEBCONFIG_SECURE = f"{WD}:/Inetpub/wwwroot/cgi-bin/secure/web.config"
-    WEBCONFIG_GLOSSIFIER = f"{WD}:/cdr/Glossifier/cgi-bin/web.config"
+    WEBCONFIG_API = f"{WD}:/cdr/api/web.config"
 
     def __init__(self, session):
         self.session = session
@@ -42,7 +42,7 @@ class Settings:
             "web.config": {
                 "root": self.xmltojson(self.WEBCONFIG_ROOT),
                 "secure": self.xmltojson(self.WEBCONFIG_SECURE),
-                "glossifier": self.xmltojson(self.WEBCONFIG_GLOSSIFIER),
+                "api": self.xmltojson(self.WEBCONFIG_API),
             }
         }
     def xmltojson(self, path):
@@ -130,11 +130,11 @@ class Settings:
         files[name] = md5
 
     def get_python_settings(self):
-        env = pkg_resources.Environment()
+        distributions = packages_distributions()
         settings = dict(python=sys.version)
-        for name in env:
-            for package in env[name]:
-                settings[package.project_name] = package.version
+        for name in distributions:
+            for package in distributions[name]:
+                settings[package] = version(package)
         return settings
     def get_mssql_settings(self):
         cursor = db.connect().cursor()

@@ -6,7 +6,7 @@ Shows versions of everything.
 """
 
 from importlib import import_module
-from pkg_resources import Environment
+from importlib.metadata import packages_distributions, version
 from os import devnull
 import sys
 from cdrcgi import Controller, Reporter
@@ -15,7 +15,7 @@ class Control(Controller):
     SUBTITLE = "Python Upgrade Information"
     SUBMIT = None
     MODULES = (
-        ("apscheduler", "Required by ndscheduler"),
+        ("apscheduler", "Required by cdr_scheduler"),
         ("cdr", "Legacy wrapper for the CDR client/server API"),
         ("cdrcgi", "Scaffolding for CDR web pages"),
         ("cdrapi.db", "CDR database API"),
@@ -25,26 +25,20 @@ class Control(Controller):
         ("cdrapi.searches", "CDR search module API"),
         ("cdrapi.settings", "CDR tier configuration API"),
         ("cdrapi.users", "CDR login session API"),
-        ("dateutil", "Required by ndscheduler"),
-        ("dateutil.parser", "Required by ndscheduler"),
-        ("dateutil.tz", "Required by ndscheduler"),
-        ("dateutil.relativedelta", "Required by ndscheduler"),
+        ("dateutil.parser", "Used by the CDR for parsing dates"),
         ("lxml.etree", "Used by the CDR to manage XML documents"),
         ("lxml.html", "Used by the CDR to manage HTML pages"),
         ("mutagen", "Uused by the CDR to analyze MP3 files"),
-        ("ndscheduler", "Required by the CDR Scheduler"),
         ("openpyxl", "Preferred package for reading/writing Excel workbooks"),
         ("paramiko", "Used by the CDR for SFTP connections"),
         ("PIL.Image", "Used by the CDR to manage images"),
         ("PIL.ImageEnhance", "Used by the CDR to scale/enhance images"),
         ("PIL.ImageFont", "Used for calculating font sizes"),
         ("pip", "Used for managing Python packages"),
-        ("pkg_resources", "Used for cataloging installed Python modules"),
-        ("psutil", "Used by the CDR scheduler software"),
-        ("pyodbc", "Used the the CDR and ndscheduler for DB communication"),
-        ("pytz", "Required by ndscheduler"),
+        ("pyodbc", "Used the the CDR for database communication"),
+        ("pytz", "Required by apscheduler"),
         ("requests", "Preferred package for HTTP/HTTPS requests"),
-        ("setuptools", "Required by ndscheduler"),
+        ("sqlalchemy", "Required by apscheduler"),
         ("tornado", "Required by apsscheduler package"),
         ("xlrd", "Legacy package for reading Excel workbooks (retire?)"),
         ("xlwt", "Legacy package for writing Excel workbooks (retire?)"),
@@ -61,8 +55,9 @@ class Control(Controller):
         cols = "Module", "Description", "Status"
         rows = []
 
-        # This strange bit is needed because the ndscheduler package
+        # This strange bit was needed because the ndscheduler package
         # is poorly implemented, and writes to stdout when it is loaded.
+        # We have abandoned that package, but left this in as harmless.
         stdout = sys.stdout
         sys.stdout = open(devnull, "w")
         for name, description in self.MODULES:
@@ -77,12 +72,12 @@ class Control(Controller):
         sys.stdout = stdout
         tables = [Reporter.Table(rows, columns=cols, caption=caption)]
         caption = "Module Versions"
-        cols = "Module", "Version"
-        rows = [("Python", str(sys.version))]
-        env = Environment()
-        for key in sorted(env, key=str.lower):
-            for package in env[key]:
-                rows.append(str(package).split())
+        cols = "Distribution", "Module", "Version"
+        rows = [("python.org", "Python", str(sys.version))]
+        distributions = packages_distributions()
+        for name in distributions:
+            for package in distributions[name]:
+                rows.append((name, package, version(package)))
         tables.append(Reporter.Table(rows, columns=cols, caption=caption))
         return tables
 
