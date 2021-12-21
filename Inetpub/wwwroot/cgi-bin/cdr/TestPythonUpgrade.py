@@ -12,7 +12,7 @@ import sys
 from cdrcgi import Controller, Reporter
 
 class Control(Controller):
-    SUBTITLE = "Python Upgrade Information"
+    SUBTITLE = f"Python Upgrade Information ({str(sys.version)})"
     SUBMIT = None
     MODULES = (
         ("apscheduler", "Required by cdr_scheduler"),
@@ -28,7 +28,7 @@ class Control(Controller):
         ("dateutil.parser", "Used by the CDR for parsing dates"),
         ("lxml.etree", "Used by the CDR to manage XML documents"),
         ("lxml.html", "Used by the CDR to manage HTML pages"),
-        ("mutagen", "Uused by the CDR to analyze MP3 files"),
+        ("mutagen", "Used by the CDR to analyze MP3 files"),
         ("openpyxl", "Preferred package for reading/writing Excel workbooks"),
         ("paramiko", "Used by the CDR for SFTP connections"),
         ("PIL.Image", "Used by the CDR to manage images"),
@@ -69,12 +69,12 @@ class Control(Controller):
         sys.stdout = stdout
         tables = [Reporter.Table(rows, columns=cols, caption=caption)]
         caption = "Module Versions"
-        cols = "Distribution", "Module", "Version"
-        rows = [("python.org", "Python", str(sys.version))]
+        cols = "Package Name", "Module Import Name", "Version"
+        rows = []
         distributions = packages_distributions()
         for name in distributions:
             for package in distributions[name]:
-                rows.append((name, package, version(package)))
+                rows.append((package, name, version(package)))
         tables.append(Reporter.Table(rows, columns=cols, caption=caption))
         return tables
 
