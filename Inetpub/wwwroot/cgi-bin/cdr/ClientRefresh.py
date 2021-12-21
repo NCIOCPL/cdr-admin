@@ -123,10 +123,10 @@ def load_server_manifest(include_file_list=True):
 #----------------------------------------------------------------------
 def check_ticket(client_ticket):
     server_ticket = load_server_manifest(include_file_list=False).ticket
-    Control.logger.debug("client_ticket.host: %s", client_ticket.host, 2)
-    Control.logger.debug("server_ticket.host: %s", server_ticket.host, 2)
+    Control.logger.debug("client_ticket.host: %s", client_ticket.host)
+    Control.logger.debug("server_ticket.host: %s", server_ticket.host)
     Control.logger.debug("client_ticket.checksum: %s", client_ticket.checksum)
-    Control.logger.debug("server_ticket.checksum: %s" % server_ticket.checksum)
+    Control.logger.debug("server_ticket.checksum: %s", server_ticket.checksum)
     Control.logger.debug("client_ticket.timestamp: %s", client_ticket.timestamp)
     Control.logger.debug("server_ticket.timestamp: %s", server_ticket.timestamp)
     response = etree.Element("Current")
@@ -215,7 +215,7 @@ def make_delta(client_manifest):
             to_be_installed.append(manifest_name)
         Control.logger.debug("sending %d files to be installed",
                              len(to_be_installed))
-        zip_file = base64.encodestring(build_zip_file(to_be_installed))
+        zip_file = base64.encodebytes(build_zip_file(to_be_installed))
         etree.SubElement(updates, "ZipFile", encoding="base64").text = zip_file
     if to_be_deleted:
         Control.logger.debug("%d files will be removed", len(to_be_deleted))
