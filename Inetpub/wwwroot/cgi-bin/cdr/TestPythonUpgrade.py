@@ -38,13 +38,10 @@ class Control(Controller):
         ("pyodbc", "Used the the CDR for database communication"),
         ("pytz", "Required by apscheduler"),
         ("requests", "Preferred package for HTTP/HTTPS requests"),
-        ("sqlalchemy", "Required by apscheduler"),
-        ("tornado", "Required by apsscheduler package"),
         ("xlrd", "Legacy package for reading Excel workbooks (retire?)"),
         ("xlwt", "Legacy package for writing Excel workbooks (retire?)"),
         ("xlsxwriter",
          "Alternate package for creating workbooks with background images"),
-        ("zeep", "Used for testing the CDR glossifier SOAP service"),
     )
     def show_form(self):
         """Go directly to the report."""
