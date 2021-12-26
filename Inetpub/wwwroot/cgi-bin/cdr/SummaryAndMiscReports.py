@@ -45,6 +45,7 @@ class Control(Controller):
             ("Summaries with ProtocolRef Links (> 5min)",
              "SummaryProtocolRefLinks.py"),
             ("Summary Internal Links", "ocecdr-3650.py"),
+            ("Updated SummaryRef Titles", "UpdatedSummaryRefTitles.py"),
         ):
             ol.append(page.B.LI(page.menu_link(script, display)))
 
