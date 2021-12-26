@@ -30,7 +30,7 @@ class Control(Controller):
         """
 
         if self.debug:
-            form.add_hidden_field("debug", True)
+            page.form.append(page.hidden_field("debug", True))
         end = datetime.date.today()
         start = end - datetime.timedelta(7)
         fieldset = page.fieldset("Select PDQ Board For Report")
