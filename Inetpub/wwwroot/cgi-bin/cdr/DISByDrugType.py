@@ -110,9 +110,20 @@ class Control(Controller):
             query.order("d.value")
             if self.drug_type and "all" not in self.drug_type:
                 query.where(query.Condition("d.value", self.drug_type, "IN"))
-            for row in query.execute(self.cursor).fetchall():
-                publishable = row.doc_id in self.publishable_drugs
-                self._rows.append(list(row) + ["Yes" if publishable else "No"])
+            rows = query.execute(self.cursor).fetchall()
+            counts = {}
+            for doc_id, title, drug_type in rows:
+                counts[doc_id] = counts.get(doc_id, 0) + 1
+            for doc_id, title, drug_type in rows:
+                opts=dict(bold=counts[doc_id]>1)
+                publishable = doc_id in self.publishable_drugs
+                row = [
+                    self.Reporter.Cell(doc_id, **opts),
+                    self.Reporter.Cell(title, **opts),
+                    self.Reporter.Cell(drug_type, **opts),
+                    self.Reporter.Cell("Yes" if publishable else "No", **opts),
+                ]
+                self._rows.append(row)
         return self._rows
 
 
