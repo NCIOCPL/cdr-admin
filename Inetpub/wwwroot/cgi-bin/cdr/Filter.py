@@ -162,7 +162,7 @@ class Control(Controller):
                     self._dtd = etree.DTD(fp)
             except Exception as e:
                 self.logger.exception("Failure loading %s", path)
-                self.bail("Failure loading {path}: {e}")
+                self.bail(f"Failure loading {path}: {e}")
         return self._dtd
 
     @property
