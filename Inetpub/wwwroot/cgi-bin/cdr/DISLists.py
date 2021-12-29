@@ -7,6 +7,7 @@ import datetime
 from cdrcgi import Controller, Reporter
 from cdrapi import db
 
+
 class Control(Controller):
     """Top-level logic for the report."""
 
@@ -95,7 +96,7 @@ class Control(Controller):
             if self.APPROVED_IN_CHILDREN in self.fda_approval_status:
                 query.outer("query_term_pub a", "a.doc_id = d.id",
                             "a.value = 'Yes'", f"a.path = '{self.ACCEL_PATH}'")
-                query.outer("query_term_pub k","k.doc_id = d.id",
+                query.outer("query_term_pub k", "k.doc_id = d.id",
                             "k.value = 'Yes'", f"k.path = '{self.KIDS_PATH}'")
                 query.where("(a.doc_id IS NOT NULL OR k.doc_id IS NOT NULL)")
             else:
@@ -103,7 +104,7 @@ class Control(Controller):
                 query.where(f"a.path = '{self.ACCEL_PATH}'")
                 query.where("a.value = 'Yes'")
                 if self.include_fda_approval:
-                    query.outer("query_term_pub k","k.doc_id = d.id",
+                    query.outer("query_term_pub k", "k.doc_id = d.id",
                                 "k.value = 'Yes'",
                                 f"k.path = '{self.KIDS_PATH}'")
         elif self.APPROVED_IN_CHILDREN in self.fda_approval_status:
@@ -116,7 +117,7 @@ class Control(Controller):
         elif self.include_fda_approval:
             query.outer("query_term_pub a", "a.doc_id = d.id",
                         "a.value = 'Yes'", f"a.path = '{self.ACCEL_PATH}'")
-            query.outer("query_term_pub k","k.doc_id = d.id",
+            query.outer("query_term_pub k", "k.doc_id = d.id",
                         "k.value = 'Yes'", f"k.path = '{self.KIDS_PATH}'")
         query.outer("query_term_pub c", "c.doc_id = d.id",
                     f"c.path = '{self.COMBO_PATH}'")

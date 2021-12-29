@@ -5,6 +5,7 @@
 
 from cdrcgi import Controller
 
+
 class Control(Controller):
 
     SUBTITLE = "Drug Information Reports"

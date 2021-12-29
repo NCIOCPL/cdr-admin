@@ -23,7 +23,7 @@ try:
     query.join("doc_type t", "t.id = d.doc_type")
     query.where(query.Condition("d.title", title))
     rows = query.execute().fetchall()
-except:
+except Exception:
     print("Status: 500 CDR database unavailable\n")
     exit(0)
 if not len(rows):

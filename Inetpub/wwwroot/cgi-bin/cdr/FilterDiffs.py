@@ -14,6 +14,7 @@ import cdrcgi
 from cdrapi import db
 from cdrapi.settings import Tier
 
+
 class Control:
     """Wrap the processing in a single namespace."""
 
@@ -63,7 +64,7 @@ class Control:
         """Names of all filters, including those on one tier only."""
 
         if not hasattr(self, "_filter_names"):
-            names =  set(self.local_filters) | set(self.prod_filters)
+            names = set(self.local_filters) | set(self.prod_filters)
             self._filter_names = names
         return self._filter_names
 
@@ -119,7 +120,7 @@ class Control:
             try:
                 with open(self.CACHED_PROD_FILTERS, "w") as fp:
                     json.dump(self._prod_filters, fp)
-            except:
+            except Exception:
                 pass
         return self._prod_filters
 

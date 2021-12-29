@@ -83,8 +83,8 @@ class Control(Controller):
                     strings = (Job.TABLE, cols, placeholders)
                     query = self.INSERT.format(*strings)
                 else:
-                    cols = ", ".join([("%s = ?" % name) for name in Job.FIELDS])
-                    strings = (Job.TABLE, cols, Job.KEY)
+                    cols = [f"{name} = ?" for name in Job.FIELDS]
+                    strings = (Job.TABLE, ", ".join(cols), Job.KEY)
                     query = self.UPDATE.format(*strings)
                 try:
                     cursor.execute(query, params)
@@ -209,7 +209,7 @@ function add_file_field() {
     }));
     jQuery("#new-files").append(field);
     jQuery("input[name='nfiles']").val(nfiles);
-}""");
+}""")
 
     def populate_summary_selection_form(self, page):
         """
@@ -466,6 +466,7 @@ function add_file_field() {
 
         query = db.Query(table_name, "value_id", "value_name")
         rows = query.order("value_pos").execute(self.cursor).fetchall()
+
         class Values:
             def __init__(self, rows):
                 self.map = {}
@@ -497,7 +498,7 @@ function add_file_field() {
             return None
         try:
             int_id = int(value)
-        except:
+        except Exception:
             self.bail(f"invalid {name} ({value!r})")
         if int_id not in valid_values:
             self.bail(f"invalid {name} ({value!r})")
@@ -633,7 +634,7 @@ function add_file_field() {
             sql = f"DELETE FROM {Job.ATTACHMENT} WHERE attachment_id = ?"
             for attachment_id in drop:
                 if int(attachment_id) not in self.attachments:
-                    bail()
+                    self.bail()
                 cursor.execute(sql, (attachment_id,))
             conn.commit()
         nfiles = int(self.fields.getvalue("nfiles", "0"))
@@ -776,6 +777,7 @@ class Job:
                 try:
                     xml = query.execute(self.__control.cursor).fetchone().xml
                     root = etree.fromstring(xml.encode("utf-8"))
+
                     class Change:
                         def __init__(self, node):
                             self.value = self.date = ""
@@ -785,6 +787,7 @@ class Job:
                             child = node.find("Date")
                             if child is not None and child.text is not None:
                                 self.date = child.text
+
                         def __lt__(self, other):
                             return self.date < other.date
                     name = "TypeOfSummaryChange"

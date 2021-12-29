@@ -24,6 +24,7 @@ class Control(Controller):
 
     def show_form(self):
         return self.show_report()
+
     def show_report(self):
         opts = dict(
             banner=self.title,
@@ -83,11 +84,13 @@ class Control(Controller):
 class Concept:
     DEFINITION_TYPES = "DEFINITION", "ALT_DEFINITION"
     SUFFIX = compile(r"\s*\(NCI\d\d\)$")
+
     def __init__(self, control, code, values, doc_ids):
         self.control = control
         self.code = code
         self.values = values
         self.doc_ids = doc_ids
+
     def show(self, page):
         page.body.append(page.B.H3(f"{self.name} ({self.code})"))
         if self.definition:
@@ -96,8 +99,10 @@ class Concept:
         for doc in sorted(self.docs):
             ul.append(doc.show(page))
         page.body.append(ul)
+
     def __lt__(self, other):
         return self.sortkey < other.sortkey
+
     @property
     def definition(self):
         if not hasattr(self, "_definition"):
@@ -112,6 +117,7 @@ class Concept:
                             definitions.append(definition)
             self._definition = definitions[0] if definitions else ""
         return self._definition
+
     @property
     def docs(self):
         if not hasattr(self, "_docs"):
@@ -119,11 +125,13 @@ class Concept:
             for doc_id in self.doc_ids:
                 self._docs.append(Doc(self.control, doc_id))
         return self._docs
+
     @property
     def sortkey(self):
         if not hasattr(self, "_sortkey"):
             self._sortkey = self.name.lower(), self.code
         return self._sortkey
+
     @property
     def name(self):
         if not hasattr(self, "_name"):
@@ -140,8 +148,10 @@ class Doc:
         row = query.execute(control.cursor).fetchone()
         self.title = row.title
         self.blocked = row.active_status != "A"
+
     def __lt__(self, other):
         return self.title < other.title
+
     def show(self, page):
         cdr_id = f"CDR{self.doc_id}"
         opts = dict(DocId=cdr_id, Filter="set:QC Term Set")

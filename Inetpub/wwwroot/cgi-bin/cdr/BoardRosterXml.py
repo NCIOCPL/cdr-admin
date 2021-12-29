@@ -223,6 +223,7 @@ class BoardMember:
         etree.SubElement(node, "BoardId").text = str(self.__row.board_id)
         return node
 
+
 class MemberDetails:
     """Detailed information about a single board member."""
 
@@ -283,7 +284,6 @@ class MemberDetails:
             id = node.get(Control.CDR_REF)
             self._person = self.Person(self.control, id)
         return self._person
-
 
     class Contact:
         """Contact information for the board member."""
@@ -408,7 +408,6 @@ class MemberDetails:
                 etree.SubElement(node, "Public").text = public
                 return node
 
-
         class Email:
             """Email address and indication whether the address is public."""
 
@@ -472,7 +471,6 @@ class MemberDetails:
                     if node is not None:
                         self._phone = MemberDetails.Contact.Phone(node)
                 return self._phone
-
 
         class OtherPracticeLocation:
             """Location associated with an organization."""
@@ -554,7 +552,6 @@ class MemberDetails:
                     elif self.organization:
                         self._phone = self.organization.phone
                 return self._phone
-
 
     class Person:
         """Information from the board member's Person document."""

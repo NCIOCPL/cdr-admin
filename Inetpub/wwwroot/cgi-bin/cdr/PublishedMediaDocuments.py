@@ -76,12 +76,13 @@ class Control(Controller):
         # are used differently for this report.
         # --------------------------------------------------------
         instruction = ("NOTE: The audience option is working differently for "
-                       "this report. Selecting both audiences will display only "
-                       "those documens for which BOTH audiences exist rather "
-                       "than documents for which either one of the audiences exists. "
-                       "Similarily for selecting one audience only. In this case "
-                       "a document will not be included if a caption for the other "
-                       "audience type also exists")
+                       "this report. Selecting both audiences will display "
+                       "only those documens for which BOTH audiences exist  "
+                       "rather than documents for which either one of the "
+                       "audiences exists. Similarily for selecting one "
+                       "audience only. In this case a document will not be "
+                       "included if a caption for the other audience type "
+                       "also exists")
         fieldset = page.fieldset("Audience(s)")
         para = page.B.P(instruction)
         fieldset.append(para)
@@ -160,9 +161,9 @@ class Control(Controller):
         # languages.
         # ---------------------------------------------------------
         if self.language == 'English':
-            query.where("l.value IS NULL") # English
+            query.where("l.value IS NULL")  # English
         elif self.language == 'Spanish':
-            query.where("l.value IS NOT NULL") # Spanish
+            query.where("l.value IS NOT NULL")  # Spanish
 
         #  Query for all media, including HP and Patien records
         all_rows = query.execute(self.cursor).fetchall()
@@ -181,12 +182,14 @@ class Control(Controller):
         selected = set()
 
         for row in all_rows:
-            if row[6] == 'Patients': pat.add(row[0])
-            else: hp.add(row[0])
+            if row[6] == 'Patients':
+                pat.add(row[0])
+            else:
+                hp.add(row[0])
 
         patandhp = pat & hp
         pat_only = pat - hp
-        hp_only  = hp - pat
+        hp_only = hp - pat
 
         # self.audience doesn't exist if both audience checkboxes have
         # been selected
@@ -197,7 +200,7 @@ class Control(Controller):
                 selected = pat_only
             else:
                 selected = hp_only
-            #audience = self.audience.replace(" ", "_")
+            # audience = self.audience.replace(" ", "_")
         else:
             audience = 'both'
             selected = patandhp
@@ -213,9 +216,10 @@ class Control(Controller):
 
                 # Since records for HP and Patients are listed twice in
                 # the select result we're skipping one of the two
-                # ---------------------------------------------------------------
-                if audience == 'both' and row.audience == 'Health_professionals':
-                    continue
+                # ----------------------------------------------------------
+                if audience == 'both':
+                    if row.audience == 'Health_professionals':
+                        continue
 
                 rows.append([
                     self.Reporter.Cell(row.doc_id, href=url, center=True),

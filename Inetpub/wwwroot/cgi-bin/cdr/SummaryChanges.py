@@ -5,7 +5,7 @@
 
 from cdrcgi import Controller
 from cdrapi.docs import Doc
-from datetime import date, timedelta
+from datetime import date
 import lxml.html
 
 
@@ -147,7 +147,7 @@ class Control(Controller):
             if self._id:
                 try:
                     self._id = Doc.extract_id(self._id)
-                except:
+                except Exception:
                     self.bail("Invalid ID")
             elif self.summaries and len(self.summaries) == 1:
                 self._id = self.summaries[0][0]
@@ -175,8 +175,8 @@ class Control(Controller):
         if not hasattr(self, "_sections"):
             last_section = None
             sections = []
-            for version, date in self.versions:
-                display_date = date.strftime("%m/%d/%Y")
+            for version, version_date in self.versions:
+                display_date = version_date.strftime("%m/%d/%Y")
                 doc = Doc(self.session, id=self.id, version=version)
                 response = doc.filter(self.FILTER)
                 html = str(response.result_tree).strip()

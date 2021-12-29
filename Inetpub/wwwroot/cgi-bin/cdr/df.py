@@ -1,8 +1,9 @@
 #!/usr/bin/env python
-#----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 # Show disk size/usage on CDR Windows Server
 # See http://code.activestate.com/recipes/577972-disk-usage/
-#----------------------------------------------------------------------
+# ----------------------------------------------------------------------
+
 def human(n):
     symbols = ('K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y')
     prefix = {}
@@ -13,6 +14,7 @@ def human(n):
             value = float(n) / prefix[s]
             return '%.1f%s' % (value, s)
     return "%sB" % n
+
 
 class Disk:
     def __init__(self, drive):
@@ -36,6 +38,7 @@ class Disk:
    FREE: {self.free:>13} ({human(self.free)})
 """)
 
+
 print("Content-type: text/plain")
 print("")
 
@@ -47,6 +50,3 @@ try:
 except Exception as e:
     cdr.LOGGER.exception("disk free failure")
     print(e)
-except:
-    cdr.LOGGER.exception("disk free unexpected error")
-    print("Unexpected error")

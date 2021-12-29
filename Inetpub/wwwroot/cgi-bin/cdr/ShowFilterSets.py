@@ -7,6 +7,7 @@ from copy import deepcopy
 from cdrcgi import Controller, navigateTo
 from cdrapi.docs import Filter as APIFilter, FilterSet as APIFilterSet
 
+
 class Control(Controller):
     """Logic for the report."""
 
@@ -184,6 +185,7 @@ class FilterSet:
             return self._node
         return deepcopy(self._node)
 
+
 class Filter:
     """Filter document with info on included modules."""
 
@@ -251,7 +253,6 @@ class Filter:
                 self._node.append(self.includes)
             return self._node
         return deepcopy(self._node)
-
 
     class Include:
         """An included (or imported) filter."""

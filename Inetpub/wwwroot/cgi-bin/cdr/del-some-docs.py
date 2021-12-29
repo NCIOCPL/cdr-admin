@@ -74,7 +74,7 @@ class Control(Controller):
                 for id in ids.split():
                     try:
                         self._ids.append(Doc.extract_id(id))
-                    except:
+                    except Exception:
                         self.bail("Invalid document ID")
         return self._ids
 

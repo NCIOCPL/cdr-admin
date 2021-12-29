@@ -187,7 +187,6 @@ class TermNameDoc:
                         self._names.append(name)
         return self._names
 
-
     class Name:
         """One of the English or Spanish names in a glossary term name doc."""
 

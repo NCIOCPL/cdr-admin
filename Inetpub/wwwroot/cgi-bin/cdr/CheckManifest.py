@@ -9,6 +9,7 @@ import cdr
 from cdrcgi import Controller, Reporter
 import lxml.etree as etree
 
+
 class Control(Controller):
 
     SUBTITLE = "Client Manifest Check"

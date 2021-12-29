@@ -9,11 +9,13 @@
 
 import cdr
 
+
 def report(what):
     print(f"""\
 Content-type: text/plain
 
 CDR {what}""")
+
 
 cdr.LOGGER.debug("cdrping called")
 
@@ -24,6 +26,6 @@ try:
         report("CORRUPT")
     else:
         report("OK")
-except Exception as e:
+except Exception:
     cdr.LOGGER.exception("CDR ping failure")
     report("UNAVAILABLE")

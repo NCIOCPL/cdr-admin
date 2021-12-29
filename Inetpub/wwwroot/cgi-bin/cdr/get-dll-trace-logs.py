@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
-#----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 # Return json-encoded dump of the client DLL trace logs, used to
 # track down what might be causing XMetaL to lock up or crash.
-#----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 from cgi import FieldStorage
 from json import dumps
 from cdrapi import db

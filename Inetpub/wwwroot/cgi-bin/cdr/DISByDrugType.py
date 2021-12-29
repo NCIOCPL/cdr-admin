@@ -115,7 +115,7 @@ class Control(Controller):
             for doc_id, title, drug_type in rows:
                 counts[doc_id] = counts.get(doc_id, 0) + 1
             for doc_id, title, drug_type in rows:
-                opts=dict(bold=counts[doc_id]>1)
+                opts = dict(bold=counts[doc_id] > 1)
                 publishable = doc_id in self.publishable_drugs
                 row = [
                     self.Reporter.Cell(doc_id, **opts),

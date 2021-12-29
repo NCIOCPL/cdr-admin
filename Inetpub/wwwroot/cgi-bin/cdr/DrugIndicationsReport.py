@@ -8,6 +8,7 @@ having two options), based on the parameters chosen at run time.
 from cdrcgi import Controller, Reporter, bail
 from cdrapi import db
 
+
 class Control(Controller):
 
     SUBTITLE = "Drug Indications"

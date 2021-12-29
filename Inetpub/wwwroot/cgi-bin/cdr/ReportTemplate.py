@@ -5,7 +5,6 @@
 
 from datetime import date, timedelta
 from cdrcgi import Controller
-from cdrcgi import Reporter
 
 
 class Control(Controller):
@@ -52,7 +51,6 @@ class Control(Controller):
         columns = "Job ID", "Job Type", "Started", "Completed", "Status"
         opts = dict(columns=columns, caption="Jobs")
         return self.Reporter.Table(table_rows, **opts)
-
 
     def show_report(self):
         """Special formatting of report output

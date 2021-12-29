@@ -6,6 +6,7 @@
 from cdrcgi import Controller, Reporter
 from cdrapi.docs import Doc
 
+
 class Control(Controller):
     """Report logic."""
 
@@ -106,7 +107,7 @@ class Control(Controller):
             if id:
                 try:
                     self._id = Doc.extract_id(id)
-                except:
+                except Exception:
                     self.bail(f"Invalid id: {id!r}")
             else:
                 name = self.fields.getvalue("name")
@@ -146,14 +147,6 @@ class Control(Controller):
             rows = query.execute(self.cursor).fetchall()
             self._source = rows[0].value if rows else None
         return self._source
-
-    @property
-    def cdr_id(self):
-        """Display version of the term name document ID."""
-
-        if not hasattr(self, "_cdr_id"):
-            self._cdr_id = f"CDR{self.id:010d}"
-        return self._cdr_id
 
     @property
     def xpath(self):

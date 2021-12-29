@@ -25,11 +25,10 @@ from cdrcgi import Controller
 from datetime import date, datetime
 from difflib import SequenceMatcher
 from functools import cached_property
-from glob import glob
 from json import load, dump
 from lxml import etree
 from ModifyDocs import Job
-from re import compile, escape, sub, UNICODE
+from re import compile, escape, sub
 from requests import get
 from string import punctuation
 from time import sleep
@@ -438,12 +437,6 @@ class Control(Controller):
 
         start = datetime.now()
         docs = {}
-        # Used during development.
-        #for path in glob("ocecdr-5016-cdrdrugs/*.xml"):
-        #    match = self.CDR_ID.search(path)
-        #    doc_id = int(match.group(1))
-        #    root = etree.parse(path).getroot()
-        #    docs[doc_id] = CDRTerm(doc_id, root)
         query = self.Query("query_term", "doc_id").unique()
         query.where("path = '/Term/SemanticType/@cdr:ref'")
         query.where(query.Condition("int_val", self.SEMANTIC_TYPES, "IN"))
@@ -452,7 +445,7 @@ class Control(Controller):
                 doc = Doc(self.session, id=row.doc_id)
                 docs[row.doc_id] = CDRTerm(doc.id, doc.root)
             except Exception:
-                self.logger.exception(f"parsing CDR%s", row.doc_id)
+                self.logger.exception("parsing CDR%s", row.doc_id)
         args = len(docs), datetime.now() - start
         self.logger.info("fetched %d drug documents in %s", *args)
         return docs
@@ -887,20 +880,20 @@ class OtherName:
 
     SKIP = {"PreferredName", "ReviewStatus"}
     TERM_TYPE_MAP = {
-        "PT"               : "Synonym", # "Preferred term",
-        "AB"               : "Abbreviation",
-        "AQ"               : "Obsolete name",
-        "BR"               : "US brand name",
-        "CN"               : "Code name",
-        "FB"               : "Foreign brand name",
-        "SN"               : "Chemical structure name",
-        "SY"               : "Synonym",
-        "INDCode"          : "IND code",
-        "NscCode"          : "NSC code",
+        "PT": "Synonym",
+        "AB": "Abbreviation",
+        "AQ": "Obsolete name",
+        "BR": "US brand name",
+        "CN": "Code name",
+        "FB": "Foreign brand name",
+        "SN": "Chemical structure name",
+        "SY": "Synonym",
+        "INDCode": "IND code",
+        "NscCode": "NSC code",
         "CAS_Registry_Name": "CAS Registry name",
-        "IND_Code"         : "IND code",
-        "NSC_Code"         : "NSC code",
-        "CAS_Registry"     : "CAS Registry name"
+        "IND_Code": "IND code",
+        "NSC_Code": "NSC code",
+        "CAS_Registry": "CAS Registry name"
     }
 
     def __init__(self, name, group, source=None):

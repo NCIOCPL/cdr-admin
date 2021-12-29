@@ -7,6 +7,7 @@ import os
 import cdr
 from cdrcgi import Controller, bail
 
+
 class Control(Controller):
 
     LOGNAME = "config-files"

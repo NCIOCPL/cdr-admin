@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-#----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 #
 # Web service for keeping CDR client files up to date.
 #
@@ -8,10 +8,9 @@
 # OCECDR-4083: Login errors when switching between tiers.
 # OCECDR-4265: Move glossifier service to Windows
 #
-#----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 from argparse import ArgumentParser
 import base64
-import datetime
 import logging
 import os
 import sys
@@ -20,28 +19,33 @@ from lxml import etree
 import cdr
 import WebService
 
+
 class Control:
     STANDALONE = False
     logger = cdr.Logging.get_logger("ClientRefresh")
 
-#----------------------------------------------------------------------
+
+# ----------------------------------------------------------------------
 # Base class for Ticket and File classes, supporting check for match
 # based on checksums (if present) or time stamps (otherwise). Also
 # checks for matching hosts for tickets.
-#----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 class ComparableNode:
     def __init__(self):
         self.host = self.checksum = self.timestamp = None
+
     def __eq__(self, other):
         if self.host != other.host:
             return False
         if self.checksum is None or other.checksum is None:
             return self.timestamp == other.timestamp
         return self.checksum == other.checksum
+
     def __ne__(self, other):
         return not self.__eq__(other)
 
-#----------------------------------------------------------------------
+
+# ----------------------------------------------------------------------
 # Object representing the header for a manifest for CDR client files.
 # Contains identification of the server to which the manifest's file
 # belong, the date/time the manifest was last built, the application
@@ -52,7 +56,7 @@ class ComparableNode:
 # updated its files.
 #
 # 2015-12-07: Add support for using checksums instead of time stamps.
-#----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 class Ticket(ComparableNode):
     def __init__(self, node):
         ComparableNode.__init__(self)
@@ -69,13 +73,14 @@ class Ticket(ComparableNode):
             elif child.tag == "Timestamp":
                 self.timestamp = child.text.strip()
 
-#----------------------------------------------------------------------
+
+# ----------------------------------------------------------------------
 # Object representing one of the files in the CDR client file set.
 # Data members for the pathname ("name") and modification date/time
 # ("timestamp") are carried in the object.
 #
 # 2015-12-07: Add support for using checksums instead of time stamps.
-#----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 class File(ComparableNode):
     def __init__(self, node):
         ComparableNode.__init__(self)
@@ -88,10 +93,11 @@ class File(ComparableNode):
             elif child.tag == "Timestamp":
                 self.timestamp = child.text.strip()
 
-#----------------------------------------------------------------------
+
+# ----------------------------------------------------------------------
 # Object representing the list of files in the CDR client file set,
 # along with a header ("ticket") for the list.
-#----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 class Manifest:
     def __init__(self, node, include_file_list=True):
         self.ticket = None
@@ -104,15 +110,17 @@ class Manifest:
                     if grandchild.tag == "File":
                         self.files.append(File(grandchild))
 
-#----------------------------------------------------------------------
+
+# ----------------------------------------------------------------------
 # Parse the server's copy of the XML document containing the list of
 # CDR client files and the header for the list.
-#----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 def load_server_manifest(include_file_list=True):
     tree = etree.parse(cdr.MANIFEST_PATH)
     return Manifest(tree.getroot(), include_file_list)
 
-#----------------------------------------------------------------------
+
+# ----------------------------------------------------------------------
 # Compare the header for the server's copy of the manifest for CDR
 # client files with the copy of the manifest header sent by the
 # client machine.  Send a response to the client indicating whether
@@ -120,20 +128,23 @@ def load_server_manifest(include_file_list=True):
 # checked.  The response from the server consists of an XML document
 # containing the single element Current, whose text content is
 # "Y" if the client's set is up to date, or "N" otherwise.
-#----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 def check_ticket(client_ticket):
     server_ticket = load_server_manifest(include_file_list=False).ticket
     Control.logger.debug("client_ticket.host: %s", client_ticket.host)
     Control.logger.debug("server_ticket.host: %s", server_ticket.host)
     Control.logger.debug("client_ticket.checksum: %s", client_ticket.checksum)
     Control.logger.debug("server_ticket.checksum: %s", server_ticket.checksum)
-    Control.logger.debug("client_ticket.timestamp: %s", client_ticket.timestamp)
-    Control.logger.debug("server_ticket.timestamp: %s", server_ticket.timestamp)
+    Control.logger.debug("client_ticket.timestamp: %s",
+                         client_ticket.timestamp)
+    Control.logger.debug("server_ticket.timestamp: %s",
+                         server_ticket.timestamp)
     response = etree.Element("Current")
     response.text = (client_ticket == server_ticket) and "Y" or "N"
     return WebService.Response(response, Control.logger)
 
-#----------------------------------------------------------------------
+
+# ----------------------------------------------------------------------
 # Create a compressed archive containing the new and/or modified files
 # which this client needs in order to bring its set in sync with the
 # set on the server.  Return the archive as an in-memory string of bytes.
@@ -144,10 +155,10 @@ def check_ticket(client_ticket):
 # in the files' timestamps (rounding instead to even seconds), and
 # using the more robust tar format would introduce the need to have
 # tar and bzip2 (with supporting libraries) installed on the client.
-#----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 def build_zip_file(file_names):
     base_name = tempfile.mktemp()
-    zip_name  = base_name + ".zip"
+    zip_name = base_name + ".zip"
     list_name = base_name + ".txt"
     list_file = open(list_name, "w")
     for name in file_names:
@@ -158,7 +169,7 @@ def build_zip_file(file_names):
     command = f"d:\\bin\\zip -@ {zip_name} < {list_name}"
     process = cdr.run_command(command, merge_output=True)
     if process.returncode:
-        msg = f"zip failure code {process.resultcode} ({result.stdout})"
+        msg = f"zip failure code {process.returncode} ({process.stdout})"
         Control.logger.debug(msg)
         raise msg
     with open(zip_name, "rb") as fp:
@@ -169,7 +180,8 @@ def build_zip_file(file_names):
         os.unlink(zip_name)
     return zip_bytes
 
-#----------------------------------------------------------------------
+
+# ----------------------------------------------------------------------
 # Compare the client's copy of the manifest for CDR client files with
 # the server's copy and build two lists of file pathnames, one for
 # files which are new or changed since the client's last file refresh,
@@ -181,7 +193,7 @@ def build_zip_file(file_names):
 # new and/or changed files needed by the client) and Delete (containing
 # one or more File grandchild elements, one for each client file
 # which needs to be removed).
-#----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 def make_delta(client_manifest):
     server_manifest = load_server_manifest()
     client_files = {}
@@ -224,11 +236,12 @@ def make_delta(client_manifest):
             etree.SubElement(deletions, "File").text = name
     return WebService.Response(updates, Control.logger)
 
-#----------------------------------------------------------------------
+
+# ----------------------------------------------------------------------
 # Entry point for the service's program.  Catch the client's request,
 # parse it, determine which command was sent, and pass the request
 # to the appropriate handler function.
-#----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 def main():
     parser = ArgumentParser()
     parser.add_argument("--standalone", action="store_true")
@@ -259,9 +272,10 @@ def main():
     else:
         response.send()
 
-#----------------------------------------------------------------------
+
+# ----------------------------------------------------------------------
 # Allow this to be loaded as a module, without doing any processing
 # until explicitly requested.
-#----------------------------------------------------------------------
-if __name__== "__main__":
+# ----------------------------------------------------------------------
+if __name__ == "__main__":
     main()

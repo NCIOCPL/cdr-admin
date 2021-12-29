@@ -5,6 +5,7 @@
 
 from cdrcgi import Controller
 
+
 class Control(Controller):
 
     SUBTITLE = "Terminology Reports"
@@ -27,7 +28,8 @@ class Control(Controller):
             ("Cancer Diagnosis Hierarchy", "DiseaseDiagnosisTerms.py"),
             ("Cancer Diagnosis Hierarchy (Without Alternate Names)",
              "DiseaseDiagnosisTerms.py", dict(flavor="short")),
-            ("Clinical Trials Drug Analysis Report", "RecentCTGovProtocols.py"),
+            ("Clinical Trials Drug Analysis Report",
+             "RecentCTGovProtocols.py"),
             ("Drug Review Report", "DrugReviewReport.py"),
             ("Drug Terms Eligible For Refresh From the EVS",
              "RefreshDrugTermsFromEVS.py"),
@@ -50,5 +52,6 @@ class Control(Controller):
                 display, script = item
                 parms = dict()
             ol.append(page.B.LI(page.menu_link(script, display, **parms)))
+
 
 Control().run()

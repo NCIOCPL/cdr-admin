@@ -145,7 +145,7 @@ class Control(Controller):
 
     @property
     def runtime(self):
-        "String for the date/time when the test global change job was run."""
+        """String for the date/time when the test global change job was run."""
 
         if not hasattr(self, "_runtime"):
             date_string, time_string = self.directory.split("_")
@@ -248,7 +248,6 @@ class DocSet:
                 self._rows += doc.rows
         return self._rows
 
-
     class Doc:
         """One of the CDR documents processed by the global change test run."""
 
@@ -324,7 +323,6 @@ class DocSet:
                             self.docs.control.bail(message)
             return self._versions
 
-
         class Version:
             """One of the versions of a document processed by the job."""
 
@@ -371,7 +369,7 @@ class DocSet:
                 if not hasattr(self, "_errors"):
                     try:
                         errors = self.File(self, "errs")
-                        if errors.size != None:
+                        if errors.size is not None:
                             self._errors = errors
                     except Exception:
                         self._errors = None
@@ -433,7 +431,6 @@ class DocSet:
                         Cell(self.diff.size, right=True),
                     ]
                 return self._row
-
 
             class File:
                 """Stat info for one of the revision's files."""
@@ -512,7 +509,6 @@ class DocSet:
                         )
                         self._url = control.make_url(control.script, **params)
                     return self._url
-
 
     class Name:
         """File name found in the job's directory."""

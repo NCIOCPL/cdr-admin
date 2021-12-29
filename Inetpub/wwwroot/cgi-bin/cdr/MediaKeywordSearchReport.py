@@ -7,6 +7,7 @@ from cdrcgi import Controller
 from cdrapi.docs import Doc, Doctype
 from re import compile, IGNORECASE, UNICODE
 
+
 class Control(Controller):
     """Logic manager for the report."""
 
@@ -93,15 +94,17 @@ jQuery(document).ready(function() {
             if doc_id:
                 try:
                     doc_id = Doc.extract_id(doc_id)
-                except:
+                except Exception:
                     self.bail("Invalid document ID")
+                path = "/Media/PhysicalMedia/ImageData/ImageEncoding"
                 query = self.Query("active_doc a", "COUNT(*)")
                 query.join("query_term q", "a.id = q.doc_id")
                 query.where(query.Condition("id", doc_id))
-                query.where("q.path = '/Media/PhysicalMedia/ImageData/ImageEncoding'")
+                query.where(f"q.path = '{path}'")
                 count = query.execute(self.cursor).fetchone()[0]
                 if count != 1:
-                    self.bail(f"CDR{doc_id} is not an active CDR image document")
+                    msg = f"CDR{doc_id} is not an active CDR image document"
+                    self.bail(msg)
                 self._doc_ids = [doc_id]
             else:
                 query = self.Query("active_doc a", "a.id", "a.title").unique()
@@ -121,8 +124,9 @@ jQuery(document).ready(function() {
                     query.where("d.name = 'Media'")
 
                 # Limiting query to images only
+                path = "/Media/PhysicalMedia/ImageData/ImageEncoding"
                 query.join("query_term j", "a.id = j.doc_id")
-                query.where("j.path = '/Media/PhysicalMedia/ImageData/ImageEncoding'")
+                query.where(f"j.path = '{path}'")
 
                 query.order("title")
                 rows = query.execute(self.cursor).fetchall()
@@ -297,15 +301,9 @@ class MediaDoc:
                         start, end = match.span()
                         if start > position:
                             segments.append(block[position:start])
-                        #segments.append("***")
-                        #segments.append(">>>>")
                         segments.append("\u25b6")
-                        #segments.append("\u2b1b\u25b6")
                         segments.append(block[start:end])
-                        #segments.append("***")
-                        #segments.append("<<<<")
                         segments.append("\u25c0")
-                        #segments.append("\u25c0\u2b1b")
                         position = end
                     if position < len(block):
                         segments.append(block[position:])
@@ -352,7 +350,6 @@ class MediaDoc:
         """
 
         return MediaDoc.WHITESPACE.sub(" ", me)
-
 
 
 if __name__ == "__main__":

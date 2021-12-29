@@ -180,6 +180,7 @@ class Control(Controller):
                 self._tree.append(term.node)
         return self._tree
 
+
 class Term:
     """Term document from the CDR repository."""
 

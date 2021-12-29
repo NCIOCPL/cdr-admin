@@ -13,7 +13,6 @@ thumbnail image.
 from datetime import datetime, date, timedelta
 from io import BytesIO
 from sys import stdout
-from lxml import etree
 from xlsxwriter import Workbook
 from cdr import get_image
 from cdrapi.docs import Doc
@@ -77,7 +76,7 @@ class Control(Controller):
 
         if not self.ids:
             message = "Your selection criteria did not retrieve any documents"
-            extra=["Please click the back button and try again."]
+            extra = ["Please click the back button and try again."]
             self.bail(message, extra)
         row = 3
         for id in self.ids:
@@ -363,7 +362,6 @@ Content-length: {len(book_bytes):d}
             for column, label in enumerate(self.labels):
                 self._sheet.write(2, column, label, self.header_format)
         return self._sheet
-
 
     @property
     def sheet_title(self):

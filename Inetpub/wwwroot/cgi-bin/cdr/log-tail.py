@@ -66,7 +66,7 @@ class Control(Controller):
         fieldset.append(page.text_field("c", label="Count", value=self.count))
         page.form.append(fieldset)
         fieldset = page.fieldset("Options")
-        label = label="Retrieve raw log bytes"
+        label = "Retrieve raw log bytes"
         fieldset.append(page.checkbox("r", value="yes", label=label))
         page.form.append(fieldset)
         page.body.append(page.B.SCRIPT("jQuery('#p').focus();"))
@@ -246,9 +246,8 @@ Content-type: text/plain; charset=utf-8
                 path = path.replace("\\", "/")
                 display = path.split("/")[-1]
                 options.append((path, display))
-            self._options = sorted(options, key=lambda o:o[1].lower())
+            self._options = sorted(options, key=lambda o: o[1].lower())
         return self._options
-
 
     class Slice:
         """Range of lines to be displayed from the log file.
@@ -313,5 +312,6 @@ Content-type: text/plain; charset=utf-8
                         self._count = num_lines
                         self._start = 0
             return self._start
+
 
 Control().run()

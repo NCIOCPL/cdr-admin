@@ -93,7 +93,6 @@ class Control(Controller):
         rows = query.execute(self.cursor).fetchall()
         return [self.Trial(self, row) for row in rows]
 
-
     class Trial:
         """Recent clinical trial to be included in the report."""
 

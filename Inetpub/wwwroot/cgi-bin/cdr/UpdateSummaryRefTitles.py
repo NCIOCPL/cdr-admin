@@ -15,14 +15,6 @@ class Control(Controller):
     COLS = "Linking ID", "Outcome"
     CAPTION = "Results"
 
-    #def run(self):
-    #    """Override to skip the form if we already have the linked doc ID."""
-
-    #    if self.id:
-    #        self.show_report()
-    #    else:
-    #        Controller.run(self)
-
     def populate_form(self, page):
         """Ask for CDR ID of linked summary.
 
@@ -43,7 +35,7 @@ class Control(Controller):
         """
 
         if not self.id:
-            self.show_form() # bail("Missing or invalid ID")
+            self.show_form()
         self.logger.info("processing links to %s", self.cdr_id)
         job = Updater(self)
         job.run()
@@ -98,7 +90,6 @@ class Control(Controller):
                 query = self.Query("query_term", "doc_id").unique()
                 query.where("path LIKE '/Summary%/SummaryRef/@cdr:href'")
                 query.where(query.Condition('int_val', self.id))
-                #query.join("pub_proc_cg", "pub_proc_cg.id = query_term.doc_id")
                 rows = query.execute(self.cursor).fetchall()
                 self._ids = sorted([row.doc_id for row in rows])
         return self._ids
@@ -166,7 +157,6 @@ class Updater(Job):
         """Custom comment embedding CDR ID of linked summary document."""
 
         if not hasattr(self, "_comment"):
-            when = self.__control.started.strftime("%Y-%m-%d %H:%M:%S")
             self._comment = ("Updating SummaryRef titles (OCECDR-5068) "
                              f"for {self.__control.cdr_id} {datetime.now()}")
         return self._comment

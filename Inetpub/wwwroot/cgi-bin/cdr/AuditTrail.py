@@ -8,6 +8,7 @@ from cdrapi.docs import Doc
 from cdrapi.users import Session
 from cdrcgi import Controller, Reporter
 
+
 class Control(Controller):
 
     SUBTITLE = "Audit Trail"
@@ -83,6 +84,7 @@ class Control(Controller):
         fieldset.append(page.text_field("id"))
         fieldset.append(page.text_field("rows", value=150))
         page.form.append(fieldset)
+
 
 if __name__ == "__main__":
     Control().run()

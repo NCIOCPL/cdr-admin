@@ -5,6 +5,7 @@
 
 from cdrcgi import Controller
 
+
 class Control(Controller):
 
     SUBTITLE = "Reports"
@@ -34,5 +35,6 @@ class Control(Controller):
             ("Terminology", "TerminologyReports.py"),
         ):
             ol.append(page.B.LI(page.menu_link(script, display)))
+
 
 Control().run()

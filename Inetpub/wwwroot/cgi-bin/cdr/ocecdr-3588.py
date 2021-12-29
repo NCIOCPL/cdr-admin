@@ -6,6 +6,7 @@
 from cdrcgi import Controller
 from nci_thesaurus import Concept
 
+
 class Control(Controller):
     """Access to database and report building facilities."""
 
@@ -47,7 +48,6 @@ class Control(Controller):
         rows = query.execute(self.cursor).fetchall()
         return [self.Term(self, row) for row in rows]
 
-
     class Term:
         """CDR Terminology document."""
 
@@ -68,7 +68,7 @@ class Control(Controller):
 
             try:
                 concept = Concept(code=self.code)
-                return "Yes" if  concept.code.upper() == self.code else "No"
+                return "Yes" if concept.code.upper() == self.code else "No"
             except Exception:
                 self.__control.logger.exception("fetching %r" % self.code)
                 return "No"

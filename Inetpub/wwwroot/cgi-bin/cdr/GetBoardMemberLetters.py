@@ -4,6 +4,7 @@ from os import listdir
 import sys
 from cdrcgi import Controller
 
+
 class Control(Controller):
 
     SUBMIT = None

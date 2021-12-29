@@ -10,6 +10,7 @@ import cdr
 from cdrcgi import Controller
 from cdrapi import db
 
+
 class ActivityReport(Controller):
 
     SUBTITLE = "Document Activity Report"
@@ -80,7 +81,8 @@ class ActivityReport(Controller):
             self._start_date = self.fields.getvalue("start_date")
             if self._start_date:
                 if not cdr.strptime(self._start_date, "%Y-%m-%d"):
-                    bail("Start Date must be valid date in YYYY-MM-DD format")
+                    msg = "Start Date must be valid date in YYYY-MM-DD format"
+                    self.bail(msg)
         return self._start_date
 
     @property
@@ -89,7 +91,8 @@ class ActivityReport(Controller):
             self._end_date = self.fields.getvalue("end_date")
             if self._end_date:
                 if not cdr.strptime(self._end_date, "%Y-%m-%d"):
-                    bail("Start Date must be valid date in YYYY-MM-DD format")
+                    msg = "Start Date must be valid date in YYYY-MM-DD format"
+                    self.bail(msg)
         return self._end_date
 
     @property
@@ -103,12 +106,13 @@ class ActivityReport(Controller):
         if not hasattr(self, "_doctype"):
             self._doctype = self.fields.getvalue("doctype")
             if self._doctype and self._doctype not in self.doctypes:
-                bail()
+                self.bail()
         return self._doctype
 
     @property
     def user(self):
         return self.fields.getvalue("user")
+
 
 if __name__ == "__main__":
     ActivityReport().run()

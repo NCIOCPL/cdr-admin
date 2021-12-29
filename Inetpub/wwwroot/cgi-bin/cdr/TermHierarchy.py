@@ -7,6 +7,7 @@ from cdrcgi import Controller
 from cdrapi.docs import Doc
 from lxml.html import builder
 
+
 class Control(Controller):
     """Access to the database and HTML generation classes."""
 
@@ -101,7 +102,7 @@ class Control(Controller):
             if value:
                 try:
                     self._id = Doc.extract_id(value)
-                except Exception as e:
+                except Exception:
                     self.bail(f"invalid id {value!r}")
             if not self._id and self.terms:
                 if len(self.terms) == 1:
@@ -203,6 +204,7 @@ class Tree:
                 if not term.parents:
                     self._roots.append(term)
         return self._roots
+
     @property
     def terms(self):
         """Dictionary of terms surrounding the user's pick in the tree."""
@@ -218,6 +220,7 @@ class Tree:
                 self._terms[r.parent].add_child(self._terms[r.child])
                 self._terms[r.child].add_parent(self._terms[r.parent])
         return self._terms
+
 
 class Term:
     """CDR Term document, with information about its position in the tree.

@@ -7,6 +7,7 @@ from cdrcgi import Controller, navigateTo, bail
 from cdrapi import db
 from cdrapi.docs import Doc, Doctype
 
+
 class Control(Controller):
     """Top-level logic for editing interface."""
 
@@ -82,7 +83,7 @@ class Control(Controller):
                             dl.append(page.B.DD(value))
                     fieldset.append(dl)
                     page.form.append(fieldset)
-            except:
+            except Exception:
                 self.logger.exception("Failure parsing vv lists")
                 fieldset = page.fieldset("Valid Values")
                 message = page.B.P("Valid value information is not parseable.")

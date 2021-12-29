@@ -50,7 +50,7 @@ class Control(Controller):
             if self._days:
                 try:
                     self._days = int(self._days)
-                except:
+                except Exception:
                     self.bail("Days must be an integer")
                 if not 0 < self._days < 100:
                     self.bail("Days must be between 1 and 99")

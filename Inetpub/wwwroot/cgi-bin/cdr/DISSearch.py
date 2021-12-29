@@ -5,6 +5,7 @@
 
 from cdrcgi import AdvancedSearch
 
+
 class DrugInformationSummarySearch(AdvancedSearch):
     """Customize search for this document type."""
 

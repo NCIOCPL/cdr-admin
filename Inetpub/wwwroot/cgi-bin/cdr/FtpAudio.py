@@ -12,8 +12,8 @@ from cdrapi.settings import Tier
 from cdr import run_command
 from io import BytesIO
 from zipfile import ZipFile
-from pathlib import Path
 from openpyxl import load_workbook
+
 
 class Control(Controller):
     """Processing logic."""
@@ -35,8 +35,8 @@ class Control(Controller):
         "Week_YYYY_WW_RevN.zip will be retrieved from the source "
         "directory on the NCI SFTP server and placed in the destination "
         "directory on the Windows CDR server. Then they will be copied "
-        "(if running in test mode) or moved to a backup location on the SFTP server "
-        "(referred to below as the Transferred directory). By default, "
+        "(if running in test mode) or moved to a backup location on the SFTP "
+        "sevver (referred to below as the Transferred directory). By default, "
         "retrieval of a zip file will be skipped if the file already exists "
         "on the Windows CDR server (though this can be overridden). "
         "In test mode, the retrievals will be reported but not "
@@ -67,7 +67,8 @@ class Control(Controller):
         fieldset.append(page.checkbox("options", **opts))
         opts = dict(value="test", label="Run in test mode")
         fieldset.append(page.checkbox("options", **opts))
-        label = "Overwrite files in 'Destination' directory if they already exist"
+        label = ("Overwrite files in 'Destination' directory "
+                 "if they already exist")
         opts = dict(value="overwrite", label=label)
         fieldset.append(page.checkbox("options", **opts))
         page.form.append(fieldset)
@@ -90,7 +91,6 @@ class Control(Controller):
         else:
             errors = []
             for name in self.zipfiles:
-                ### pass  ###
                 errors += self.check_mp3_paths(name)
             if errors:
                 lines += errors
@@ -147,13 +147,13 @@ class Control(Controller):
         # There are several different scenarios:
         # a) The specific file to be copied already exists
         #    If file already exists in transfer directory first move the
-        #    existing file to a backup location (adding time stamp to file name)
+        #    existing file to a backup location (adding timestamp to file name)
         # b) Running in Test or Live mode
         #    In test mode files are always copied
-        #    In live mode files are moved unless option to keep source is specified
+        #    In live mode files are moved unless 'keep' is specified
         # c) Setting option to keep files in source directory
         #    In test mode files are always kept in source directory
-        #    In live mode files are moved unless option to keep source is specified
+        #    In live mode files are moved unless 'keep' is specified
         #
         #    File exists   Test/Live   Keep Y/N   Action
         #    ---------------------------------------------
@@ -166,8 +166,7 @@ class Control(Controller):
         #      Y           Test           Y        move backup, then copy
         #      Y           Live           N        move backup, then move
         #      Y           Live           Y        move backup, then copy
-        # -------------------------------------------------------------------------
-        ### if not failed and not self.keep:
+        # --------------------------------------------------------------------
         if not failed:
             target = f"{self.transferred_dir}/{name}"
             program = "cp"
@@ -181,7 +180,8 @@ class Control(Controller):
 
             # File already exists if ls command succeeds
             if not ls_error:
-                self.logger.info(f"Found existing file {target.split('/')[-1]}")
+                filename = target.split('/')[-1]
+                self.logger.info(f"Found existing file {filename}")
                 backup = f"{target}-{mode_flag}-{self.stamp}"
                 self.logger.info(f"Create backup file {backup.split('/')[-1]}")
                 cmd = f"mv {target} {backup}"
@@ -191,7 +191,8 @@ class Control(Controller):
                     lines.append(f"Errors moving existing file {target}")
                     self.logger.info(errors)
 
-            if not self.test and not self.keep: program = "mv"
+            if not self.test and not self.keep:
+                program = "mv"
 
             cmd = f"{program} {source} {target}"
 
@@ -253,7 +254,7 @@ class Control(Controller):
                                     errors.append("Missing MP3 path")
                                 else:
                                     col_paths.add(value)
-                            except:
+                            except Exception:
                                 errors.append("Missing MP3 path")
         all_paths = mp3_paths | col_paths
         for path in all_paths:
@@ -341,7 +342,7 @@ class Control(Controller):
 
     @property
     def overwrite(self):
-        """Boolean indicating whether it is OK to overwrite destination files."""
+        """Flag indicating whether it is OK to overwrite destination files."""
         return "overwrite" in self.options
 
     @property
@@ -432,7 +433,7 @@ class Control(Controller):
                 self.logger.warning("No audio archive files found to transfer")
             else:
                 self.logger.info("%d audio archive files found to transfer",
-                                                                len(zipfiles))
+                                 len(zipfiles))
             for name in zipfiles:
                 self.logger.info(name)
             if rejected:

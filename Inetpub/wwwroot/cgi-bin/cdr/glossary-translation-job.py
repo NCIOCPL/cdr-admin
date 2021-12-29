@@ -309,7 +309,7 @@ jQuery(function() {{
             if self.assigned_to and self.assigned_to not in translators.map:
                 translators = translators.map
                 translators[self.assigned_to] = self.users[self.assigned_to]
-                key = lambda pair: pair[1].lower()
+                def key(pair): return pair[1].lower()
                 self._translators = sorted(translators.items(), key=key)
             else:
                 self._translators = translators.items
@@ -427,7 +427,6 @@ class Job:
                 title = f"{title[:40]} ..."
             self._subtitle = f"Translation job for {cdr_id} ({title})"
         return self._subtitle
-
 
 
 if __name__ == "__main__":

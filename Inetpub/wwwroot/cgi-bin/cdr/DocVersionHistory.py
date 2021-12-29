@@ -40,7 +40,7 @@ class Control(Controller):
                 legend += " (First 500 Shown)"
                 titles = titles[:500]
             fieldset = page.fieldset(legend)
-            checked=True
+            checked = True
             for doc_id, doc_title, doc_type in titles:
                 tooltip = f"CDR{doc_id:d} ({doc_type}) {doc_title}"
                 if len(doc_title) > 90:
@@ -52,7 +52,7 @@ class Control(Controller):
                     tooltip=tooltip,
                 )
                 fieldset.append(page.radio_button(DOCID, **opts))
-                checked=False
+                checked = False
             page.form.append(fieldset)
             page.add_css("fieldset { width: 800px; }")
         else:
@@ -72,7 +72,7 @@ class Control(Controller):
                 try:
                     int_id = Doc.extract_id(doc_id)
                     self._document = Document(self, int_id)
-                except Exception as e:
+                except Exception:
                     self.bail("Not a valid document ID")
             else:
                 fragment = self.fields.getvalue("DocTitle", "").strip()
@@ -408,7 +408,6 @@ class Document:
             self._versions = [self.Version(self, row) for row in rows]
         return self._versions
 
-
     class PubEvent:
         """Information about a publication of this document"""
 
@@ -469,7 +468,6 @@ class Document:
                 if self.removed:
                     self._span.set("class", "removed")
             return self._span
-
 
     class Version:
         """One for each version created for our document."""

@@ -111,14 +111,13 @@ class Control(Controller):
                             citation.update()
                             row.append("updated")
                         except Exception:
-                            args = pmid
                             self.logger.exception("Failure updating %s", pmid)
                             cell = self.Reporter.Cell("failed", **error_opts)
                             row.append(cell)
                 else:
                     changed = True
                     cell = self.Reporter.Cell("missing", **error_opts)
-                    row  += [cell, ""]
+                    row += [cell, ""]
                 if changed:
                     self._rows.append(row)
         return self._rows
@@ -278,8 +277,8 @@ class PubmedArticle:
 
             if not hasattr(self, "_version"):
                 try:
-                    self._version = int(self._-node.get("Version"))
-                except:
+                    self._version = int(self.__node.get("Version"))
+                except Exception:
                     self._version = 0
             return self._version
 

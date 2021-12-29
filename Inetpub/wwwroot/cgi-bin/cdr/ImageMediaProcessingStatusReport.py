@@ -89,7 +89,7 @@ class Control(Controller):
             diagnoses = self.fields.getlist("diagnosis")
             try:
                 self._diagnosis = [int(doc_id) for doc_id in diagnoses]
-            except:
+            except Exception:
                 self.bail()
             if set(self._diagnosis) - set(self.diagnoses):
                 self.bail()
@@ -212,7 +212,7 @@ class MediaDoc:
                 try:
                     id = Doc.extract_id(ref)
                     self._diagnoses.append(self.control.diagnoses[id])
-                except:
+                except Exception:
                     self._diagnoses.append(f"INVALID DIAGNOSIS ID {ref}")
         return self._diagnoses
 
@@ -355,7 +355,6 @@ class MediaDoc:
         if not hasattr(self, "_url"):
             self._url = self.URL.format(self.doc.id)
         return self._url
-
 
     class Status:
         """Parsed processing status values."""

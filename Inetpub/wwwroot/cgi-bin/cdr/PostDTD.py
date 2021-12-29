@@ -4,7 +4,6 @@
 """
 
 from cdrcgi import Controller
-from os.path import basename
 from cdr import run_command, PDQDTDPATH, FIX_PERMISSIONS
 
 
@@ -106,7 +105,7 @@ class Control(Controller):
                         self._subtitle = message
                     else:
                         self._subtitle = f"Successfully installed {path}"
-                except Exception as e:
+                except Exception:
                     self.logger.exception(path)
                     self._subtitle = f"Failed installing {path} (see logs)"
         return self._subtitle

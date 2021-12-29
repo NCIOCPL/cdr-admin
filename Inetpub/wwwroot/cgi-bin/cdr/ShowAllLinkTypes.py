@@ -15,10 +15,10 @@ class Control(Controller):
     CAPTION = "All Available Linking Element Combinations"
     COLUMNS = (
         "Link Type",
-	"Source Doctype",
-	"Linking Element",
-	"Target Doctype",
-	"Pub/Ver/Cwd",
+        "Source Doctype",
+        "Linking Element",
+        "Target Doctype",
+        "Pub/Ver/Cwd",
     )
     FIELDS = (
         "ltp.name AS link_type",

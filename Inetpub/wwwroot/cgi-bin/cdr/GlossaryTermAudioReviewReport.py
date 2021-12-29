@@ -148,7 +148,7 @@ class Control(Controller):
                 Reporter.Cell(unreviewed, center=True),
             ]
             opts = dict(columns=self.STATUSES, caption="Status Totals")
-            self._summary_table =  Reporter.Table([row], **opts)
+            self._summary_table = Reporter.Table([row], **opts)
         return self._summary_table
 
     @property
@@ -184,6 +184,7 @@ class AudioSet:
                     self.name = row.term_name
                     self.user = row.fullname
                     self.date = row.review_date
+
                 @property
                 def row(self):
                     return (

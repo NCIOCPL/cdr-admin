@@ -37,7 +37,7 @@ class Control(Controller):
         """
 
         # Default fieldsets for summaries.
-        opts = { "titles": titles, "id-label": "CDR ID(s)" }
+        opts = {"titles": titles, "id-label": "CDR ID(s)"}
         opts["id-tip"] = "separate multiple IDs with spaces"
         self.add_summary_selection_fields(page, **opts)
 
@@ -112,7 +112,8 @@ jQuery(document).ready(function() {
         sheet.merge_range("A1:E1", title, formats["header"])
         sheet.merge_range("A2:E2", subtitle, formats["header"])
         widths = 10, 50, 30, 80, 18
-        headers = "Doc ID", "Doc Title", "Match", "Context", "Standard Wording?"
+        headers = ("Doc ID", "Doc Title", "Match",
+                   "Context", "Standard Wording?")
         for i, width in enumerate(widths):
             sheet.set_column(i, i, width)
             sheet.write(3, i, headers[i], formats["header"])
@@ -159,7 +160,7 @@ Content-length: {len(book_bytes)}
                     for id in ids:
                         try:
                             id = int(id)
-                        except:
+                        except Exception:
                             self.bail()
                         if id not in boards:
                             self.bail()
@@ -218,7 +219,7 @@ Content-length: {len(book_bytes)}
             for word in self.fields.getvalue("cdr-id", "").strip().split():
                 try:
                     self._cdr_id.add(Doc.extract_id(word))
-                except:
+                except Exception:
                     self.bail("Invalid format for CDR ID")
         return self._cdr_id
 
@@ -632,7 +633,6 @@ class Summary:
 
         return Summary.WHITESPACE.sub(" ", me)
 
-
     class Context:
         """
         Information about the surrounding context for a match
@@ -782,7 +782,6 @@ class Summary:
         def in_standard_wording(self):
             """Was the match was found inside a StandardWording block?"""
             return self.__standard_wording
-
 
     class Match:
         """

@@ -12,7 +12,7 @@ class Control(Controller):
     """Access to database, session, and report/form building."""
 
     SUBTITLE = "Glossary Term Name Documents Modified Report"
-    NAME_LABELS = {"en": "Term Name", "es": "Translated Term Name" }
+    NAME_LABELS = {"en": "Term Name", "es": "Translated Term Name"}
     LANGUAGES = (("en", "English"), ("es", "Spanish"))
     STATUS_PATHS = dict(
         en="/GlossaryTermName/TermNameStatus",
@@ -44,7 +44,7 @@ class Control(Controller):
         fieldset.append(page.date_field("end_date", value=end))
         page.form.append(fieldset)
         fieldset = page.fieldset("Language")
-        checked=True
+        checked = True
         for value, label in self.LANGUAGES:
             opts = dict(value=value, label=label, checked=checked)
             fieldset.append(page.radio_button("language", **opts))
@@ -183,6 +183,7 @@ class Control(Controller):
             self._statuses = sorted(statuses)
         return self._statuses
 
+
 class GlossaryTermName:
     """Information needed for a glossary term's report rows."""
 
@@ -262,7 +263,6 @@ class GlossaryTermName:
     def rows(self):
         "Create a row for each of the term's name strings"
         return [name.row for name in self.names]
-
 
     class Name:
         """A Glossary term can have multiple names, each with a comment."""

@@ -69,6 +69,7 @@ class Control(Controller):
                 def __init__(self, control):
                     self.__control = control
                     UserDict.__init__(self)
+
                 def __getitem__(self, key):
                     if key not in self.data:
                         self.data[key] = Citation(self.__control, key)
@@ -220,7 +221,7 @@ class Citation:
                 message = f"failure filtering {self.doc.cdr_id}: {e}"
                 self.__control.bail(message)
             for node in result.result_tree.iter("FormattedReference"):
-                self._details = Doc.get_text(node) # XXX WAS node.text ???
+                self._details = Doc.get_text(node)
         return self._details
 
     @property

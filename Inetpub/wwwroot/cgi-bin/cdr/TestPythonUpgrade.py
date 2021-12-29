@@ -11,6 +11,7 @@ from os import devnull
 import sys
 from cdrcgi import Controller, Reporter
 
+
 class Control(Controller):
     SUBTITLE = f"Python Upgrade Information ({str(sys.version)})"
     SUBMIT = None
@@ -43,9 +44,11 @@ class Control(Controller):
         ("xlsxwriter",
          "Alternate package for creating workbooks with background images"),
     )
+
     def show_form(self):
         """Go directly to the report."""
         self.show_report()
+
     def build_tables(self):
         """Test essential imports and show versions."""
         caption = "Module Import Status"
@@ -77,5 +80,6 @@ class Control(Controller):
                 rows.append((package, name, version(package)))
         tables.append(Reporter.Table(rows, columns=cols, caption=caption))
         return tables
+
 
 Control().run()

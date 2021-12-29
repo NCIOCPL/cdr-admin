@@ -8,6 +8,7 @@ from cdrcgi import Controller, Reporter, bail
 from cdr import Board
 from cdrapi import db
 
+
 class Control(Controller):
     """Top-level processing logic."""
 
@@ -266,7 +267,6 @@ class Meeting:
         if control.end:
             query.where(query.Condition("d.value", control.end, "<="))
         query.log()
-        rows = query.execute(control.cursor).fetchall()
         return [cls(control, row) for row in query.execute(control.cursor)]
 
     @staticmethod

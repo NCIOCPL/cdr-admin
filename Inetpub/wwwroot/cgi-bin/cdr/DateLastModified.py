@@ -6,6 +6,7 @@
 import datetime
 from cdrcgi import Controller
 
+
 class Control(Controller):
     """Top-level report logic."""
 
@@ -39,7 +40,7 @@ class Control(Controller):
         fieldset = page.fieldset("Select Document Type")
         opts = dict(value="all_types", checked=True)
         fieldset.append(page.radio_button("doctype", **opts))
-        doctypes = sorted(self.doctypes.items(), key=lambda t:t[1].lower())
+        doctypes = sorted(self.doctypes.items(), key=lambda t: t[1].lower())
         for value, label in doctypes:
             opts = dict(value=value, label=label)
             fieldset.append(page.radio_button("doctype", **opts))
@@ -71,7 +72,7 @@ class Control(Controller):
                 self._doctype = self.Doctype(self, doctype, name)
             else:
                 items = list(self.doctypes.items())
-                doctypes = sorted(items, key=lambda t:t[1].lower())
+                doctypes = sorted(items, key=lambda t: t[1].lower())
                 self._doctype = []
                 for id, name in doctypes:
                     self._doctype.append(self.Doctype(self, id, name))
@@ -114,6 +115,7 @@ class Control(Controller):
         if not hasattr(self, "_range"):
             today = datetime.date.today()
             start = today - datetime.timedelta(7)
+
             class Range:
                 def __init__(self, start, end):
                     self.start = start
@@ -150,7 +152,6 @@ class Control(Controller):
         if self.request == "Submit" and self.format == "excel":
             return self.SUBTITLE
         return self.TITLE
-
 
     class Doctype:
         """Collect information about docs of this document type."""
@@ -217,7 +218,6 @@ class Control(Controller):
                     opts["sheet_name"] = self.name
                 self._table = self.control.Reporter.Table(rows, **opts)
             return self._table
-
 
         class Doc:
             """CDR document with its most recent "date last modified" value."""

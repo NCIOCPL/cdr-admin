@@ -54,7 +54,6 @@ class Control(Controller):
         ("m", "Modules only", False),
     )
 
-
     def build_tables(self):
         """Assemble the tables to be rendered for the report."""
 
@@ -342,7 +341,7 @@ class Board:
             columns=columns,
         )
         if "Complementary" in self.name:
-            opts["sheet_name"] = "IACT" # name is too big
+            opts["sheet_name"] = "IACT"  # Name is too big.
         if modules:
             opts["sheet_name"] += " (m)"
         rows = []
@@ -399,7 +398,6 @@ class Summary:
         self.title = title
         self.module = module == "Yes"
         self.reviews = []
-        c_path = "/Summary/ComprehensiveReview/Comment"
         d_path = "/Summary/ComprehensiveReview/ComprehensiveReviewDate"
         t_path = d_path + "/@DateType"
         query = control.Query("query_term d", "d.value", "t.value", "c.value")

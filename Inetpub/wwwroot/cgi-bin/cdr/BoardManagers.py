@@ -6,6 +6,7 @@
 from cdrapi.users import Session
 from cdrcgi import Controller, bail
 
+
 class Control(Controller):
 
     SUBTITLE = "Board Managers"

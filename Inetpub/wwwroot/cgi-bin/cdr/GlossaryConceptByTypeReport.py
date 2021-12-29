@@ -9,6 +9,7 @@ consistency in the wording of definitions."
 from cdrcgi import Controller
 from cdrapi.docs import Doc
 
+
 class Control(Controller):
 
     SUBTITLE = "Glossary Term Concept By Type Report"
@@ -649,7 +650,6 @@ class Definition:
         if with_tail and node.tail is not None:
             pieces.append(node.tail)
         return pieces
-
 
     class PlaceHolder:
         """Object to represent a placeholder in a glossary definition."""

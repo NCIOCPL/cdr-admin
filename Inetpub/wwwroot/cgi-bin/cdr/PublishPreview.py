@@ -104,7 +104,7 @@ class Control(Controller):
                 self.bail("Required document ID missing")
             try:
                 self._id = Doc.extract_id(id)
-            except:
+            except Exception:
                 self.bail("Invalid ID")
             if self._id <= 0:
                 self.bail("Invalid ID")
@@ -255,7 +255,8 @@ class Summary:
             response = requests.post(url, json=data, verify=False)
             cookies = response.cookies
             self.__control.show_progress("clearing old temp docs...")
-            self.client.remove(-self.doc.id)
+            if isinstance(self.doc.id, int):
+                self.client.remove(-self.doc.id)
             self.__control.show_progress("pushing summary values to Drupal...")
             nid = self.client.push(self.values)
             url = f"{self.client.base}{espanol}/node/{nid}"
@@ -496,7 +497,6 @@ class GTN:
             audio.play();
         }"""
 
-
     def __init__(self, control):
         """Remember the caller's value.
 
@@ -583,7 +583,8 @@ class GTN:
                     script.set("defer")
                 self._head.append(script)
             self._head.append(self.B.STYLE(self.STYLE))
-            self._head.append(self.B.SCRIPT(self.JSFUNC, type="text/javascript"))
+            self._head.append(self.B.SCRIPT(self.JSFUNC,
+                                            type="text/javascript"))
         return self._head
 
     @property
@@ -670,7 +671,6 @@ class GTN:
         """String for the head's title element."""
         return f"Publish Preview: CDR{self.doc.id}"
 
-
     class Result:
         """Portion of the display specific to one language."""
 
@@ -707,15 +707,19 @@ class GTN:
             if self.audio_url:
                 B = self.term.B
                 return B.DIV(
-                    B.E("audio",
+                    B.E(
+                        "audio",
                         B.CLASS("CDR_audiofile"),
                         id=f"play-{self.langcode}",
                         type="audio/mpeg",
                         src=self.audio_url,
+                    ),
+                    B.E(
+                        "button",
+                        B.SPAN(
+                            "Listen to pronunciation",
+                            B.CLASS("show-for-sr")
                         ),
-                    B.E("button",
-                        B.SPAN("Listen to pronunciation",
-                        B.CLASS("show-for-sr")),
                         " ",
                         B.CLASS("btnAudio"),
                         onClick=f"play_{self.langcode}()",
@@ -767,14 +771,14 @@ class GTN:
                             if element.tag == 'Emphasis':
                                 text.append(B.EM(element.text))
                             elif element.tag == 'ForeignWord':
-                                text.append(B.EM(element.text, 
-                                                        B.CLASS("foreign-word")))
+                                text.append(B.EM(element.text,
+                                                 B.CLASS("foreign-word")))
                             elif element.tag == 'GeneName':
-                                text.append(B.EM(element.text, 
-                                                        B.CLASS("gene-name")))
+                                text.append(B.EM(element.text,
+                                                 B.CLASS("gene-name")))
                             elif element.tag == 'ScientificName':
-                                text.append(B.EM(element.text, 
-                                                        B.CLASS("scientific-name")))
+                                text.append(B.EM(element.text,
+                                                 B.CLASS("scientific-name")))
                             elif element.tag == 'Strong':
                                 text.append(B.B(element.text))
                             elif element.tag == 'ExternalRef':
@@ -903,7 +907,6 @@ class GTN:
         def pronunciation(self):
             """DD element for the term name's pronunciation (if present)."""
 
-            audio_old = self.audio_old
             audio = self.audio
             if not self.key and audio is None:
                 return None
@@ -912,7 +915,6 @@ class GTN:
             if audio is not None:
                 children = [audio]
             if self.key:
-                #children.append(f" {self.key}")
                 children.append(B.DIV(f" {self.key}",
                                       B.CLASS("pronunciation__key")))
             return B.DD(*children, B.CLASS("pronunciation"))
@@ -1007,7 +1009,6 @@ class GTN:
                             self._videos.append(self.Video(self, node))
             return self._videos
 
-
         class Image:
             """Images associated with this glossary term."""
 
@@ -1085,7 +1086,7 @@ class GTN:
                 if not hasattr(self, "_id"):
                     try:
                         self._id = Doc.extract_id(self.__node.get("ref"))
-                    except:
+                    except Exception:
                         self._id = None
                 return self._id
 
@@ -1113,7 +1114,6 @@ class GTN:
                     else:
                         self._suffix = "jpg"
                 return self._suffix
-
 
         class Ref:
             """Link to a related resource."""
@@ -1169,7 +1169,6 @@ class GTN:
                         url = self.__node.get("url", "")
                         self._url = f"https://www.cancer.gov{url}"
                 return self._url
-
 
         class Video:
             """Embedded video for the glossary term."""

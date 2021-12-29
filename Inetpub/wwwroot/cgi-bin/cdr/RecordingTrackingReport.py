@@ -198,4 +198,3 @@ class MediaDoc:
 if __name__ == "__main__":
     """Don't run the script if loaded as a module."""
     Control().run()
-

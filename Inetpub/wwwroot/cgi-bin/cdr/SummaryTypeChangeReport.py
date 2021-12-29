@@ -75,7 +75,7 @@ class Control(Controller):
         """
 
         page.form.append(page.hidden_field("debug", self.debug or ""))
-        opts = { "titles": titles, "id-label": "CDR ID(s)" }
+        opts = {"titles": titles, "id-label": "CDR ID(s)"}
         opts["id-tip"] = "separate multiple IDs with spaces"
         self.add_summary_selection_fields(page, **opts)
         fieldset = page.fieldset("Include")
@@ -163,7 +163,7 @@ $(function() {
                 for id in boards:
                     try:
                         self._board.add(int(id))
-                    except:
+                    except Exception:
                         self.bail()
                 self._board = list(self._board)
                 if not self._board:
@@ -187,7 +187,7 @@ $(function() {
             for word in self.fields.getvalue("cdr-id", "").strip().split():
                 try:
                     self._cdr_ids.add(Doc.extract_id(word))
-                except:
+                except Exception:
                     self.bail("Invalid format for CDR ID")
         return self._cdr_ids
 
@@ -196,7 +196,7 @@ $(function() {
         """Report each type of change in its own table."""
 
         if not hasattr(self, "_change_type_tables"):
-            opts = { "html_callback_pre": Control.table_spacer }
+            opts = {"html_callback_pre": Control.table_spacer}
             tables = []
             title = "Type of Change Report"
             range = self.date_range
@@ -619,7 +619,6 @@ class Summary:
         if nchanges > 0:
             return [tuple(row)]
         return []
-
 
     class Change:
         """

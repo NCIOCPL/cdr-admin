@@ -9,6 +9,7 @@ import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
+
 class Control(Controller):
     """Access to the database and report-building utilities."""
 
@@ -111,7 +112,7 @@ class Summary:
                 if nct_id:
                     nct_ids.add(nct_id)
                 protocol_refs.add((protocol_id, nct_id))
-            opts = dict(timeout=(5,5), verify=False, allow_redirects=True)
+            # opts = dict(timeout=(5, 5), verify=False, allow_redirects=True)
             urls = {}
             for nct_id in nct_ids:
                 url = f"https://www.cancer.gov/clinicaltrials/{nct_id}"
@@ -120,7 +121,7 @@ class Summary:
                     urls[nct_id] = response.url
                     args = nct_id, response.url
                     self.__control.logger.debug("%s -> %s", *args)
-                except:
+                except Exception:
                     self.__control.logger.exception("Failure for %s", url)
                     urls[nct_id] = "*** URL timed out"
             self._rows = []

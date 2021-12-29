@@ -8,6 +8,7 @@ from cdrcgi import Controller, Reporter, bail
 from cdrapi import db
 from cdrapi.docs import Doc
 
+
 class Control(Controller):
     """Top-level logic for the report."""
 

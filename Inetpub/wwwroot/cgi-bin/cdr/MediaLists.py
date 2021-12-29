@@ -34,7 +34,8 @@ class Control(Controller):
                 cat_rows.append([cat, totals[cat]])
             cat_rows.append(['Total  ========>', len(self.rows)])
 
-            cat_opts = dict(columns=cat_columns, caption="Count for Conditions")
+            caption = "Count for Conditions"
+            cat_opts = dict(columns=cat_columns, caption=caption)
             tables.append(self.Reporter.Table(cat_rows, **cat_opts))
 
         opts = dict(caption=self.caption, columns=self.columns)
@@ -146,7 +147,7 @@ class Control(Controller):
                 try:
                     for diagnosis in diagnoses:
                         self._diagnosis.append(int(diagnosis))
-                except:
+                except Exception:
                     self.bail()
             self.logger.info("diagnoses selected: %s", self._diagnosis)
         return self._diagnosis
@@ -162,7 +163,7 @@ class Control(Controller):
         try:
             for id in self.diagnosis:
                 names.append(diagnoses[id])
-        except:
+        except Exception:
             self.bail()
         return ", ".join(sorted(names))
 
@@ -216,16 +217,15 @@ class Control(Controller):
             self.logger.info("%d rows found", len(self._rows))
         return self._rows
 
-
     @property
     def category_count(self):
         """Count by category for the count table."""
 
         if not hasattr(self, "_category_count"):
             category_count = {}
+            table = "query_term_pub" if "pub" in self.options else "query_term"
+            fields = ["m.doc_id", "m.value"] if self.show_id else ["m.value"]
             for category in self.category:
-                table = "query_term_pub" if "pub" in self.options else "query_term"
-                fields = ["m.doc_id", "m.value"] if self.show_id else ["m.value"]
                 query = self.Query(f"{table} m", *fields).unique()
                 query.order("m.value")
                 query.where("m.path = '/Media/MediaTitle'")
@@ -238,7 +238,8 @@ class Control(Controller):
                 if self.diagnosis:
                     query.join(f"{table} d", "d.doc_id = m.doc_id")
                     query.where(query.Condition("d.path", self.DIAGNOSIS_PATH))
-                    query.where(query.Condition("d.int_val", self.diagnosis, "IN"))
+                    query.where(query.Condition("d.int_val", self.diagnosis,
+                                                "IN"))
                 if len(self.languages) == 1:
                     if "en" in self.languages:
                         query.outer(f"{table} t", "t.doc_id = m.doc_id",
@@ -252,7 +253,6 @@ class Control(Controller):
                 category_count[category] = len(rows)
             self._category_count = category_count
         return self._category_count
-
 
     @property
     def show_id(self):

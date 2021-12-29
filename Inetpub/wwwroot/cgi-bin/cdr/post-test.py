@@ -5,6 +5,7 @@
 
 from cdrcgi import Controller
 
+
 class Control(Controller):
 
     def populate_form(self, page):

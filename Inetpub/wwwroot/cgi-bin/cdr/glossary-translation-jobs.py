@@ -142,7 +142,7 @@ class Control(Controller):
                 self.bail("No translator selected")
             try:
                 self._assignee = int(assignee)
-            except:
+            except Exception:
                 self.bail()
             if self._assignee not in [row.id for row in self.translators]:
                 self.bail()

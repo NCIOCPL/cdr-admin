@@ -5,6 +5,7 @@
 
 from cdrcgi import Controller
 
+
 class Control(Controller):
 
     SUBTITLE = "CIAT/OCC Staff"
@@ -24,7 +25,8 @@ class Control(Controller):
             ("Batch Job Status", "getBatchStatus.py"),
             ("Create World Server Translated Summary",
              "post-translated-summary.py"),
-            ("Fetch English Summary For Translation", "get-english-summary.py"),
+            ("Fetch English Summary For Translation",
+             "get-english-summary.py"),
             ("Glossary Translation Job Queue", "glossary-translation-jobs.py"),
             ("Mailers", "Mailers.py"),
             ("Media Translation Job Queue", "media-translation-jobs.py"),

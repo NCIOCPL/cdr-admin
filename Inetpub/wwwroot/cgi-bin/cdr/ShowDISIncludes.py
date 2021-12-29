@@ -116,7 +116,7 @@ class Summary:
                     try:
                         for node in self.doc.root.iter(tag):
                             self._counts[tag] = self._counts.get(tag, 0) + 1
-                    except:
+                    except Exception:
                         print(self.doc.id)
                         raise
         return self._counts

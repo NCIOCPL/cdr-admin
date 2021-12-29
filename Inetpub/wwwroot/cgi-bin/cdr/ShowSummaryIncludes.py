@@ -84,10 +84,6 @@ class Control(Controller):
             query.where("d.title NOT LIKE '%BLOCKED%'")
             rows = query.execute(self.cursor).fetchall()
             self._summaries = [Summary(self, row.id) for row in rows]
-            #for row in query.execute(self.cursor).fetchall():
-            #    summary = Summary(self, row.id)
-            #    if summary.doc.root is not None:
-            #        self._summaries.append(summary)
         return self._summaries
 
 
@@ -119,7 +115,7 @@ class Summary:
                     try:
                         for node in self.doc.root.iter(tag):
                             self._counts[tag] = self._counts.get(tag, 0) + 1
-                    except:
+                    except Exception:
                         print(self.doc.id)
                         raise
         return self._counts

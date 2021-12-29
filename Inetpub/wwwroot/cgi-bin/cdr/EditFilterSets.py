@@ -6,6 +6,7 @@
 from cdrcgi import Controller, navigateTo
 from cdrapi.docs import FilterSet
 
+
 class Control(Controller):
     """Encapsulates processing logic for building the menu page."""
 

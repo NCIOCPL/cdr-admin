@@ -3,7 +3,7 @@
 """Create a new CDR action or modify an existing one.
 """
 
-from cdrcgi import Controller, navigateTo, bail
+from cdrcgi import Controller
 
 
 class Control(Controller):
@@ -45,7 +45,7 @@ class Control(Controller):
         """Go back to the menu listing all the CDR actions."""
 
         opts = dict(deleted=deleted) if deleted else {}
-        navigateTo(self.EDIT_ACTIONS, self.session.name, **opts)
+        self.navigate_to(self.EDIT_ACTIONS, self.session.name, **opts)
 
     def run(self):
         """Override base class so we can handle the extra buttons."""
@@ -58,7 +58,7 @@ class Control(Controller):
             elif self.request == self.SUBMENU:
                 return self.return_to_actions_menu()
         except Exception as e:
-            bail(f"Failure: {e}")
+            self.bail(f"Failure: {e}")
         Controller.run(self)
 
     def save(self):
@@ -85,7 +85,7 @@ class Control(Controller):
             if name:
                 self._action = self.session.get_action(name)
             else:
-               self._action = self.session.Action("", "N")
+                self._action = self.session.Action("", "N")
         return self._action
 
     @action.setter

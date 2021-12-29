@@ -156,7 +156,7 @@ class Control(Controller):
             try:
                 jobs = self.fields.getvalue("jobs", "").split()
                 self._jobs = [int(job) for job in jobs]
-            except:
+            except Exception:
                 self.bail("invalid job IDs")
         return self._jobs
 

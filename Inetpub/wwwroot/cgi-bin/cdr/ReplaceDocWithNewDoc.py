@@ -413,6 +413,6 @@ if __name__ == "__main__":
                 doc = getattr(control, which_doc)
                 if doc and doc.lock:
                     doc.check_in()
-            except:
+            except Exception:
                 control.logger.exception(f"Failure unlocking {which_doc} doc")
         control.bail(e)

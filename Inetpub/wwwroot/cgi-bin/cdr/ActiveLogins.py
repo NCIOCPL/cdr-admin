@@ -6,6 +6,7 @@
 from cdrcgi import Controller, Reporter
 from cdrapi import db
 
+
 class Control(Controller):
 
     SUBTITLE = "Current Sessions"
@@ -32,5 +33,6 @@ class Control(Controller):
         desc = self.cursor.description
         cols = [d[0].replace("_", " ").title() for d in desc]
         return Reporter.Table(rows, columns=cols)
+
 
 Control().run()

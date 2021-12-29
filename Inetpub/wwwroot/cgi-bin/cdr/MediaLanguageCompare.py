@@ -10,12 +10,10 @@ import datetime
 from datetime import date
 from cdrapi.docs import Doc
 from cdrcgi import Controller
-from cdr import URDATE, getSchemaEnumVals
-from lxml import html, etree
+from lxml import html
 from lxml.html import builder
 from cdr import exNormalize
 import sys
-
 
 
 class Control(Controller):
@@ -30,7 +28,6 @@ class Control(Controller):
     CATEGORY_PATH = "/Media/MediaContent/Categories/Category"
     MEDIA_SELECTION_METHODS = "id", "title", "search"
 
-
     def show_report(self):
         """Send the report back to the browser."""
 
@@ -44,7 +41,6 @@ class Control(Controller):
         sys.stdout.buffer.write(html.tostring(report, **opts))
         sys.exit(0)
 
-
     def get_int_cdr_id(self, value):
         """
         Convert CDR ID to integer. Exit with an error message on failure.
@@ -52,10 +48,9 @@ class Control(Controller):
         if value:
             try:
                 return exNormalize(value)[1]
-            except:
+            except Exception:
                 self.bail("Invalid format for CDR ID")
         return None
-
 
     @property
     def report(self):
@@ -76,24 +71,24 @@ class Control(Controller):
             # -----------------------------------------------
             search_c = search_d = search_dr = ""
             search = True if self.category or self.diagnosis or self.start\
-                          else False
+                else False
             if search:
                 search_hdr = B.P("Search Criteria", id="media-id")
                 if self.category:
                     category = ",".join(x for x in self.category)
                     search_c = B.P(B.B("Category: "), f"{category}",
-                                                 id="category-id")
+                                   id="category-id")
                 if self.diagnosis:
                     search_d = B.P(B.B("Diagnosis: "),
-                                                 f"{self.diagnosis_names}",
-                                                 id="diagnosis-id")
+                                   f"{self.diagnosis_names}",
+                                   id="diagnosis-id")
                 if self.start and self.start is not None:
                     search_dr = B.P(B.B("Date Range: "),
-                                                 f"{self.start} - {self.end}",
-                                                 id="date-range-id")
+                                    f"{self.start} - {self.end}",
+                                    id="date-range-id")
                 wrapper = body = B.BODY(B.E("header", B.H1(*args)),
-                                                 search_hdr,
-                                                 search_d, search_c, search_dr)
+                                        search_hdr,
+                                        search_d, search_c, search_dr)
             else:
                 orig_id = B.P(f"Media selected: CDR{cdrId}", id="media-id")
                 wrapper = body = B.BODY(B.E("header", B.H1(*args)), orig_id)
@@ -138,7 +133,7 @@ class Control(Controller):
                     # Display the media title
                     media_title = media_doc.title
                     media_info = B.P(f"CDR{media_doc.id} - {media_title}",
-                                                    B.CLASS("media-title"))
+                                     B.CLASS("media-title"))
                     wrapper.append(media_info)
 
                     image = ("/cgi-bin/cdr/GetCdrImage.py?"
@@ -155,7 +150,7 @@ class Control(Controller):
                         for caption in captions:
                             attributes = caption.attrib
                             aud = 'Patient' if attributes.get('audience') \
-                                                    == 'Patients' else 'HP'
+                                == 'Patients' else 'HP'
                             if attributes.get('audience') in self.audiences:
                                 wrapper.append(B.P(
                                     B.B(f"Caption - {aud}:")))
@@ -171,7 +166,7 @@ class Control(Controller):
                         for description in descriptions:
                             attributes = description.attrib
                             aud = 'Patient' if attributes.get('audience') \
-                                                    == 'Patients' else 'HP'
+                                == 'Patients' else 'HP'
                             if attributes.get('audience') in self.audiences:
                                 wrapper.append(B.P(
                                     B.B(f"Description - {aud}:")))
@@ -188,7 +183,6 @@ class Control(Controller):
                     wrapper_pair.append(wrapper)
         return self._report
 
-
     def populate_form(self, page, titles=None):
         """Put the fields on the form.
 
@@ -200,7 +194,7 @@ class Control(Controller):
         """
 
         page.form.append(page.hidden_field("debug", self.debug or ""))
-        opts = { "titles": titles, "id-label": "CDR ID" }
+        opts = {"titles": titles, "id-label": "CDR ID"}
         opts["id-tip"] = "enter CDR ID"
         self.add_doc_selection_fields(page, **opts)
 
@@ -221,7 +215,6 @@ class Control(Controller):
         fieldset.append(page.date_field("start_date", value=self.start))
         fieldset.append(page.date_field("end_date", value=self.end))
         page.form.append(fieldset)
-
 
         # Fieldset for language selection
         # -------------------------------
@@ -267,7 +260,6 @@ class Control(Controller):
             fieldset.append(page.radio_button("audience", **opts))
         page.form.append(fieldset)
 
-
     def add_doc_selection_fields(self, page, **kwopts):
         """
         Display the fields used to specify which document should be
@@ -299,12 +291,12 @@ class Control(Controller):
             nothing (the form object is populated as a side effect)
         """
 
-        #--------------------------------------------------------------
+        # --------------------------------------------------------------
         # Show the second stage in a cascading sequence of the form if we
         # have invoked this method directly from build_tables(). Widen
         # the form to accomodate the length of the title substrings
         # we're showing.
-        #--------------------------------------------------------------
+        # --------------------------------------------------------------
         titles = kwopts.get("titles")
         if titles:
             page.form.append(page.hidden_field("selection_method", "id"))
@@ -344,7 +336,6 @@ class Control(Controller):
             page.form.append(fieldset)
             page.add_script(self.media_selection_js)
 
-
     @property
     def cdr_id(self):
         """Get the entered/selected CDR ID as an integer"""
@@ -353,10 +344,9 @@ class Control(Controller):
             doc_id = self.fields.getvalue("cdr-id", "").strip()
             try:
                 self._cdr_id = Doc.extract_id(doc_id)
-            except:
+            except Exception:
                 self.bail("Unable to extract CDR ID")
         return self._cdr_id
-
 
     @property
     def display_options(self):
@@ -368,7 +358,6 @@ class Control(Controller):
             else:
                 self._display_options = ["caption", "description"]
         return self._display_options
-
 
     @property
     def media_selection_js(self):
@@ -415,7 +404,6 @@ jQuery(function() {
     check_selection_method('title');
 }); """
 
-
     def get_media_pair(self, doc_id):
         """Get the corresponding media id for a single document
            EN --> ES or ES --> EN
@@ -429,7 +417,8 @@ jQuery(function() {
         query.where("path = '/Media/TranslationOf/@cdr:ref'")
         query.where(f"int_val = {doc_id}")
         row = query.execute(self.cursor).fetchone()
-        if row: isEnglish = True
+        if row:
+            isEnglish = True
 
         # CDR ID for Spanish summary entered
         if not row:
@@ -437,8 +426,10 @@ jQuery(function() {
             query.where("path = '/Media/TranslationOf/@cdr:ref'")
             query.where(f"doc_id = {doc_id}")
             row = query.execute(self.cursor).fetchone()
-            if row: isSpanish = True
-        if not isSpanish: isEnglish = True
+            if row:
+                isSpanish = True
+        if not isSpanish:
+            isEnglish = True
 
         if self.languages == 'en' and isEnglish:
             _media_pair = (doc_id, 0)
@@ -447,12 +438,11 @@ jQuery(function() {
         else:
             try:
                 _media_pair = (row[1], row[0])
-            except:
+            except Exception:
                 _media_pair = None
                 self.logger.info(f"No Spanish translation exists for CDR{id}"
                                  " - excluded")
         return _media_pair
-
 
     @property
     def cdr_pair(self):
@@ -475,11 +465,10 @@ jQuery(function() {
 
             try:
                 self._cdr_pair = (row[1], row[0]) or None
-            except:
+            except Exception:
                 self.bail(f"Error: CDR{self.cdr_id} is not a Media document"
-                           " or a Spanish translation does not exist")
+                          " or a Spanish translation does not exist")
         return self._cdr_pair
-
 
     @property
     def categories(self):
@@ -509,7 +498,6 @@ jQuery(function() {
             return "All Categories"
         return ", ".join(sorted(self.category))
 
-
     @property
     def diagnoses(self):
         """ID/name tuples of the diagnosis terms for the form picklist."""
@@ -532,7 +520,7 @@ jQuery(function() {
                 try:
                     for diagnosis in diagnoses:
                         self._diagnosis.append(int(diagnosis))
-                except:
+                except Exception:
                     self.bail()
             self.logger.info("diagnoses selected: %s", self._diagnosis)
         return self._diagnosis
@@ -548,7 +536,7 @@ jQuery(function() {
         try:
             for id in self.diagnosis:
                 names.append(diagnoses[id])
-        except:
+        except Exception:
             self.bail()
         return ", ".join(sorted(names))
 
@@ -556,27 +544,22 @@ jQuery(function() {
     def start(self):
         """Beginning of the date range for the report - default: 1 week."""
         if not hasattr(self, "_start"):
-            days_delta = datetime.timedelta(weeks=1)
-            start = self.started - days_delta
-            start_date = start.strftime("%Y-%m-%d")
-            self._start = self.fields.getvalue("start_date") or start_date
-        else:
             self._start = self.fields.getvalue("start_date")
-        self.logger.info(f"start date selected: {self._start}")
+            if not self._start:
+                days_delta = datetime.timedelta(weeks=1)
+                self._start = (self.started - days_delta).strftime("%Y-%m-%d")
+            self.logger.info("start date selected: %s", self._start)
         return self._start
-
 
     @property
     def end(self):
         """End of the date range for the report."""
         if not hasattr(self, "_end"):
-            default = self.started.strftime("%Y-%m-%d")
-            self._end = self.fields.getvalue("end_date") or default
-        else:
             self._end = self.fields.getvalue("end_date")
-        self.logger.info(f"end date selected: {self._end}")
+            if not self._end:
+                self._end = self.started.strftime("%Y-%m-%d")
+            self.logger.info("end date selected: %s", self._end)
         return self._end
-
 
     @property
     def languages(self):
@@ -584,7 +567,6 @@ jQuery(function() {
         if not hasattr(self, "_languages"):
             self._languages = self.fields.getvalue("language", "all")
         return self._languages
-
 
     @property
     def audiences(self):
@@ -599,7 +581,6 @@ jQuery(function() {
                 self._audiences = all
         return self._audiences
 
-
     @property
     def show_caption(self):
         """Check if display of caption has been selected"""
@@ -607,7 +588,6 @@ jQuery(function() {
         if not hasattr(self, "_show_caption"):
             self._show_caption = "caption" in self.display_options
         return self._show_caption
-
 
     @property
     def show_description(self):
@@ -617,7 +597,6 @@ jQuery(function() {
             self._show_description = "description" in self.display_options
         return self._show_description
 
-
     @property
     def show_label(self):
         """Check if display of labels has been selected"""
@@ -625,7 +604,6 @@ jQuery(function() {
         if not hasattr(self, "_show_label"):
             self._show_label = "labels" in self.display_options
         return self._show_label
-
 
     @property
     def debug(self):
@@ -717,20 +695,17 @@ jQuery(function() {
                     query.join("query_term d", "d.doc_id = q.doc_id")
                     query.where(query.Condition("d.path", d_path))
                     query.where(query.Condition("d.value", d_val, "IN"))
-                if self.start:
-                    query.join("query_term sd", "sd.doc_id = q.doc_id")
-                    query.where(query.Condition("sd.path", sd_path))
-                    query.where(query.Condition("sd.node_loc", "%000001",
-                                                "LIKE"))
-                    query.where(query.Condition("sd.value", self.start, ">="))
-                #if control.end:
-                    query.where(query.Condition("sd.value", self.end, "<="))
+                query.join("query_term sd", "sd.doc_id = q.doc_id")
+                query.where(query.Condition("sd.path", sd_path))
+                query.where(query.Condition("sd.node_loc", "%000001", "LIKE"))
+                query.where(query.Condition("sd.value", self.start, ">="))
+                query.where(query.Condition("sd.value", self.end, "<="))
 
                 rows = query.execute(self.cursor).fetchall()
                 if not rows:
-                    self.bail(f"No documents exist for the given search "
-                               "parameters and selected range of "
-                               "{self.start} and {self.end}")
+                    self.bail("No documents exist for the given search "
+                              "parameters and selected range of "
+                              f"{self.start} and {self.end}")
 
                 # For the version of the report displaying both languages,
                 # we skip documents without Spanish translation and we only
@@ -745,7 +720,7 @@ jQuery(function() {
                     if media_pair and media_pair not in all_media_pairs:
                         all_media_pairs.append(media_pair)
                         self._media_docs.append([Media(self, id)
-                                                    for id in media_pair])
+                                                 for id in media_pair])
 
                 # We created a list of media object pairs, one pair for
                 # each document returned in the SQL query.  Depending on the
@@ -758,14 +733,15 @@ jQuery(function() {
                 # which one of the CDR-ID is not 0.
                 # We then sort the remaining list by CDR-ID.
                 if self.languages == 'en':
-                    english_docs = [x for x in self._media_docs if x[1].id==0]
+                    english_docs = [x for x in self._media_docs
+                                    if x[1].id == 0]
                     self._media_docs = english_docs
                 elif self.languages == 'es':
-                    spanish_docs = [x for x in self._media_docs if x[0].id==0]
+                    spanish_docs = [x for x in self._media_docs
+                                    if x[0].id == 0]
                     self._media_docs = spanish_docs
 
         return self._media_docs
-
 
     @property
     def selection_method(self):
@@ -777,7 +753,6 @@ jQuery(function() {
             if self._selection_method not in self.MEDIA_SELECTION_METHODS:
                 self.bail()
         return self._selection_method
-
 
     @property
     def choice_of_media_titles(self):
@@ -821,7 +796,6 @@ jQuery(function() {
                     self._choice_of_media_titles.append(docs)
         return self._choice_of_media_titles
 
-
     @property
     def today(self):
         """Today's date object, used in several places."""
@@ -838,91 +812,6 @@ jQuery(function() {
 
         page.add_css("table { margin-top: 25px; }")
 
-
-# class Summary:
-#     """
-#     Represents one CDR Summary document.
-#
-#     Attributes:
-#         id       -  CDR ID of summary document
-#         title    -  title of summary (from title column of all_docs table)
-#         control  -  object holding request parameters for report
-#         media    -  list of MediaLink IDs for the summary
-#     """
-#
-#     def __init__(self, control, doc_id):
-#         """Remember the caller's values.
-#
-#         Pass:
-#             control - access to the database and the report options
-#             doc_id - integer for the PDQ summary's unique CDR document ID
-#         """
-#
-#         self.__control = control
-#         self.__doc_id = doc_id
-#
-#     @property
-#     def control(self):
-#         """Access to the database and the report options."""
-#         return self.__control
-#
-#     @property
-#     def doc(self):
-#         """`Doc` object for the summary's CDR document."""
-#
-#         if not hasattr(self, "_doc"):
-#             self._doc = Doc(self.control.session, id=self.id)
-#         return self._doc
-#
-#     @property
-#     def display_title(self):
-#         return f"{self.title}"
-#
-#     @property
-#     def id(self):
-#         """Integer for the PDQ summary's unique CDR document ID."""
-#         return self.__doc_id
-#
-#     @property
-#     def title(self):
-#         """Official title of the PDQ summary."""
-#
-#         if not hasattr(self, "_title"):
-#             self._title = Doc.get_text(self.doc.root.find("Title"))
-#             if not self._title:
-#                 self._title = self.doc.title.split(";")[0]
-#         return self._title
-#
-#     @property
-#     def media_link_ids(self):
-#         """MediaLink IDs for the images of a summary.
-#
-#            Extracting the MediaID (ref) attribute and converting the ID to an integer
-#         """
-#
-#         if not hasattr(self, "_media_link_ids"):
-#             self._media_link_ids = Doc.get_text(self.doc.root.find("MediaID"))
-#             media_doc_ids = self.doc.root.findall(".//MediaLink/MediaID")
-#             self._media_link_ids = []
-#             for media_doc in media_doc_ids:
-#                 self._media_link_ids.append(Doc.extract_id(media_doc.values()[0]))
-#
-#         return self._media_link_ids
-#
-#
-#     @property
-#     def media_docs(self):
-#         """Media documents selected for the report.
-#
-#         """
-#
-#         if not hasattr(self, "_media_docs"):
-#             if not self.media_link_ids:
-#                 message = "Summary selected does not contain images"
-#                 self.control.bail(f"ERROR: {message}")
-#             self._media_docs = [Media(self, id) for id in self.media_link_ids]
-#         return self._media_docs
-#
 
 class Media:
     """
@@ -947,7 +836,6 @@ class Media:
 
         self.__control = control
         self.__doc_id = doc_id
-
 
     @property
     def control(self):

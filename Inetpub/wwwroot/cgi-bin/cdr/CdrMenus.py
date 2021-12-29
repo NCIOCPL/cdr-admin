@@ -391,7 +391,7 @@ class Item:
 
         if not hasattr(self, "_items"):
             host = self.control.session.tier.hosts["APPC"]
-            query = { "Session": self.control.SESSION }
+            query = {"Session": self.control.SESSION}
             for k in self.parms:
                 val = self.parms[k]
                 if val:
@@ -412,7 +412,7 @@ class Item:
                 for ol in root.iter("ol", "ul"):
                     for a in ol.findall("li/a"):
                         items.append(Item(self.control, a.text, a.get("href")))
-            except Exception as e:
+            except Exception:
                 pass
             self._items = items
         return self._items

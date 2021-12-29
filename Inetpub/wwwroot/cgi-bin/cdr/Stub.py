@@ -5,6 +5,7 @@
 
 from cdrcgi import Controller
 
+
 class Control(Controller):
     SUBTITLE = "Reports"
     SUBMIT = None
@@ -13,6 +14,7 @@ class Control(Controller):
         "yet have the specs, or because it's behind higher-priority tasks "
         "in the development task queue."
     )
+
     def populate_form(self, page):
         fieldset = page.fieldset()
         fieldset.append(page.B.P(self.INSTRUCTIONS))

@@ -239,7 +239,6 @@ class Board:
             self._table = self.control.Reporter.Table(rows, **opts)
         return self._table
 
-
     class Summary:
         """Summary managed by the current board."""
 
@@ -402,7 +401,6 @@ class Board:
             query.where(query.Condition("doc_id", id))
             rows = query.execute(self.control.cursor).fetchall()
             return rows[0].value if rows else "Title not found"
-
 
         class Counts:
             """

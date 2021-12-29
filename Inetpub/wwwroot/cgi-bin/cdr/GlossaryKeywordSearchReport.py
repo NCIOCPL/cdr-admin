@@ -4,11 +4,10 @@
 """
 
 from cdrcgi import Controller
-from cdrapi.docs import Doc, Doctype
+from cdrapi.docs import Doc
 from lxml import etree
 from re import compile, IGNORECASE, UNICODE
 
-import sys, os
 
 class Control(Controller):
     """Logic manager for the report."""

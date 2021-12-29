@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
-#----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 # Determine whether an account is allowed to perform a CDR action.
 # JIRA::OCECDR-4107 - require authorization for viewing GP emailer list
-#----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 import cgi
 import cdr
 from cdrapi import db
@@ -12,11 +12,13 @@ LOGNAME = "check-auth"
 LOGFILE = f"{cdr.DEFAULT_LOGDIR}/{LOGNAME}.log"
 LOGGER = cdr.Logging.get_logger(LOGNAME)
 
+
 def answer(yn):
     print(f"""\
 Content-type: text/plain
 
 {yn}""")
+
 
 fields = cgi.FieldStorage()
 try:
@@ -29,7 +31,7 @@ try:
         answer("Y")
     else:
         answer("N")
-except Exception as e:
+except Exception:
     try:
         LOGGER.exception("check-auth failure")
     finally:

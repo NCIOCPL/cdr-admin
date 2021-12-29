@@ -41,7 +41,7 @@ class Control(Controller):
         fieldset.append(page.date_field("end_date", value=end))
         page.form.append(fieldset)
         fieldset = page.fieldset("Language")
-        checked=True
+        checked = True
         for value, label in self.LANGUAGES:
             opts = dict(value=value, label=label, checked=checked)
             fieldset.append(page.radio_button("language", **opts))
@@ -70,8 +70,7 @@ class Control(Controller):
     @property
     def audience_display(self):
         """Audience display for the comment column."""
-        display = {'Patient':'PT', 
-                   'Health professional': 'HP'}
+        display = {'Patient': 'PT', 'Health professional': 'HP'}
         return display[self.audience]
 
     @property
@@ -83,7 +82,8 @@ class Control(Controller):
             self.Reporter.Column("Date Last Modified", width="100px"),
             self.Reporter.Column("Publishable?", width="100px"),
             self.Reporter.Column("Date First Published (*)", width="100px"),
-            self.Reporter.Column(f"Last {self.audience_display} Comment", width="450px")
+            self.Reporter.Column(f"Last {self.audience_display} Comment",
+                                 width="450px")
         )
 
     @property

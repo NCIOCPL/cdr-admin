@@ -104,9 +104,11 @@ class Control(Controller):
                 for line in fp:
                     if "Ticket request from" in line:
                         lines.append(line.strip())
+
                 class Request:
                     strptime = datetime.datetime.strptime
                     PATTERN = "%Y-%m-%d %H:%M:%S.%f"
+
                     def __init__(self, time, ip):
                         self.time = self.strptime(time, self.PATTERN)
                         self.ip = ip

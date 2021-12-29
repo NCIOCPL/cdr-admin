@@ -7,6 +7,7 @@ from cdrcgi import Controller
 from cdrapi import db
 from socket import gethostbyname, create_connection
 
+
 class Control(Controller):
     """Report builder"""
 
@@ -38,7 +39,6 @@ class Control(Controller):
         opts = dict(src="/images/checkmark.gif", alt="check mark")
         cell = self.HTMLPage.B.IMG(**opts)
         return cell
-
 
     class AppServer:
         """The CDR Windows server."""
@@ -90,7 +90,6 @@ class Control(Controller):
 
             opts = dict(columns=self.columns, caption="Host Name Mappings")
             return self.__control.Reporter.Table(self.rows, **opts)
-
 
         class Role:
             """TCP/IP settings for a specific role on the server."""
@@ -151,7 +150,7 @@ class Control(Controller):
                     if self.dns:
                         try:
                             self._id = gethostbyname(self.dns)
-                        except:
+                        except Exception:
                             self.logger.exception("%s not found", self.dns)
                 return self._id
 
@@ -166,7 +165,7 @@ class Control(Controller):
                     conn = create_connection(key)
                     conn.close()
                     return True
-                except:
+                except Exception:
                     self.control.logger.exception("failure connecting")
                     return False
 
@@ -211,7 +210,6 @@ class Control(Controller):
                 """Port on which SQL Server listens for this tier."""
                 return self.control.session.tier.port("cdr")
 
-
     class DatabaseServer:
         """SQL Server with which the CDR communicates for data persistence."""
 
@@ -245,7 +243,7 @@ class Control(Controller):
                     try:
                         db.connect(user=account, database=database)
                         status = self.__control.ok_image
-                    except:
+                    except Exception:
                         status = self.__control.HTMLPage.B.SPAN("LOGIN FAILED")
                         status.set("class", "error")
                     status = self.__control.Reporter.Cell(status, center=True)

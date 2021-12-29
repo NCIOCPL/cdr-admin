@@ -3,10 +3,10 @@
 """Search for CDR Term documents.
 """
 
-from cdr import unlock
 from cdrcgi import AdvancedSearch, bail
 from cdrapi.docs import Doc
 from nci_thesaurus import Concept
+
 
 class TermSearch(AdvancedSearch):
     """Customize search for this document type."""
@@ -26,7 +26,7 @@ class TermSearch(AdvancedSearch):
     IMP_BTN = "term-import-button"
     JS = """\
 function chk_cdrid() {
-    if (jQuery("#cdrid").val().replace(/\D/g, "").length === 0)
+    if (jQuery("#cdrid").val().replace(/\\D/g, "").length === 0)
         jQuery("#term-import-button input").val("Import");
     else
         jQuery("#term-import-button input").val("Update");

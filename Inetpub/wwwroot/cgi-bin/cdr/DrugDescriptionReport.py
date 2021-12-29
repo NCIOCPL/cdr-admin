@@ -242,6 +242,7 @@ class Control(Controller):
             query.join("doc_version v", "v.id = d.id")
             query.where("t.name = 'DrugInformationSummary'")
             rows = query.unique().execute(self.cursor).fetchall()
+
             class VersionedDrugDoc:
                 """Information needed for the drug picklist."""
                 def __init__(self, row):

@@ -109,7 +109,7 @@ class Control(Controller):
                         row[-1] = Cell(errors, classes="error")
                     else:
                         row[-1] = Cell(node)
-                except:
+                except Exception:
                     row[-1] = Cell(B.SPAN(*html.fragments_fromstring(row[-1])))
             rows.append(row)
         return rows

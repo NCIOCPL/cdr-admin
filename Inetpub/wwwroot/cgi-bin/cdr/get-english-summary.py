@@ -104,11 +104,13 @@ class Control(Controller):
                 action=self.script,
                 buttons=buttons,
             )
+
             class Page(HTMLPage):
                 """Customized for raw HTML block."""
                 def __init__(self, pre, title, **opts):
                     self.__pre = pre
                     HTMLPage.__init__(self, title, **opts)
+
                 def tostring(self):
                     opts = dict(self.STRING_OPTS, encoding="unicode")
                     string = html.tostring(self.html, **opts)
@@ -169,7 +171,7 @@ class Control(Controller):
 
     @property
     def fmt(self):
-        "One of 'raw' or 'display' (validated)."""
+        """One of 'raw' or 'display' (validated)."""
 
         if not hasattr(self, "_fmt"):
             self._fmt = self.fields.getvalue("fmt")
@@ -204,12 +206,12 @@ class Control(Controller):
             if self._version:
                 try:
                     self._version = int(self._version)
-                except:
+                except Exception:
                     self.bail("version must be an integer")
                 if self._version < 0:
                     try:
                         doc = Doc(self.session, id=self.id, version="last")
-                    except:
+                    except Exception:
                         self.bail(f"CDR{self.id} not versioned")
                     self._version = doc.version + self._version + 1
                     if self._version < 1:
@@ -239,9 +241,9 @@ class Control(Controller):
                 etree.strip_attributes(root, "PdqKey")
                 opts = dict(pretty_print=True, encoding="unicode")
                 self._xml = etree.tostring(root, **opts)
-            except:
-                logger.exception("failure processing XML")
-                bail("failure processing XML")
+            except Exception:
+                self.logger.exception("failure processing XML")
+                self.bail("failure processing XML")
         return self._xml
 
 

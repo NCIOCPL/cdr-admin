@@ -7,6 +7,7 @@ JIRA::OCECDR-4115 - support searching titles with non-ascii characters
 
 from cdrcgi import AdvancedSearch
 
+
 class MiscSearch(AdvancedSearch):
     """Customize search for this document type."""
 
@@ -36,6 +37,7 @@ class MiscSearch(AdvancedSearch):
     def types(self):
         """Valid miscellaneous document type names."""
         return self.values_for_paths([self.TYPE_PATH])
+
 
 if __name__ == "__main__":
     MiscSearch().run()

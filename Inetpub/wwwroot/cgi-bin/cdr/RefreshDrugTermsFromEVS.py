@@ -14,8 +14,7 @@ from functools import cached_property
 from json import load, dump
 from lxml import etree
 from ModifyDocs import Job
-from nci_thesaurus import Concept
-from re import compile, escape, sub, UNICODE
+from re import compile, escape, sub  # , UNICODE
 from requests import get
 from string import punctuation
 from time import sleep
@@ -437,11 +436,11 @@ class Normalizer:
         """
 
         return text.lower()
-        #for c in self.FUNKY_WHITESPACE:
-        #    text = text.replace(c, " ")
-        #return sub(r"\s+", " ", text).strip().lower()
-        #return sub(r"\s+", " ", sub(r"\W", " ", text)).lower().strip()
-        """
+        # for c in self.FUNKY_WHITESPACE:
+        #     text = text.replace(c, " ")
+        # return sub(r"\s+", " ", text).strip().lower()
+        # return sub(r"\s+", " ", sub(r"\W", " ", text)).lower().strip()
+        r"""
         step1 = sub(r"\s+", " ", text.strip(), UNICODE)
         if opts.get("strip_suffix"):
             step2 = cls.SUFFIX.sub("", step1, UNICODE)
@@ -622,20 +621,20 @@ class OtherName:
 
     SKIP = {"PreferredName", "ReviewStatus"}
     TERM_TYPE_MAP = {
-        "PT"               : "Synonym", # "Preferred term",
-        "AB"               : "Abbreviation",
-        "AQ"               : "Obsolete name",
-        "BR"               : "US brand name",
-        "CN"               : "Code name",
-        "FB"               : "Foreign brand name",
-        "SN"               : "Chemical structure name",
-        "SY"               : "Synonym",
-        "INDCode"          : "IND code",
-        "NscCode"          : "NSC code",
+        "PT": "Synonym",
+        "AB": "Abbreviation",
+        "AQ": "Obsolete name",
+        "BR": "US brand name",
+        "CN": "Code name",
+        "FB": "Foreign brand name",
+        "SN": "Chemical structure name",
+        "SY": "Synonym",
+        "INDCode": "IND code",
+        "NscCode": "NSC code",
         "CAS_Registry_Name": "CAS Registry name",
-        "IND_Code"         : "IND code",
-        "NSC_Code"         : "NSC code",
-        "CAS_Registry"     : "CAS Registry name"
+        "IND_Code": "IND code",
+        "NSC_Code": "NSC code",
+        "CAS_Registry": "CAS Registry name"
     }
 
     def __init__(self, name, group, source=None):

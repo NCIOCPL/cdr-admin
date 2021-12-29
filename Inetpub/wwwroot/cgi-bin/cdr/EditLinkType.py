@@ -84,8 +84,8 @@ class Control(Controller):
             linktype.save()
             self.messages.append(message)
         except Exception as e:
-            self.logger.exception("Failure saving link type %s", name)
-            self.errors.append(f"Failure saving link type {name}: {e}")
+            self.logger.exception("Failure saving link type %s", self.name)
+            self.errors.append(f"Failure saving link type {self.name}: {e}")
 
         # Force re-load of the link type values.
         del self._linktype
@@ -265,7 +265,7 @@ class Control(Controller):
             select.append(option)
         return self.HTMLPage.B.DIV(
             self.HTMLPage.B.LABEL(self.HTMLPage.B.FOR(name), "Rule Type"),
-           select,
+            select,
             self.HTMLPage.B.IMG(
                 src="/images/add.gif",
                 onclick=f"add_block({counter}, 'r')",
@@ -479,7 +479,7 @@ class Control(Controller):
                     try:
                         doctype = Doctype(self, name=name)
                         sources.append(LinkType.LinkSource(doctype, element))
-                    except Exception as e:
+                    except Exception:
                         error = f"Failure adding source {name}/{element}"
                         self.logger.exception(error)
                         self.errors.append(error)

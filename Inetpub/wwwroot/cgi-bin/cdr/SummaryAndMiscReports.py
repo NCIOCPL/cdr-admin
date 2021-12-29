@@ -5,6 +5,7 @@
 
 from cdrcgi import Controller
 
+
 class Control(Controller):
 
     SUBTITLE = "Summary and Miscellaneous Document Reports"
@@ -61,7 +62,6 @@ class Control(Controller):
              dict(flavor="standard")),
         ):
             ol.append(page.B.LI(page.menu_link(script, display, **parms)))
-
 
         # Part 4: Summary QC.
         page.form.append(page.B.H3("Summary QC Reports"))

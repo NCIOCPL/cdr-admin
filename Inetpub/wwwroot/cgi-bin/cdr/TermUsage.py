@@ -29,7 +29,7 @@ class Control(Controller):
         """
 
         fieldset = page.fieldset("Enter Term IDs Separated by Space")
-        fieldset.append(page.textarea("ids", label="Term IDs", rows = 5))
+        fieldset.append(page.textarea("ids", label="Term IDs", rows=5))
         page.form.append(fieldset)
 
     @property
@@ -47,7 +47,7 @@ class Control(Controller):
             ids = self.fields.getvalue("ids") or ""
             try:
                 self._ids = [Doc.extract_id(id) for id in ids.split()]
-            except:
+            except Exception:
                 self.bail(f"Invalid document ID format in {ids}")
         return self._ids
 

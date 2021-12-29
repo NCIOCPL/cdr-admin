@@ -5,7 +5,6 @@
 
 import os
 from cdrcgi import Controller
-from cdr import WORK_DRIVE
 from cdrpub import Control as PubControl
 
 
