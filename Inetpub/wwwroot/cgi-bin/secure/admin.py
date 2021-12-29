@@ -1,9 +1,9 @@
-#----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 # Initiate a new CDR Session using the user's NIH domain account login
 # and redirects to the top level CDR Admin menu.
 # JIRA::OCECDR-3849
 # JIRA::OCECDR-4092
-#----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 import cgi
 import os
 import cdrlite
@@ -19,7 +19,7 @@ if auth_user:
     if domain.upper() == "NIH":
         try:
             session = cdrlite.login(name)
-        except:
+        except Exception:
             session = False
 now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 try:
@@ -27,7 +27,7 @@ try:
     fp = open("d:/cdr/log/admin-login.log", "a")
     fp.write("%s admin.py %s %s %s\n" % strings)
     fp.close()
-except:
+except Exception:
     pass
 if session:
     if "//" not in target:
