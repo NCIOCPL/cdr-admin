@@ -47,11 +47,13 @@ $(function() { chk_cdrid(); chk_code(); });
         for name in self.PATHS:
             setattr(self, name, self.fields.getvalue(name))
         self.changes = None
+        # pylint: disable=no-member
         if self.term_type and self.term_type not in self.term_types:
             raise Exception("Tampering with form values")
         if self.sem_type:
             if self.sem_type not in [st[0] for st in self.semantic_types]:
                 raise Exception("Tampering with form values")
+        # pylint: enable=no-member
         self.search_fields = (
             self.text_field("name"),
             self.text_field("other_name"),

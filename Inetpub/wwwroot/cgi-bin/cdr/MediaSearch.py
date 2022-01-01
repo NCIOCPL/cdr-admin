@@ -31,6 +31,7 @@ class MediaSearch(AdvancedSearch):
         AdvancedSearch.__init__(self)
         for name in self.PATHS:
             setattr(self, name, self.fields.getvalue(name))
+        # pylint: disable=no-member
         if self.category and self.category not in self.categories:
             raise Exception("Tampering with form values")
         if self.image_type and self.image_type not in self.image_types:
@@ -40,6 +41,7 @@ class MediaSearch(AdvancedSearch):
         if self.diagnosis:
             if self.diagnosis not in [d[0] for d in self.diagnoses]:
                 raise Exception("Tampering with form values")
+        # pylint: enable=no-member
         self.search_fields = (
             self.text_field("title"),
             self.text_field("desc", label="Content Desc"),

@@ -161,10 +161,12 @@ Content-length: {len(book_bytes):d}
         last_col = len(cols) - 1
         sheet = self.book.add_worksheet(name)
         sheet.freeze_panes(2, 0)
+        # pylint: disable-next=no-member
         args = 0, 0, 0, last_col, name, self.styles.merge
         sheet.merge_range(*args)
         for i, col in enumerate(cols):
             sheet.set_column(i, i, col.width)
+            # pylint: disable-next=no-member
             sheet.write(1, i, col.label, self.styles.header)
         row = 2
         divider = False

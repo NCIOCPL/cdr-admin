@@ -52,10 +52,12 @@ class PersonSearch(AdvancedSearch):
         AdvancedSearch.__init__(self)
         for name in self.PATHS:
             setattr(self, name, self.fields.getvalue(name))
+        # pylint: disable=no-member
         if self.state and self.state not in [s[0] for s in self.states]:
             raise Exception("Tampering with form values")
         if self.country and self.country not in [c[0] for c in self.countries]:
             raise Exception("Tampering with form values")
+        # pylint: enable=no-member
         self.search_fields = (
             self.text_field("surname"),
             self.text_field("forename", label="Given Name"),

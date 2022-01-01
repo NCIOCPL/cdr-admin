@@ -472,14 +472,14 @@ class Normalizer:
     @cached_property
     def normalized_name(self):
         """Normalized version of the preferred name."""
-        return self.normalize(self.name)
+        return self.normalize(self.name)  # pylint: disable=no-member
 
     @cached_property
     def normalized_other_names(self):
         """Dictionary of other names indexed by normalized key."""
 
         normalized_other_names = {}
-        for other_name in self.other_names:
+        for other_name in self.other_names:  # pylint: disable=no-member
             if isinstance(other_name, str):
                 key = self.normalize(other_name)
             else:
@@ -494,6 +494,7 @@ class Normalizer:
         """Sequence of normalized definition strings."""
 
         opts = dict(strip_suffix=True)
+        # pylint: disable=no-member
         return {self.normalize(d, **opts) for d in self.definitions}
 
 

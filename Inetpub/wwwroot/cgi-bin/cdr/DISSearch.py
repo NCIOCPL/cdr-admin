@@ -27,6 +27,7 @@ class DrugInformationSummarySearch(AdvancedSearch):
         fda_appr_vals = self.valid_values["FDAApproved"]
         drug_ref_vals = self.valid_values["DrugReferenceType"]
         appr_ind_vals = self.approved_indication_terms
+        # pylint: disable=no-member
         if self.fda_appr and self.fda_appr not in fda_appr_vals:
             raise Exception("Tampering with form values")
         fda_appr_vals = [""] + fda_appr_vals
@@ -36,6 +37,7 @@ class DrugInformationSummarySearch(AdvancedSearch):
         if self.appr_ind:
             if self.appr_ind not in [v[0] for v in appr_ind_vals]:
                 raise Exception("Tampering with form values")
+        # pylint: enable=no-member
         appr_ind_vals = [""] + appr_ind_vals
         self.search_fields = (
             self.text_field("title"),

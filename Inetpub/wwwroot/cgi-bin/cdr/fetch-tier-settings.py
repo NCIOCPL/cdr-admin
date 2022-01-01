@@ -65,6 +65,7 @@ class Settings:
         return children
 
     def get_windows_settings(self):
+        # pylint: disable-next=no-member
         winver = sys.getwindowsversion()
         settings = dict(version={})
         for name in ("major", "minor", "build", "platform", "service_pack"):

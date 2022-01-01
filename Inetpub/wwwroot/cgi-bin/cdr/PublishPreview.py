@@ -20,6 +20,7 @@ from cdr import TMP
 
 # TODO: Get Acquia to fix their broken certificates.
 from urllib3.exceptions import InsecureRequestWarning
+# pylint: disable-next=no-member
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
 
@@ -256,6 +257,7 @@ class Summary:
             cookies = response.cookies
             self.__control.show_progress("clearing old temp docs...")
             if isinstance(self.doc.id, int):
+                # pylint: disable-next=invalid-unary-operand-type
                 self.client.remove(-self.doc.id)
             self.__control.show_progress("pushing summary values to Drupal...")
             nid = self.client.push(self.values)

@@ -5,6 +5,7 @@
 
 from cdrcgi import Controller
 from cdrapi import db
+# pylint: disable-next=no-name-in-module
 from socket import gethostbyname, create_connection
 
 

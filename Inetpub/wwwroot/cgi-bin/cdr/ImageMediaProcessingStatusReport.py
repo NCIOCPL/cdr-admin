@@ -170,6 +170,7 @@ class Control(Controller):
 
         if not hasattr(self, "_statuses"):
             doctype = Doctype(self.session, name="Media")
+            # pylint: disable-next=unsubscriptable-object
             statuses = doctype.vv_lists["ProcessingStatusValue"]
             self._statuses = [s for s in statuses if not s.startswith("Audio")]
         return self._statuses

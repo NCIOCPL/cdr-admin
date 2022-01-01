@@ -79,6 +79,7 @@ class Control(Controller):
                     dl = page.B.DL()
                     for name in sorted(self.doctype.vv_lists, key=str.lower):
                         dl.append(page.B.DT(name))
+                        # pylint: disable-next=unsubscriptable-object
                         for value in self.doctype.vv_lists[name]:
                             dl.append(page.B.DD(value))
                     fieldset.append(dl)

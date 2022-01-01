@@ -36,6 +36,7 @@ class GlossaryTermConceptSearch(AdvancedSearch):
         AdvancedSearch.__init__(self)
         for name in self.PATHS:
             setattr(self, name, self.fields.getvalue(name))
+        # pylint: disable=no-member
         if self.audience and self.audience not in self.audiences:
             raise Exception("Tampering with form values")
         if self.dictionary and self.dictionary not in self.dictionaries:
@@ -44,6 +45,7 @@ class GlossaryTermConceptSearch(AdvancedSearch):
             raise Exception("Tampering with form values")
         if self.stat_es and self.stat_es not in self.statuses_es:
             raise Exception("Tampering with form values")
+        # pylint: enable=no-member
         statuses_en = [""] + self.statuses_en
         statuses_es = [""] + self.statuses_es
         self.search_fields = (

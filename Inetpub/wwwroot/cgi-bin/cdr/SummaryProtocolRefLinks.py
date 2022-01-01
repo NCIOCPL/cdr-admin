@@ -6,7 +6,9 @@
 from cdrcgi import Controller
 from cdrapi.docs import Doc
 import requests
+# pylint: disable-next=import-error
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
+# pylint: disable-next=no-member
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 

@@ -20,8 +20,10 @@ class Disk:
     def __init__(self, drive):
         self.drive = drive.upper()
         path = "%s:\\" % drive
+        # pylint: disable=no-value-for-parameter
         _, total, free = (ctypes.c_ulonglong(), ctypes.c_ulonglong(),
                           ctypes.c_ulonglong())
+        # pylint: enable=no-value-for-parameter
         f = ctypes.windll.kernel32.GetDiskFreeSpaceExW
         ret = f(path, ctypes.byref(_), ctypes.byref(total), ctypes.byref(free))
         if ret == 0:
