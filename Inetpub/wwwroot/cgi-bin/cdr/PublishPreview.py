@@ -5,6 +5,8 @@
 
 from argparse import ArgumentParser
 from datetime import datetime
+from functools import cached_property
+from json import loads
 from re import search
 from sys import stderr
 from cdrcgi import Controller, DOCID
@@ -463,26 +465,56 @@ class GTN:
         "/satelliteLib-5b3dcf1f2676c378b518a1583ef5355acd83cd3d.js"
     )
     SCRIPT = (
-        ("https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js",
-         False),
-        ("https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1"
-         "/jquery-ui.min.js", True),
-        ("https://cdnjs.cloudflare.com/ajax/libs/jplayer/2.9.2"
-         "/jplayer/jquery.jplayer.min.js", False),
-        ("https://www.cancer.gov"
-         "/app-modules/glossary-app/glossary-app.v1.2.2"
-         "/static/js/main.js", True),
-        ("https://www.cancer.gov"
-         "/profiles/custom/cgov_site/themes/custom"
-         "/cgov/gcov_common/dist/js/Common.js", True),
+        dict(
+            src="https://code.jquery.com/jquery-3.6.0.min.js",
+            integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=",
+            crossorigin="anonymous",
+        ),
+        dict(
+            src="https://code.jquery.com/ui/1.13.0/jquery-ui.min.js",
+            integrity="sha256-hlKLmzaRlE8SCJC1Kw8zoUbU8BxA+8kR3gseuKfMjxA=",
+            crossorigin="anonymous",
+            defer=None,
+        ),
+        dict(
+            src=(
+                "https://cdnjs.cloudflare.com/ajax/libs/jplayer/2.9.2"
+                "/jplayer/jquery.jplayer.min.js"
+            ),
+        ),
+        dict(
+            src=(
+                "https://www.cancer.gov/app-modules/glossary-app"
+                "/glossary-app.v1.2.2/static/js/main.js"
+            ),
+            defer=None,
+            onload=(
+                "window.GlossaryApp(window.NCI_glossary_app_root_js_config)"
+            ),
+        ),
+        dict(
+            src=(
+                "https://www.cancer.gov/profiles/custom/cgov_site/themes"
+                "/custom/cgov/gcov_common/dist/js/Common.js"
+            ),
+            defer=None,
+        ),
     )
     CSS = (
-        ("https://www.cancer.gov"
-         "/profiles/custom/cgov_site/themes/custom"
-         "/cgov/cgov_common/dist/css/Common.css"),
-        ("https://www.cancer.gov"
-         "/app-modules/glossary-app/glossary-app.v1.2.2"
-         "/static/css/main.css"),
+        dict(
+            href=(
+                "https://www.cancer.gov/profiles/custom/cgov_site/themes"
+                "/custom/cgov/cgov_common/dist/css/Common.css"
+            ),
+            rel="stylesheet",
+        ),
+        dict(
+            href=(
+                "https://www.cancer.gov/app-modules/glossary-app"
+                "/glossary-app.v1.2.2/static/css/main.css"
+            ),
+            rel="stylesheet",
+        ),
     )
     STYLE = "dl.dictionary-list figure.image-left-medium { float: none; }"
     STYLE = """
@@ -544,6 +576,19 @@ class GTN:
         """Access to the report parameters and the database."""
         return self.__control
 
+    @cached_property
+    def css_link_attrs(self):
+        """Possibly overriden CDN links for CSS files."""
+
+        query = self.control.Query("ctl", "val")
+        query.where("grp = 'cdn'")
+        query.where("name = 'pp-gtn-css'")
+        query.where("inactivated IS NULL")
+        row = query.execute(self.control.cursor).fetchone()
+        if row:
+            return loads(row.val)
+        return self.CSS
+
     @property
     def doc(self):
         """`Doc` object for the version to be previewed."""
@@ -574,19 +619,18 @@ class GTN:
             self._head.append(fonts)
             for name, content in self.META:
                 self._head.append(self.B.META(name=name, content=content))
-            for url in self.CSS:
-                self._head.append(self.B.LINK(href=url, rel="stylesheet"))
-            for url, defer in self.SCRIPT:
-                script = self.B.SCRIPT(src=url, type="text/javascript")
-                if "main.js" in url:
-                    script.set('onload="window.GlossaryApp('
-                               'window.NCI_glossary_app_root_js_config)"')
-                if defer:
-                    script.set("defer")
-                self._head.append(script)
+            for attrs in self.css_link_attrs:
+                element = self.B.LINK()
+                for key, value in attrs.items():
+                    element.set(key, value)
+                self._head.append(element)
+            for attrs in self.script_link_attrs:
+                element = self.B.SCRIPT()
+                for key, value in attrs.items():
+                    element.set(key, value)
+                self._head.append(element)
             self._head.append(self.B.STYLE(self.STYLE))
-            self._head.append(self.B.SCRIPT(self.JSFUNC,
-                                            type="text/javascript"))
+            self._head.append(self.B.SCRIPT(self.JSFUNC))
         return self._head
 
     @property
@@ -667,6 +711,17 @@ class GTN:
             result = self.doc.filter(self.VENDOR_FILTERS, **opts)
             self._root = result.result_tree.getroot()
         return self._root
+
+    @cached_property
+    def script_link_attrs(self):
+        query = self.control.Query("ctl", "val")
+        query.where("grp = 'cdn'")
+        query.where("name = 'pp-gtn-js'")
+        query.where("inactivated IS NULL")
+        row = query.execute(self.control.cursor).fetchone()
+        if row:
+            return loads(row.val)
+        return self.SCRIPT
 
     @property
     def title(self):
