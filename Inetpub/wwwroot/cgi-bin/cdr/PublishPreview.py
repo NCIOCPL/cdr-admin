@@ -623,6 +623,8 @@ class GTN:
                 element = self.B.LINK()
                 for key, value in attrs.items():
                     element.set(key, value)
+                if "rel" not in attrs:
+                    element.set("rel", "stylesheet")
                 self._head.append(element)
             for attrs in self.script_link_attrs:
                 element = self.B.SCRIPT()
