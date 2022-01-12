@@ -3,8 +3,9 @@
 """Show thesaurus concept IDs for concepts marked as not yet public.
 """
 
+from functools import cached_property
 from cdrcgi import Controller
-from nci_thesaurus import Concept
+from nci_thesaurus import EVS
 
 
 class Control(Controller):
@@ -21,13 +22,15 @@ class Control(Controller):
         """Return the single table for the report."""
         return self.table
 
-    @property
+    @cached_property
+    def evs(self):
+        """Interface to the EVS API."""
+        return EVS()
+
+    @cached_property
     def table(self):
         """Assemble the report's table."""
-
-        if not hasattr(self, "_table"):
-            self._table = self.Reporter.Table(self.rows, columns=self.COLS)
-        return self._table
+        return self.Reporter.Table(self.rows, columns=self.COLS)
 
     @property
     def rows(self):
@@ -62,13 +65,13 @@ class Control(Controller):
             self.__control = control
             self.__row = row
 
-        @property
+        @cached_property
         def available(self):
             """Yes or No, depending on whether NCI/T still has the term."""
 
             try:
-                concept = Concept(code=self.code)
-                return "Yes" if concept.code.upper() == self.code else "No"
+                self.__control.evs.fetch(self.code, include="minimal")
+                return "Yes"
             except Exception:
                 self.__control.logger.exception("fetching %r" % self.code)
                 return "No"
