@@ -64,7 +64,7 @@ class Control(Controller):
         else:
             id = self.linktypes.get(opts["name"].lower())
             if id:
-                if not self.linktype or self.linktype.id != id:
+                if not self.linktype or int(self.linktype.id) != id:
                     self.errors.append(f"Name {self.name} already in use")
         if not self.sources:
             self.errors.append("Missing required source(s)")
