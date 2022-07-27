@@ -9,6 +9,7 @@ import sys
 from cdrcgi import Controller, Reporter, bail
 from cdrapi import db
 
+
 class Control(Controller):
     """Top-level router for script logic.
 

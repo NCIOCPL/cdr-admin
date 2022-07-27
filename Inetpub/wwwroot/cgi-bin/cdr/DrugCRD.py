@@ -36,7 +36,6 @@ class Control(Controller):
         ),
     )
 
-
     def build_tables(self):
         """Assemble the tables to be rendered for the report."""
 

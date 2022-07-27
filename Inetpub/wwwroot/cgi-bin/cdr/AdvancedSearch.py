@@ -5,9 +5,11 @@
 
 from cdrcgi import Controller
 
+
 class Control(Controller):
     SUBTITLE = "Advanced Search"
     SUBMIT = None
+
     def populate_form(self, page):
         page.body.set("class", "admin-menu")
         page.form.append(page.B.H3("Document Type"))
@@ -30,4 +32,6 @@ class Control(Controller):
         ):
             ol.append(page.B.LI(page.menu_link(script, display)))
         page.form.append(ol)
+
+
 Control().run()

@@ -424,7 +424,6 @@ class Summary:
                 self._title = self.doc.title
         return self._title
 
-
     class Section:
         """PDQ summary section with comments."""
 
@@ -457,11 +456,10 @@ class Summary:
                     self._rows.append(comment.cells)
             return self._rows
 
-
     class Comment:
         """A comment found in a PDQ summary section."""
 
-        NO_SECTION_TITLE = "No Section Title" # In case we don't find one.
+        NO_SECTION_TITLE = "No Section Title"  # In case we don't find one.
 
         def __init__(self, control, node):
             """Save the caller's passed values.
@@ -538,7 +536,6 @@ class Summary:
         def in_scope(self):
             """True if this comment should be included on the report."""
 
-            wanted = self.control.types
             if self.__node.tag == Control.RESPONSE:
                 return "R" in self.control.types
             if "C" in self.control.types:

@@ -9,12 +9,9 @@
 from datetime import date
 from cdrapi.docs import Doc
 from cdrcgi import Controller
-from cdr import URDATE, getSchemaEnumVals
-from lxml import html, etree
+from lxml import html
 from lxml.html import builder
-from cdr import exNormalize
 import sys
-
 
 
 class Control(Controller):
@@ -26,7 +23,6 @@ class Control(Controller):
     LOGNAME = "MediaInSummary"
     CURRENT = "Current (most recent changes for each category of change)"
     CSS = "../../stylesheets/MediaInSummary.css"
-
 
     def show_report(self):
         """Send the report back to the browser."""
@@ -40,18 +36,16 @@ class Control(Controller):
         sys.stdout.buffer.write(html.tostring(self.report, **opts))
         sys.exit(0)
 
-
     def get_int_cdr_id(self, value):
         """
         Convert CDR ID to integer. Exit with an error message on failure.
         """
         if value:
             try:
-                return exNormalize(value)[1]
-            except:
+                return Doc.extract_id(value)
+            except Exception:
                 self.bail("Invalid format for CDR ID")
         return None
-
 
     @property
     def report(self):
@@ -69,8 +63,6 @@ class Control(Controller):
             orig_id = B.P(f"Summary selected: CDR{cdrId}", id="summary-id")
             wrapper = body = B.BODY(B.E("header", B.H1(*args)), orig_id)
             self._report = B.HTML(head, body)
-            aud = { 'Patients':'Patients',
-                    'Health_professionals':'Health professionals'}
 
             # Users want to be able to only display the content for a single
             # language.  In that case we're creating a single element list
@@ -87,13 +79,14 @@ class Control(Controller):
             # Creating one column per language
             # --------------------------------
             for summary_doc in summary_docs:
-                lang = Doc.get_text(summary_doc.doc.root.find(".//SummaryLanguage"))
-                audience = Doc.get_text(summary_doc.doc.root.find(".//SummaryAudience"))
+                root = summary_doc.doc.root
+                lang = Doc.get_text(root.find(".//SummaryLanguage"))
+                audience = Doc.get_text(root.find(".//SummaryAudience"))
                 wrapper = B.DIV(B.CLASS("lang-wrapper"))
                 body.append(wrapper)
 
                 # Display the language and CDR-ID of the summary
-                summary_lang = B.P(f"{lang} - CDR{summary_doc.id}", 
+                summary_lang = B.P(f"{lang} - CDR{summary_doc.id}",
                                    id=f"summary-{lang.lower()}")
                 wrapper.append(summary_lang)
 
@@ -104,39 +97,39 @@ class Control(Controller):
 
                 for media_doc in summary_doc.media_docs:
                     # Display the image title and CDR-ID, followed by the image
-                    wrapper.append(B.P(B.B("Image: "), 
-                                       B.SPAN(f"{media_doc.title} (CDR{media_doc.id})")))
+                    span = B.SPAN(f"{media_doc.title} (CDR{media_doc.id})")
+                    wrapper.append(B.P(B.B("Image: "), span))
                     image = ("/cgi-bin/cdr/GetCdrImage.py?"
                              f"id=CDR{media_doc.id}-400.jpg")
                     full_image = image.replace('-400', '')
                     wrapper.append(B.A(B.IMG(src=image), href=full_image))
 
-                    # keep the else block if we're asked to include video, too
-                    #
-                    #else:
-                    #    host_id = self.getHostID(summary_doc.id)
-                    #    image = f"https://img.youtube.com/vi/{host_id}/hqdefault.jpg"
-                    #    wrapper.append(B.P(B.IMG(src=image)))
-
                     attributes = {}
                     if self.show_caption:
-                        captions = media_doc.doc.root.findall(".//MediaCaption")
-                        for caption in captions:
+                        path = ".//MediaCaption"
+                        for caption in media_doc.doc.root.findall(path):
                             attributes = caption.attrib
                             if attributes.get('audience') == audience:
-                                wrapper.append(B.P(B.B("Caption:"),
-                                                   B.BR(),
-                                                   B.P(f"{Doc.get_text(caption)}")))
+                                # XXX Do we really want to nest p elements?
+                                paragraph = B.P(
+                                    B.B("Caption:"),
+                                    B.BR(),
+                                    B.P(Doc.get_text(caption))
+                                )
+                                wrapper.append(paragraph)
 
                     attributes = {}
                     if self.show_description:
-                        descriptions = media_doc.doc.root.findall(".//ContentDescription")
-                        for description in descriptions:
-                            attributes = description.attrib
+                        path = ".//ContentDescription"
+                        for node in media_doc.doc.root.findall(path):
+                            attributes = node.attrib
                             if attributes.get('audience') == audience:
-                                wrapper.append(B.P(B.B("Description:"),
-                                                   B.BR(),
-                                                   B.P(f"{Doc.get_text(description)}")))
+                                paragraph = B.P(
+                                    B.B("Description:"),
+                                    B.BR(),
+                                    B.P(Doc.get_text(node))
+                                )
+                                wrapper.append(paragraph)
 
                     if self.show_label:
                         labels = media_doc.doc.root.findall(".//LabelName")
@@ -146,7 +139,6 @@ class Control(Controller):
                                            B.BR()))
 
         return self._report
-
 
     def populate_form(self, page, titles=None):
         """Put the fields on the form.
@@ -159,7 +151,7 @@ class Control(Controller):
         """
 
         page.form.append(page.hidden_field("debug", self.debug or ""))
-        opts = { "titles": titles, "id-label": "CDR ID" }
+        opts = {"titles": titles, "id-label": "CDR ID"}
         opts["id-tip"] = "enter CDR ID"
         self.add_doc_selection_fields(page, **opts)
 
@@ -182,7 +174,6 @@ class Control(Controller):
             opts = dict(value=value, label=label, checked=True, onclick=None)
             fieldset.append(page.checkbox("show", **opts))
         page.form.append(fieldset)
-
 
     def add_doc_selection_fields(self, page, **kwopts):
         """
@@ -214,16 +205,16 @@ class Control(Controller):
             nothing (the form object is populated as a side effect)
         """
 
-        #--------------------------------------------------------------
+        # --------------------------------------------------------------
         # Show the second stage in a cascading sequence of the form if we
         # have invoked this method directly from build_tables(). Widen
         # the form to accomodate the length of the title substrings
         # we're showing.
-        #--------------------------------------------------------------
+        # --------------------------------------------------------------
         titles = kwopts.get("titles")
         if titles:
             page.form.append(page.hidden_field("selection_method", "id"))
-            #page.form.append(page.hidden_field("format", self.format))
+            # page.form.append(page.hidden_field("format", self.format))
             fieldset = page.fieldset("Choose Summary")
             page.add_css("fieldset { width: 600px; }")
             for t in titles:
@@ -259,7 +250,6 @@ class Control(Controller):
             page.form.append(fieldset)
             page.add_script(self.summary_selection_js)
 
-
     @property
     def cdr_id(self):
         """Get the entered/selected CDR ID as an integer"""
@@ -268,7 +258,7 @@ class Control(Controller):
             doc_id = self.fields.getvalue("cdr-id", "").strip()
             try:
                 self._cdr_id = Doc.extract_id(doc_id)
-            except:
+            except Exception:
                 self.bail("Invalid format for CDR ID")
         return self._cdr_id
 
@@ -304,10 +294,10 @@ class Control(Controller):
         """Check if display of description has been selected"""
 
         if not hasattr(self, "_show_description"):
-            show_description = self.fields.getvalue("show", "")
-            if isinstance(show_description, list) and 'description' in show_description:
+            show = self.fields.getvalue("show", "")
+            if isinstance(show, list) and 'description' in show:
                 self._show_description = True
-            elif isinstance(show_description, str) and 'description' == show_description:
+            elif isinstance(show, str) and 'description' == show:
                 self._show_description = True
             else:
                 self._show_description = False
@@ -350,7 +340,6 @@ class Control(Controller):
             self._cdr_pair = (row[1], row[0]) or None
         return self._cdr_pair
 
-
     @property
     def debug(self):
         """True if we're running with increased logging."""
@@ -391,7 +380,7 @@ class Control(Controller):
 
         If the user chooses the "by summary title" method for
         selecting which document to use for the report, and the
-        fragment supplied matches more than one document, display the 
+        fragment supplied matches more than one document, display the
         form a second time so the user can pick the correct document.
 
         The user selects a single document and we're selecting the
@@ -458,7 +447,6 @@ class Control(Controller):
                         docs = SummaryTitle(doc_id, title)
                     self._choice_of_summary_titles.append(docs)
         return self._choice_of_summary_titles
-
 
     @property
     def today(self):
@@ -534,8 +522,9 @@ class Summary:
     @property
     def media_link_ids(self):
         """MediaLink IDs for the images of a summary.
-           
-           Extracting the MediaID (ref) attribute and converting the ID to an integer
+
+           Extracting the MediaID (ref) attribute and converting the
+           ID to an integer
         """
 
         if not hasattr(self, "_media_link_ids"):
@@ -543,10 +532,10 @@ class Summary:
             media_doc_ids = self.doc.root.findall(".//MediaLink/MediaID")
             self._media_link_ids = []
             for media_doc in media_doc_ids:
-                self._media_link_ids.append(Doc.extract_id(media_doc.values()[0]))
+                doc_id = Doc.extract_id(media_doc.values()[0])
+                self._media_link_ids.append(doc_id)
 
         return self._media_link_ids
-
 
     @property
     def media_docs(self):
@@ -585,7 +574,6 @@ class Media:
 
         self.__control = control
         self.__doc_id = doc_id
-
 
     @property
     def control(self):

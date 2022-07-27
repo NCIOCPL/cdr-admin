@@ -5,12 +5,13 @@ from urllib.parse import urlencode
 from cdrcgi import Controller, Reporter, navigateTo, DOCID, SESSION, REQUEST
 from cdrapi.docs import FilterSet
 
+
 class Control(Controller):
 
     COMPARE = "Compare With PROD"
     PARAMS = "Filter Params"
     SUBTITLE = "Manage Filters"
-    #LOGLEVEL = "DEBUG"
+    # LOGLEVEL = "DEBUG"
     LOGNAME = "EditFilters"
 
     @property

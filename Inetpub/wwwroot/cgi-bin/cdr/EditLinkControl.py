@@ -5,6 +5,7 @@
 
 from cdrcgi import Controller, navigateTo
 
+
 class Control(Controller):
     """Encapsulates processing logic for building the menu page."""
 

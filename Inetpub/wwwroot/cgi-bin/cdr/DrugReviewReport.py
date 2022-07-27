@@ -140,6 +140,7 @@ Content-length: {len(book_bytes):d}
                 ),
                 merge=dict(align="center", bold=True),
             )
+
             class Styles:
                 def __init__(self, book, styles):
                     for name in styles:
@@ -160,10 +161,12 @@ Content-length: {len(book_bytes):d}
         last_col = len(cols) - 1
         sheet = self.book.add_worksheet(name)
         sheet.freeze_panes(2, 0)
+        # pylint: disable-next=no-member
         args = 0, 0, 0, last_col, name, self.styles.merge
         sheet.merge_range(*args)
         for i, col in enumerate(cols):
             sheet.set_column(i, i, col.width)
+            # pylint: disable-next=no-member
             sheet.write(1, i, col.label, self.styles.header)
         row = 2
         divider = False
@@ -524,7 +527,6 @@ class Drug(Comments, Status):
         else:
             return "".join(pieces)
 
-
     class Definition(Comments, Status):
         """One of the definitions for a drug term."""
 
@@ -556,7 +558,6 @@ class Drug(Comments, Status):
                     comments = [f"\n[{comment}]" for comment in self.comments]
                     self._text = self._text, "".join(comments)
             return self._text
-
 
     class OtherName(Comments, Status):
         """An alternate name for the drug term."""
@@ -628,7 +629,6 @@ class Drug(Comments, Status):
             if not hasattr(self, "_type"):
                 self._type = Doc.get_text(self.node.find("OtherNameType"))
             return self._type
-
 
         class Source:
             """Identification of the origin of the term's alternate name."""

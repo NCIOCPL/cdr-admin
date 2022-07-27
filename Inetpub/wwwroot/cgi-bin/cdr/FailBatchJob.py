@@ -101,6 +101,7 @@ table { width: 95%; }""")
             self.HTMLPage.B.TH("Status", self.HTMLPage.B.STYLE("center")),
             self.HTMLPage.B.TH("Name", self.HTMLPage.B.STYLE("center"))
         )
+
     @property
     def jobs(self):
         """Dictionary of stalled jobs (both publihsing and batch)."""

@@ -3,6 +3,7 @@
 """Fetch an English summary ready for translation
 """
 
+from functools import cached_property
 from html import escape as html_escape
 from re import findall, split, sub
 from sys import stdout
@@ -40,6 +41,7 @@ class Control(Controller):
         "PdqKey",
         "RelatedDocuments",
         "ReplacementFor",
+        "ResponseToComment",
         "SectMetaData",
         "TypeOfSummaryChange",
     )
@@ -103,11 +105,13 @@ class Control(Controller):
                 action=self.script,
                 buttons=buttons,
             )
+
             class Page(HTMLPage):
                 """Customized for raw HTML block."""
                 def __init__(self, pre, title, **opts):
                     self.__pre = pre
                     HTMLPage.__init__(self, title, **opts)
+
                 def tostring(self):
                     opts = dict(self.STRING_OPTS, encoding="unicode")
                     string = html.tostring(self.html, **opts)
@@ -152,96 +156,91 @@ class Control(Controller):
         pieces.append(">")
         return "".join(pieces)
 
-    @property
+    @cached_property
     def display(self):
         """Colorized markup to show the document prior to download."""
 
-        if not hasattr(self, "_display"):
-            xml = sub("<([^>]+)>", Control.markup_tag, self.xml)
-            doc = html_escape(xml)
-            doc = doc.replace("@@TAG-START@@", '<span class="tag">')
-            doc = doc.replace("@@NAME-START@@", '<span class="name">')
-            doc = doc.replace("@@VALUE-START@@", '<span class="value">')
-            doc = doc.replace("@@END-SPAN@@", "</span>")
-            self._display = doc
-        return self._display
+        xml = sub("<([^>]+)>", Control.markup_tag, self.xml)
+        doc = html_escape(xml)
+        doc = doc.replace("@@TAG-START@@", '<span class="tag">')
+        doc = doc.replace("@@NAME-START@@", '<span class="name">')
+        doc = doc.replace("@@VALUE-START@@", '<span class="value">')
+        return doc.replace("@@END-SPAN@@", "</span>")
 
-    @property
+    @cached_property
     def fmt(self):
-        "One of 'raw' or 'display' (validated)."""
+        """One of 'raw' or 'display' (validated)."""
 
-        if not hasattr(self, "_fmt"):
-            self._fmt = self.fields.getvalue("fmt")
-            if self._fmt not in ("raw", "display"):
-                self.bail()
-        return self._fmt
+        fmt = self.fields.getvalue("fmt")
+        if fmt not in ("raw", "display"):
+            self.bail()
+        return fmt
 
     @property
     def raw(self):
         """True if we send raw bytes. Else send display version."""
         return self.fmt == "raw"
 
-    @property
+    @cached_property
     def doc(self):
         """`Doc` object for the requested CDR document."""
+        return Doc(self.session, id=self.id, version=self.version)
 
-        if not hasattr(self, "_doc"):
-            self._doc = Doc(self.session, id=self.id, version=self.version)
-        return self._doc
-
-    @property
+    @cached_property
     def id(self):
         """Integer for the CDR document ID."""
         return int(self.fields.getvalue("id"))
 
-    @property
+    @cached_property
     def version(self):
         """Which version to get."""
 
-        if not hasattr(self, "_version"):
-            self._version = self.fields.getvalue("version", "").strip()
-            if self._version:
-                try:
-                    self._version = int(self._version)
-                except:
-                    self.bail("version must be an integer")
-                if self._version < 0:
-                    try:
-                        doc = Doc(self.session, id=self.id, version="last")
-                    except:
-                        self.bail(f"CDR{self.id} not versioned")
-                    self._version = doc.version + self._version + 1
-                    if self._version < 1:
-                        self.bail(f"invalid version number for CDR{self.id}")
-        return self._version
+        version = self.fields.getvalue("version", "").strip()
+        if not version:
+            return ""
+        try:
+            version = int(version)
+        except Exception:
+            self.bail("version must be an integer")
+        if version < 0:
+            try:
+                doc = Doc(self.session, id=self.id, version="last")
+                version = doc.version + version + 1
+            except Exception:
+                self.bail(f"CDR{self.id} not versioned")
+        try:
+            doc = Doc(self.session, id=self.id, version=version)
+            if doc.doctype.name == "Summary":
+                return doc.version
+        except Exception:
+            self.bail(f"invalid version number for CDR{self.id}")
+        self.bail(f"version {version} of CDR{self.id} has type {doc.doctype}")
 
-    @property
+    @cached_property
     def xml(self):
         """Filtered and stripped serialized document."""
 
-        if not hasattr(self, "_xml"):
-            try:
-                xml = etree.tostring(self.doc.resolved, encoding="utf-8")
-                parser = etree.XMLParser(remove_blank_text=True)
-                root = etree.fromstring(xml, parser)
-                first = True
-                for node in root.findall("SummaryMetaData/MainTopics"):
-                    if first:
-                        first = False
-                    else:
-                        parent = node.getparent()
-                        parent.remove(node)
-                for node in root.xpath(self.CHANGES):
+        try:
+            xml = etree.tostring(self.doc.resolved, encoding="utf-8")
+            parser = etree.XMLParser(remove_blank_text=True)
+            root = etree.fromstring(xml, parser)
+            first = True
+            for node in root.findall("SummaryMetaData/MainTopics"):
+                if first:
+                    first = False
+                else:
                     parent = node.getparent()
                     parent.remove(node)
-                etree.strip_elements(root, with_tail=False, *self.STRIP)
-                etree.strip_attributes(root, "PdqKey")
-                opts = dict(pretty_print=True, encoding="unicode")
-                self._xml = etree.tostring(root, **opts)
-            except:
-                logger.exception("failure processing XML")
-                bail("failure processing XML")
-        return self._xml
+            for node in root.xpath(self.CHANGES):
+                parent = node.getparent()
+                parent.remove(node)
+            etree.strip_elements(root, with_tail=False, *self.STRIP)
+            etree.strip_attributes(root, "PdqKey")
+            opts = dict(pretty_print=True, encoding="unicode")
+            return etree.tostring(root, **opts)
+        except Exception:
+            self.logger.exception("failure processing XML")
+            self.bail("failure processing XML")
 
 
 if __name__ == "__main__":

@@ -3,8 +3,7 @@
 """Create a new CDR user account or modify an existing one.
 """
 
-from cdrcgi import Controller, navigateTo, bail
-from cdrapi import db
+from cdrcgi import Controller
 
 
 class Control(Controller):
@@ -113,7 +112,7 @@ fieldset.text-fields-box textarea {
         """Go back to the menu listing all the CDR user accounts."""
 
         opts = dict(deleted=deleted) if deleted else {}
-        navigateTo(self.EDIT_USERS, self.session.name, **opts)
+        self.navigate_to(self.EDIT_USERS, self.session.name, **opts)
 
     def run(self):
         """Override base class so we can handle the extra buttons."""
@@ -126,14 +125,14 @@ fieldset.text-fields-box textarea {
             elif self.request == self.SUBMENU:
                 return self.return_to_users_menu()
         except Exception as e:
-            bail(f"Failure: {e}")
+            self.bail(f"Failure: {e}")
         Controller.run(self)
 
     def save(self):
         """Save the new or modified user account object."""
 
         if not self.name:
-            bail("Required name is missing")
+            self.bail("Required name is missing")
         if self.user.name:
             self.subtitle = f"Changes to {self.name} saved successfully"
         else:
@@ -150,10 +149,10 @@ fieldset.text-fields-box textarea {
         )
         if self.authmode == "local":
             if self.password != self.confirm:
-                bail("Password confirmation mismatch")
+                self.bail("Password confirmation mismatch")
             password = self.password or None
             if not self.user.name and not password:
-                bail("Password required for local system accounts")
+                self.bail("Password required for local system accounts")
         else:
             password = None
         self.user = self.session.User(self.session, **opts)

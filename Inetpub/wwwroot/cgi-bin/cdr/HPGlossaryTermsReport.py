@@ -6,6 +6,7 @@
 from cdrcgi import Controller
 from cdrapi.docs import Doc
 
+
 class Control(Controller):
 
     SUBTITLE = "Health Professional Glossary Terms Report"
@@ -471,7 +472,6 @@ class NameDoc:
             self._root = self.doc.resolved
         return self._root
 
-
     class Name:
         """One of the names in a glossary name document."""
 
@@ -668,7 +668,6 @@ class Definition:
         if with_tail and node.tail is not None:
             pieces.append(node.tail)
         return pieces
-
 
     class PlaceHolder:
         """Object to represent a placeholder in a glossary definition."""

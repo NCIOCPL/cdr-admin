@@ -62,7 +62,7 @@ class Control(Controller):
             else:
                 try:
                     days = int(age)
-                except:
+                except Exception:
                     self.bail("Age must be an integer")
                 today = datetime.date.today()
                 self._start = today - datetime.timedelta(days)

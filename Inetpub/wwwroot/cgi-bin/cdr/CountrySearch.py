@@ -5,6 +5,7 @@
 
 from cdrcgi import AdvancedSearch
 
+
 class CountrySearch(AdvancedSearch):
     """Customize search for this document type."""
 

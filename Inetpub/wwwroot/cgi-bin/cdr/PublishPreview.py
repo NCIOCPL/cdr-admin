@@ -5,11 +5,14 @@
 
 from argparse import ArgumentParser
 from datetime import datetime
+from functools import cached_property
+from json import loads
 from re import search
 from sys import stderr
 from cdrcgi import Controller, DOCID
 from cdrapi.publishing import DrupalClient
 from cdrapi.docs import Doc
+from cdrapi.users import Session
 import cdrpub
 from lxml import etree, html
 from lxml.html import builder
@@ -19,6 +22,7 @@ from cdr import TMP
 
 # TODO: Get Acquia to fix their broken certificates.
 from urllib3.exceptions import InsecureRequestWarning
+# pylint: disable-next=no-member
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
 
@@ -103,7 +107,7 @@ class Control(Controller):
                 self.bail("Required document ID missing")
             try:
                 self._id = Doc.extract_id(id)
-            except:
+            except Exception:
                 self.bail("Invalid ID")
             if self._id <= 0:
                 self.bail("Invalid ID")
@@ -254,7 +258,9 @@ class Summary:
             response = requests.post(url, json=data, verify=False)
             cookies = response.cookies
             self.__control.show_progress("clearing old temp docs...")
-            self.client.remove(-self.doc.id)
+            if isinstance(self.doc.id, int):
+                # pylint: disable-next=invalid-unary-operand-type
+                self.client.remove(-self.doc.id)
             self.__control.show_progress("pushing summary values to Drupal...")
             nid = self.client.push(self.values)
             url = f"{self.client.base}{espanol}/node/{nid}"
@@ -429,7 +435,7 @@ class DIS(Summary):
 class GTN:
     """GlossaryTermName document."""
 
-    MEDIA = "/PublishedContent/Media/CDR/media/"
+    # MEDIA = "/PublishedContent/Media/CDR/media/"
     VENDOR_FILTERS = "set:Vendor GlossaryTerm Set"
     JSON_FILTER = "Glossary Term JSON"
     IMAGE_LOCATION = "[__imagelocation]"
@@ -459,27 +465,71 @@ class GTN:
         "/satelliteLib-5b3dcf1f2676c378b518a1583ef5355acd83cd3d.js"
     )
     SCRIPT = (
-        ("https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js",
-         False),
-        ("https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1"
-         "/jquery-ui.min.js",
-         True),
-        ("https://cdnjs.cloudflare.com/ajax/libs/jplayer/2.9.2"
-         "/jplayer/jquery.jplayer.min.js", False),
-        ("https://cancer.gov/PublishedContent/js/cdeConfig.js", False),
-        ("https://cancer.gov/PublishedContent/js/Common.js", True),
-        ("https://cancer.gov/PublishedContent/js/InnerPage.js", True),
-        ("https://cancer.gov/PublishedContent/js/DictionaryPage.js", True),
+        dict(
+            src="https://code.jquery.com/jquery-3.6.0.min.js",
+            integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=",
+            crossorigin="anonymous",
+        ),
+        dict(
+            src="https://code.jquery.com/ui/1.13.0/jquery-ui.min.js",
+            integrity="sha256-hlKLmzaRlE8SCJC1Kw8zoUbU8BxA+8kR3gseuKfMjxA=",
+            crossorigin="anonymous",
+            defer=None,
+        ),
+        dict(
+            src=(
+                "https://cdnjs.cloudflare.com/ajax/libs/jplayer/2.9.2"
+                "/jplayer/jquery.jplayer.min.js"
+            ),
+        ),
+        dict(
+            src=(
+                "https://www.cancer.gov/app-modules/glossary-app"
+                "/glossary-app.v1.2.2/static/js/main.js"
+            ),
+            defer=None,
+            onload=(
+                "window.GlossaryApp(window.NCI_glossary_app_root_js_config)"
+            ),
+        ),
+        dict(
+            src=(
+                "https://www.cancer.gov/profiles/custom/cgov_site/themes"
+                "/custom/cgov/gcov_common/dist/js/Common.js"
+            ),
+            defer=None,
+        ),
     )
     CSS = (
-        "https://cancer.gov/PublishedContent/Styles/Common.css",
-        "https://cancer.gov/PublishedContent/Styles/InnerPage.css",
-        "/stylesheets/fonts.css",
+        dict(
+            href=(
+                "https://www.cancer.gov/profiles/custom/cgov_site/themes"
+                "/custom/cgov/cgov_common/dist/css/Common.css"
+            ),
+            rel="stylesheet",
+        ),
+        dict(
+            href=(
+                "https://www.cancer.gov/app-modules/glossary-app"
+                "/glossary-app.v1.2.2/static/css/main.css"
+            ),
+            rel="stylesheet",
+        ),
     )
     STYLE = "dl.dictionary-list figure.image-left-medium { float: none; }"
-    STYLE = "div.results { clear: both; }"
+    STYLE = """
+        div.results { clear: both; }
+        dl dt { font-size: 1.75em; } """
     NAV = "LEFT NAV GOES HERE"
-
+    JSFUNC = """
+        function play_en() {
+            var audio = document.getElementById('play-en');
+            audio.play();
+        }
+        function play_es() {
+            var audio = document.getElementById('play-es');
+            audio.play();
+        }"""
 
     def __init__(self, control):
         """Remember the caller's value.
@@ -526,6 +576,19 @@ class GTN:
         """Access to the report parameters and the database."""
         return self.__control
 
+    @cached_property
+    def css_link_attrs(self):
+        """Possibly overriden CDN links for CSS files."""
+
+        query = self.control.Query("ctl", "val")
+        query.where("grp = 'cdn'")
+        query.where("name = 'pp-gtn-css'")
+        query.where("inactivated IS NULL")
+        row = query.execute(self.control.cursor).fetchone()
+        if row:
+            return loads(row.val)
+        return self.CSS
+
     @property
     def doc(self):
         """`Doc` object for the version to be previewed."""
@@ -556,14 +619,20 @@ class GTN:
             self._head.append(fonts)
             for name, content in self.META:
                 self._head.append(self.B.META(name=name, content=content))
-            for url in self.CSS:
-                self._head.append(self.B.LINK(href=url, rel="stylesheet"))
-            for url, defer in self.SCRIPT:
-                script = self.B.SCRIPT(src=url, type="text/javascript")
-                if defer:
-                    script.set("defer")
-                self._head.append(script)
+            for attrs in self.css_link_attrs:
+                element = self.B.LINK()
+                for key, value in attrs.items():
+                    element.set(key, value)
+                if "rel" not in attrs:
+                    element.set("rel", "stylesheet")
+                self._head.append(element)
+            for attrs in self.script_link_attrs:
+                element = self.B.SCRIPT()
+                for key, value in attrs.items():
+                    element.set(key, value)
+                self._head.append(element)
             self._head.append(self.B.STYLE(self.STYLE))
+            self._head.append(self.B.SCRIPT(self.JSFUNC))
         return self._head
 
     @property
@@ -600,7 +669,7 @@ class GTN:
                     self.B.DIV(
                         self.B.DIV(
                             self.B.DIV(
-                                *self.results,
+                                *self.results,  # What does '*' do here???
                                 self.B.CLASS("slot-item last-SI"),
                             ),
                             id="cgvBody",
@@ -645,11 +714,21 @@ class GTN:
             self._root = result.result_tree.getroot()
         return self._root
 
+    @cached_property
+    def script_link_attrs(self):
+        query = self.control.Query("ctl", "val")
+        query.where("grp = 'cdn'")
+        query.where("name = 'pp-gtn-js'")
+        query.where("inactivated IS NULL")
+        row = query.execute(self.control.cursor).fetchone()
+        if row:
+            return loads(row.val)
+        return self.SCRIPT
+
     @property
     def title(self):
         """String for the head's title element."""
         return f"Publish Preview: CDR{self.doc.id}"
-
 
     class Result:
         """Portion of the display specific to one language."""
@@ -666,7 +745,7 @@ class GTN:
             self.__language = language
 
         @property
-        def audio(self):
+        def audio_old(self):
             """Media link for the term's pronunciation in this language."""
 
             if self.audio_url:
@@ -676,6 +755,36 @@ class GTN:
                     B.CLASS("CDR_audiofile"),
                     href=self.audio_url,
                     type="ExternalLink",
+                )
+            return None
+
+        @property
+        def audio(self):
+            """Media link for the term's pronunciation in this language.
+               This needs to be an audio tag combined with a button to press"""
+
+            if self.audio_url:
+                B = self.term.B
+                return B.DIV(
+                    B.E(
+                        "audio",
+                        B.CLASS("CDR_audiofile"),
+                        id=f"play-{self.langcode}",
+                        type="audio/mpeg",
+                        src=self.audio_url,
+                    ),
+                    B.E(
+                        "button",
+                        B.SPAN(
+                            "Listen to pronunciation",
+                            B.CLASS("show-for-sr")
+                        ),
+                        " ",
+                        B.CLASS("btnAudio"),
+                        onClick=f"play_{self.langcode}()",
+                        type="button",
+                    ),
+                    B.CLASS("pronunciation__audio"),
                 )
             return None
 
@@ -708,9 +817,46 @@ class GTN:
                 if self.langcode == "es":
                     name = "SpanishTermDefinition"
                 for node in self.term.root.findall(f"{name}/DefinitionText"):
-                    text = Doc.get_text(node, "").strip()
+                    # Definition with inline markup
+                    # A glossary definition may contain the following inline
+                    # markup elements: GeneName, ScientificName, Emphasis,
+                    # ForeignWord, strong, or ExternalRef. We're building the
+                    # individual element objects and concatenating them to be
+                    # displayed within the DD element.
+                    # =======================================================
+                    if len(node):  # Definition includes inline markup
+                        text = []
+                        for element in node.iter():
+                            if element.tag == 'Emphasis':
+                                text.append(B.EM(element.text))
+                            elif element.tag == 'ForeignWord':
+                                text.append(B.EM(element.text,
+                                                 B.CLASS("foreign-word")))
+                            elif element.tag == 'GeneName':
+                                text.append(B.EM(element.text,
+                                                 B.CLASS("gene-name")))
+                            elif element.tag == 'ScientificName':
+                                text.append(B.EM(element.text,
+                                                 B.CLASS("scientific-name")))
+                            elif element.tag == 'Strong':
+                                text.append(B.B(element.text))
+                            elif element.tag == 'ExternalRef':
+                                attributes = element.attrib
+                                text.append(B.A(element.text,
+                                                href=attributes['xref']))
+                            else:
+                                text.append(element.text)
+                            if element.tail:
+                                text.append(element.tail)
+                    # No inline markup
+                    else:          # Definition is plain text
+                        text = Doc.get_text(node, "").strip()
+
                     if text:
-                        dd = B.DD(text, B.BR(), B.CLASS("definition"))
+                        if isinstance(text, list):
+                            dd = B.DD(*text, B.BR(), B.CLASS("definition"))
+                        else:
+                            dd = B.DD(text, B.BR(), B.CLASS("definition"))
                         related = self.related
                         if related is not None:
                             dd.append(self.related)
@@ -828,7 +974,8 @@ class GTN:
             if audio is not None:
                 children = [audio]
             if self.key:
-                children.append(f" {self.key}")
+                children.append(B.DIV(f" {self.key}",
+                                      B.CLASS("pronunciation__key")))
             return B.DD(*children, B.CLASS("pronunciation"))
 
         @property
@@ -921,7 +1068,6 @@ class GTN:
                             self._videos.append(self.Video(self, node))
             return self._videos
 
-
         class Image:
             """Images associated with this glossary term."""
 
@@ -999,7 +1145,7 @@ class GTN:
                 if not hasattr(self, "_id"):
                     try:
                         self._id = Doc.extract_id(self.__node.get("ref"))
-                    except:
+                    except Exception:
                         self._id = None
                 return self._id
 
@@ -1027,7 +1173,6 @@ class GTN:
                     else:
                         self._suffix = "jpg"
                 return self._suffix
-
 
         class Ref:
             """Link to a related resource."""
@@ -1081,9 +1226,8 @@ class GTN:
                         self._url = f"PublishPreview.py?{DOCID}={href}"
                     else:
                         url = self.__node.get("url", "")
-                        self._url = f"https://cancer.gov{url}"
+                        self._url = f"https://www.cancer.gov{url}"
                 return self._url
-
 
         class Video:
             """Embedded video for the glossary term."""

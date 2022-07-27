@@ -1,0 +1,12 @@
+.form-title { text-align: center; }
+.sticky { position: sticky; top: 0; }
+table { margin: 2rem auto; }
+table, tbody, .cb-row { background-color: #e8e8e8; }
+.cb-row th {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+    text-align: left;
+    background-color: #e8e8e8;
+    border-left: none;
+    border-right: none;
+}

@@ -5,7 +5,8 @@
 
 from json import loads
 from cdrcgi import Controller, bail, navigateTo
-from cdrapi.docs import Doc, FilterSet
+from cdrapi.docs import FilterSet
+
 
 class Control(Controller):
     """Processing control logic for managing filter sets."""
@@ -98,7 +99,6 @@ class Control(Controller):
     def save(self):
         """Save the new or modified filter set."""
 
-        original_name = self.set.name
         opts = dict(
             name=self.name,
             description=self.description,

@@ -7,6 +7,7 @@ from lxml import html
 from cdrcgi import Controller
 from cdrapi.docs import Doc
 
+
 class Control(Controller):
     """Logic for creating the report."""
 
@@ -57,7 +58,6 @@ class Control(Controller):
                 rows = []
                 for member in self.members:
                     rows.append(member.row)
-                #self.bail(f"{len(rows)} rows")
                 opts["caption"] = self.caption
                 return self.Reporter.Table(rows, **opts)
             tables = []
@@ -218,7 +218,7 @@ class Board:
     CURRENT_PATH = f"{DETAILS}/CurrentMember"
     TERM_START_PATH = f"{DETAILS}/TermStartDate"
     GOVT_EMPLOYEE_PATH = "/PDQBoardMemberInfo/GovernmentEmployee"
-    PERSON_PATH = f"/PDQBoardMemberInfo/BoardMemberName/@cdr:ref"
+    PERSON_PATH = "/PDQBoardMemberInfo/BoardMemberName/@cdr:ref"
     IACT = "Integrative, Alternative, and Complementary Therapies"
     FULL_FIELDS = (
         "m.doc_id AS member_id",
@@ -290,7 +290,6 @@ class Board:
                 members.append(self.Member(self, row))
             self._members = sorted(members)
         return self._members
-
 
     class Member:
         """Member of a PDQ board."""

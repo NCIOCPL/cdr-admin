@@ -1,19 +1,20 @@
 #!/usr/bin/env python
 
-#----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 # Show all of the top-level parameters used by CDR filters.  Useful
 # for XSL/T script writers who want to avoid conflicting uses of the
 # same parameter names across more than one script, which might be
 # invoked as a set (the CdrFilter command expects all of the parameters
 # supplied for the command to be applicable to all filters named by
 # the command).
-#----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 
 from lxml import etree
 from lxml.html import builder
 from cdrapi import db
 
 TITLE = "Global Filter Parameters"
+
 
 class Filter:
     def __init__(self, doc_id, doc_title, doc_xml):
@@ -31,17 +32,21 @@ class Filter:
                     parameter = Parameter(name)
                     Parameter.parameters[name] = parameter
                 parameter.filters.append(self)
+
     def make_cells(self):
         return (
             builder.TD("CDR%010d" % self.doc_id),
             builder.TD(self.doc_title)
         )
 
+
 class Parameter:
     parameters = {}
+
     def __init__(self, name):
         self.name = name
         self.filters = []
+
     def add_rows(self, tbody):
         name = builder.TH(self.name)
         if len(self.filters) > 1:
@@ -50,6 +55,7 @@ class Parameter:
         tbody.append(row)
         for f in self.filters[1:]:
             tbody.append(builder.TR(*f.make_cells()))
+
 
 def main():
     cursor = db.connect(user="CdrGuest").cursor()
@@ -74,6 +80,7 @@ def main():
     )
     print("Content-type: text/html\n")
     print(etree.tostring(page, pretty_print=True).decode("ascii"))
+
 
 if __name__ == "__main__":
     main()

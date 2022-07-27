@@ -5,6 +5,7 @@
 
 from cdrcgi import Controller
 
+
 class Control(Controller):
     """Script logic."""
 
@@ -68,6 +69,7 @@ fieldset dd.col { color: blue; font-size: 10pt; font-style: normal; }""")
             self.LOG_OUT,
         )
 
+
 class Database:
     """Database to be cataloged."""
 
@@ -130,7 +132,6 @@ class Database:
             rows = query.execute(self.cursor).fetchall()
             self._views = [self.Table(self, row.name) for row in rows]
         return self._views
-
 
     class Table:
         """Table or view information."""
@@ -205,7 +206,6 @@ class Database:
         def schema(self):
             """String for the name of the schema table for this database."""
             return self.database.schema
-
 
         class Column:
             """Column in a database table."""

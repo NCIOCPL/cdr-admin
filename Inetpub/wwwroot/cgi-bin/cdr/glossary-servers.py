@@ -56,8 +56,6 @@ class Control(Controller):
         fieldset.append(ul)
         page.form.append(fieldset)
         counter = 1
-        a_opts = dict(label="Alias", classes="alias")
-        u_opts = dict(label="URL")
         for alias in sorted(servers):
             fieldset = page.fieldset("Server")
             fieldset.set("class", "server-block")
@@ -84,7 +82,7 @@ class Control(Controller):
 
         if not self.session.can_do(self.ACTION):
             self.logger.error("Denied for session %r", self.session)
-            cdrcgi.bail("You do not have {!r} permission".format(self.ACTION))
+            self.bail("You do not have {!r} permission".format(self.ACTION))
         num_servers = int(self.fields.getvalue("num-servers"))
         old = getControlGroup(self.GROUP)
         new = dict()
@@ -95,13 +93,13 @@ class Control(Controller):
             alias = self.fields.getvalue(f"alias-{i:d}")
             if url and alias:
                 if alias in new:
-                    cdrcgi.bail(f"Duplicate alias {alias!r}")
+                    self.bail(f"Duplicate alias {alias!r}")
                 if not url.startswith("http"):
-                    cdrcgi.bail(f"{url!r} is not an HTTP URL")
+                    self.bail(f"{url!r} is not an HTTP URL")
                 url = url.strip("/")
                 key = url.lower()
                 if key in urls:
-                    cdrcgi.bail("f{key!r} appears more than once")
+                    self.bail("f{key!r} appears more than once")
                 urls.add(key)
                 new[alias] = url
             i += 1

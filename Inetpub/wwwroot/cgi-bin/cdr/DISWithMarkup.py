@@ -8,10 +8,14 @@ from cdrcgi import Controller, Reporter, bail
 from cdrapi import db
 from cdrapi.docs import Doc
 
+
 class Control(Controller):
     """Top-level logic for the report."""
 
-    TYPES = "publish", "approved", "proposed", "rejected"
+    # The bogus revision level type of "other" is added to catch
+    # the situation when Insertion/Deletion markup has been added
+    # without a valid (i.e. None) revision level
+    TYPES = "publish", "approved", "proposed", "rejected", "other"
     SUBTITLE = "Drug Summaries with Markup"
     DOCTYPE = "DrugInformationSummary"
     TODAY = date.today().strftime("%B %d, %Y")
@@ -80,7 +84,7 @@ class Summary:
         doc = Doc(control.session, id=doc_id)
         for tag in self.TAGS:
             for node in doc.root.iter(tag):
-                self.__counts[node.get("RevisionLevel")] += 1
+                self.__counts[node.get("RevisionLevel", "other")] += 1
 
     @property
     def id(self):

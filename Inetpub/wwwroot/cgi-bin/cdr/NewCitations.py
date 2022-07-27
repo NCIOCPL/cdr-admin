@@ -63,7 +63,7 @@ class Control(Controller):
         try:
             end = self.fields.getvalue("end")
             return self.parse_date(end)
-        except:
+        except Exception:
             self.logger.exception("invalid end date")
             self.bail("Invalid ending date")
 
@@ -74,7 +74,7 @@ class Control(Controller):
         try:
             start = self.fields.getvalue("start")
             return self.parse_date(start)
-        except:
+        except Exception:
             self.logger.exception("invalid start date")
             self.bail("Invalid starting date")
 
@@ -100,7 +100,6 @@ class Control(Controller):
         if self.start:
             subquery.where(f"c.dt >= '{self.start}'")
         if self.end:
-            end = f"{self.end} 23:59:59"
             subquery.where(f"c.dt <= '{self.end} 23:59:59'")
         subquery.group("d.id", "c.dt", "c.usr")
         subquery.alias("t")

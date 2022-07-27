@@ -1,21 +1,21 @@
 #!/usr/bin/env python
 
-#----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 # Collect settings from this tier as JSON.
 # OCECDR-4101
-#----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 import cgi
 import hashlib
 import json
 import os
 import sys
-import pkg_resources
 import lxml.etree as etree
-import requests
 import cdr
 import cdrcgi
 from cdrapi import db
 from cdrapi.settings import Tier
+from importlib.metadata import packages_distributions, version
+
 
 class Settings:
     TIER = Tier()
@@ -24,17 +24,18 @@ class Settings:
     WD = cdr.WORK_DRIVE
     WEBCONFIG_ROOT = f"{WD}:/Inetpub/wwwroot/web.config"
     WEBCONFIG_SECURE = f"{WD}:/Inetpub/wwwroot/cgi-bin/secure/web.config"
-    WEBCONFIG_GLOSSIFIER = f"{WD}:/cdr/Glossifier/cgi-bin/web.config"
+    WEBCONFIG_API = f"{WD}:/cdr/api/web.config"
 
     def __init__(self, session):
         self.session = session
         try:
-            with open(f"self.TIER.etc/cdrenv.rc") as fp:
+            with open(f"{self.TIER.etc}/cdrenv.rc") as fp:
                 self.org = fp.read().strip()
-        except:
+        except Exception:
             self.org = "CBIIT"
         self.tier = self.TIER.name
         self.windows = self.get_windows_settings()
+
     def get_iis_settings(self):
         return {
             "account": cdr.run_command("whoami").stdout.strip(),
@@ -42,12 +43,14 @@ class Settings:
             "web.config": {
                 "root": self.xmltojson(self.WEBCONFIG_ROOT),
                 "secure": self.xmltojson(self.WEBCONFIG_SECURE),
-                "glossifier": self.xmltojson(self.WEBCONFIG_GLOSSIFIER),
+                "api": self.xmltojson(self.WEBCONFIG_API),
             }
         }
+
     def xmltojson(self, path):
         root = etree.parse(path).getroot()
-        return { root.tag: self.extract_node(root) }
+        return {root.tag: self.extract_node(root)}
+
     def extract_node(self, node):
         children = {}
         for key in node.keys():
@@ -60,9 +63,11 @@ class Settings:
             if len(children[name]) == 1:
                 children[name] = children[name][0]
         return children
+
     def get_windows_settings(self):
+        # pylint: disable-next=no-member
         winver = sys.getwindowsversion()
-        settings = { "version": {} }
+        settings = dict(version={})
         for name in ("major", "minor", "build", "platform", "service_pack"):
             settings["version"][name] = getattr(winver, name, "")
         settings["environ"] = dict(os.environ)
@@ -104,6 +109,7 @@ class Settings:
         self.walk(files, f"{self.WD}:/cdr/Licensee")
         self.walk(files, f"{self.WD}:/Inetpub/wwwroot")
         return files
+
     def walk(self, files, path):
         for path, dirs, filenames in os.walk(path):
             if "__pycache__" in path:
@@ -116,6 +122,7 @@ class Settings:
                 directory = directory[name]
             for name in filenames:
                 self.add_file(path, name, directory)
+
     def add_file(self, path, name, files):
         try:
             path = "%s/%s" % (path, name)
@@ -125,17 +132,18 @@ class Settings:
             md5 = hashlib.md5()
             md5.update(bytes)
             md5 = md5.hexdigest().lower()
-        except Exception as e:
+        except Exception:
             md5 = "unreadable"
         files[name] = md5
 
     def get_python_settings(self):
-        env = pkg_resources.Environment()
+        distributions = packages_distributions()
         settings = dict(python=sys.version)
-        for name in env:
-            for package in env[name]:
-                settings[package.project_name] = package.version
+        for name in distributions:
+            for package in distributions[name]:
+                settings[package] = version(package)
         return settings
+
     def get_mssql_settings(self):
         cursor = db.connect().cursor()
         cursor.execute("EXEC sp_server_info")
@@ -143,12 +151,16 @@ class Settings:
         for attr_id, attr_name, attr_value in cursor.fetchall():
             settings[attr_name] = attr_value
         return settings
+
     def serialize(self):
         return json.dumps({
             "windows": self.windows,
         }, indent=2)
+
     def run(self):
         print(f"Content-type: application/json\n\n{self.serialize()}")
+
+
 if __name__ == "__main__":
     fields = cgi.FieldStorage()
     session = cdrcgi.getSession(fields)

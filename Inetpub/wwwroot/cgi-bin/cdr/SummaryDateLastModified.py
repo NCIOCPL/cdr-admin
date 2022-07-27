@@ -40,7 +40,7 @@ class Control(Controller):
             field_name = f"{language[0].lower()}st"
             classes = f"{field_name}-individual"
             fieldset = page.fieldset(language)
-            opts = dict(value="all", checked=language=="English")
+            opts = dict(value="all", checked=language == "English")
             fieldset.append(page.checkbox(field_name, **opts))
             for name, id in boards:
                 opts = dict(value=id, label=name, classes=classes)
@@ -389,7 +389,7 @@ class Control(Controller):
 
         if not hasattr(self, "_workbook"):
             self._workbook = Excel(self.SUBTITLE, wrap=True, stamp=True)
-            sheet = self._workbook.add_sheet("DLM Report")
+            self._workbook.add_sheet("DLM Report")
         return self._workbook
 
 

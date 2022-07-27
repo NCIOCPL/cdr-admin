@@ -43,7 +43,7 @@ class Control(Controller):
         fieldset = page.fieldset("Choose Tiers and Click the 'Compare' Button")
         opts = dict(options=self.TIERS, default=self.session.tier.name)
         if self.session.tier.name == "PROD":
-            default = "DEV"
+            opts["default"] = "DEV"
         fieldset.append(page.select("lower", **opts))
         opts["default"] = "PROD"
         fieldset.append(page.select("upper", **opts))
@@ -83,7 +83,6 @@ fieldset { width: 1024px; }
             method=self.method,
         )
         page = self.HTMLPage(self.title, **opts)
-        diffs = False
         only_lower = lower - upper
         only_upper = upper - lower
         if only_lower:

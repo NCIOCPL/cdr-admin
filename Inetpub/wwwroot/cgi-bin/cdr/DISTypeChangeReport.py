@@ -39,7 +39,6 @@ class Control(Controller):
         "Copy and paste the complete set of CDR IDs into the CDR ID field."
     )
 
-
     def build_tables(self):
         """Assemble the table(s) for the report.
 
@@ -58,8 +57,8 @@ class Control(Controller):
         if self.type == self.CURRENT:
             caption = "Type of Change Report (Most Recent Change)"
         elif self.organization == self.BY_SUMMARY:
-            caption = "Type of Change Report (All Changes by Drug Info Summary)"
-            caption = caption, self.date_range
+            first = "Type of Change Report (All Changes by Drug Info Summary)"
+            caption = first, self.date_range
         else:
             tables = self.change_type_tables
         if tables is None:
@@ -71,7 +70,8 @@ class Control(Controller):
             table_rows = []
             for row in rows:
                 cells = [
-                    self.Reporter.Cell(row[0], href=f"QcReport.py?DocId={row[0]}")
+                    self.Reporter.Cell(row[0],
+                                       href=f"QcReport.py?DocId={row[0]}")
                 ]
                 cells += row[1:]
                 table_rows.append(cells)
@@ -95,7 +95,6 @@ class Control(Controller):
         self.report.page.add_css("th { background-color: lightgrey; }")
         self.report.send(self.format)
 
-
     def populate_form(self, page, titles=None):
         """Put the fields on the form.
 
@@ -109,12 +108,13 @@ class Control(Controller):
         fieldset = page.fieldset("Instructions")
         fieldset.append(page.B.P(self.INSTRUCTIONS[0],
                         page.B.BR(),
-                        page.B.A(self.INSTRUCTIONS[1], href=self.INSTRUCTIONS[2]),
+                        page.B.A(self.INSTRUCTIONS[1],
+                                 href=self.INSTRUCTIONS[2]),
                         page.B.BR(), self.INSTRUCTIONS[3]))
         page.form.append(fieldset)
 
         page.form.append(page.hidden_field("debug", self.debug or ""))
-        opts = { "titles": titles, "id-label": "CDR ID(s)" }
+        opts = {"titles": titles, "id-label": "CDR ID(s)"}
         opts["id-tip"] = "separate multiple IDs with spaces"
         self.add_dis_selection_fields(page, **opts)
 
@@ -165,7 +165,6 @@ $(function() {
     check_type($("input[name='type']:checked").val());
 });""")
 
-
     def add_dis_selection_fields(self, page, **kwopts):
         """
         Display the fields used to specify which DIS should be
@@ -196,16 +195,15 @@ $(function() {
             nothing (the form object is populated as a side effect)
         """
 
-        #--------------------------------------------------------------
+        # --------------------------------------------------------------
         # Show the second stage in a cascading sequence of the form if we
         # have invoked this method directly from build_tables(). Widen
         # the form to accomodate the length of the title substrings
         # we're showing.
-        #--------------------------------------------------------------
+        # --------------------------------------------------------------
         titles = kwopts.get("titles")
         if titles:
             page.form.append(page.hidden_field("selection_method", "id"))
-            #page.form.append(page.hidden_field("format", self.format))
             fieldset = page.fieldset("Choose Drug Info Summary")
             page.add_css("fieldset { width: 600px; }")
             for t in titles:
@@ -240,7 +238,6 @@ $(function() {
             page.form.append(fieldset)
             page.add_script(self.summary_selection_js)
 
-
     @property
     def all_dis_types(self):
         """Valid type of change values parsed from the Drug schema."""
@@ -259,7 +256,7 @@ $(function() {
             for word in self.fields.getvalue("cdr-id", "").strip().split():
                 try:
                     self._cdr_ids.add(Doc.extract_id(word))
-                except:
+                except Exception:
                     self.bail("Invalid format for CDR ID")
         return self._cdr_ids
 
@@ -268,7 +265,7 @@ $(function() {
         """Report each type of change in its own table."""
 
         if not hasattr(self, "_change_type_tables"):
-            opts = { "html_callback_pre": Control.table_spacer }
+            opts = {"html_callback_pre": Control.table_spacer}
             tables = []
             title = "Type of Change Report"
             range = self.date_range
@@ -444,7 +441,7 @@ $(function() {
 
         If the user chooses the "by drug info summary title" method for
         selecting which document to use for the report, and the
-        fragment supplied matches more than one document, display the 
+        fragment supplied matches more than one document, display the
         form a second time so the user can pick the correct document.
         """
 
@@ -466,12 +463,6 @@ $(function() {
                 self._dis_docs = [Summary(self, id) for id in self.cdr_ids]
             else:
                 self.bail("Invalid selection_method")
-#               query = self.Query("active_doc d", "d.id")
-#               query.join("query_term_pub a", "a.doc_id = d.id")
-#               query.join("query_term_pub l", "l.doc_id = d.id")
-#               query.join("query_term_pub b", "b.doc_id = d.id")
-#               rows = query.unique().execute(self.cursor).fetchall()
-#               self._dis_docs = [Summary(self, row.id) for row in rows]
         return self._dis_docs
 
     @property
@@ -511,41 +502,6 @@ $(function() {
                         dis = DISTitle(doc_id, title)
                     self._dis_titles.append(dis)
         return self._dis_titles
-
-
-#   @property
-#   def dis(self):
-#       """PDQ summaries selected for the report.
-
-#       If the user chooses the "by summary title" method for
-#       selecting which summary to use for the report, and the
-#       fragment supplied matches more than one summary document,
-#       display the form a second time so the user can pick the
-#       summary.
-#       """
-
-#       if not hasattr(self, "_dis"):
-#           if self.selection_method == "title":
-#               if not self.fragment:
-#                   self.bail("Title fragment is required.")
-#               titles = self.summary_titles
-#               if not titles:
-#                   self.bail("No DIS match that title fragment")
-#               if len(titles) == 1:
-#                   self._dis = [Summary(self, titles[0].id)]
-#               else:
-#                   self.populate_form(self.form_page, titles)
-#                   self.form_page.send()
-#           #elif self.selection_method == "id":
-#           else:
-#               if not self.cdr_ids:
-#                   self.bail("At least one CDR ID is required.")
-#               self._dis = [Summary(self, id) for id in self.cdr_ids]
-##            else:
-##                query = self.Query("active_doc d", "d.id")
-##                rows = query.execute(self.cursor).fetchall()
-##                self._summaries = [Summary(self, row.id) for row in rows]
-#       return self._summaries
 
     @property
     def today(self):
@@ -729,7 +685,6 @@ class Summary:
         if nchanges > 0:
             return [tuple(row)]
         return []
-
 
     class Change:
         """

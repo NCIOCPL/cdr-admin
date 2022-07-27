@@ -3,6 +3,7 @@
 """Filter CDR documents.
 """
 
+from functools import cached_property
 from lxml import etree
 from cdrapi.docs import Doc, FilterSet
 from cdrcgi import Controller, DOCID
@@ -45,15 +46,14 @@ class Control(Controller):
             self.report.page.add_css(self.CSS)
         self.report.send(self.format)
 
-
-    def current_set_members(self, current_set):
+    def get_member_sets(self, set_name):
         """Extract the names of filter sets that are member of the
-           current filter set
+           named filter set
 
            Returns a list of filter set names up to two levels down"""
 
         sub_sets = []
-        for member in getFilterSet(self.session, current_set).members:
+        for member in getFilterSet(self.session, set_name).members:
             if isinstance(member.id, int):
                 sub_sets.append(member.name)
                 # If we're using filter sets more than 3 levels deep we
@@ -63,222 +63,169 @@ class Control(Controller):
                         sub_sets.append(member2.name)
         return sub_sets
 
-
-    @property
+    @cached_property
     def all_filter_ids(self):
         """Set of integers for the Filter documents in the system."""
+        return {id for id in self.all_filters.values()}
 
-        if not hasattr(self, "_all_filter_ids"):
-            self._all_filter_ids = {id for id in self.all_filters.values()}
-        return self._all_filter_ids
-
-    @property
+    @cached_property
     def all_filter_sets(self):
         """Dictionary of filter set IDs indexed by normalized title."""
 
-        if not hasattr(self, "_all_filter_sets"):
-            self._all_filter_sets = {}
-            for id, name in FilterSet.get_filter_sets(self.session):
-                self._all_filter_sets[name.upper()] = id
-        return self._all_filter_sets
+        filter_sets = {}
+        for id, name in FilterSet.get_filter_sets(self.session):
+            filter_sets[name.upper()] = id
+        return filter_sets
 
-    @property
+    @cached_property
     def all_filters(self):
         """Dictionary of filter IDs indexed by normalized title."""
 
-        if not hasattr(self, "_all_filters"):
-            self._all_filters = {}
-            for filter in FilterSet.get_filters(self.session):
-                self._all_filters[filter.title.upper()] = filter.id
-        return self._all_filters
+        filters = {}
+        for filter in FilterSet.get_filters(self.session):
+            filters[filter.title.upper()] = filter.id
+        return filters
 
-    @property
+    @cached_property
     def audiences(self):
         """Audience(s) selected for glossary definitions."""
 
-        if not hasattr(self, "_audiences"):
-            self._audiences = []
-            for audience in ("patient", "hp"):
-                if self.fields.getvalue(f"gloss{audience}") == "true":
-                    self._audiences.append(audience)
-        return self._audiences
+        audiences = []
+        for audience in ("patient", "hp"):
+            if self.fields.getvalue(f"gloss{audience}") == "true":
+                audiences.append(audience)
+        return audiences
 
-    @property
+    @cached_property
     def boards(self):
         """Editorial and/or advisory PDQ boards."""
 
-        if not hasattr(self, "_boards"):
-            self._boards = []
-            for board in ("editorial", "advisory"):
-                if self.fields.getvalue(board) == "true":
-                    self._boards.append(f"{board}-board")
-        return self._boards
+        boards = []
+        for board in ("editorial", "advisory"):
+            if self.fields.getvalue(board) == "true":
+                boards.append(f"{board}-board")
+        return boards
 
-    @property
+    @cached_property
     def comments(self):
         """(I)nternal, (E)xternal, (A)ll, or (N)one."""
 
-        if not hasattr(self, "_comments"):
-            self._comments = "N"
-            if self.fields.getvalue("internal") == "true":
-                self._comments = "I"
-            if self.fields.getvalue("external") == "true":
-                self._comments = "A" if self.comments == "I" else "E"
-        return self._comments
+        comments = "N"
+        if self.fields.getvalue("internal") == "true":
+            comments = "I"
+        if self.fields.getvalue("external") == "true":
+            comments = "A" if comments == "I" else "E"
+        return comments
 
-    @property
+    @cached_property
     def doc(self):
         """`Doc` object for the CDR document to be filtered."""
 
-        if not hasattr(self, "_doc"):
-            id = self.fields.getvalue(DOCID)
-            if not id:
-                self.bail("No document selected")
-            try:
-                id = Doc.extract_id(id)
-            except Exception:
-                self.bail("Unrecognized document ID format")
-            version = self.fields.getvalue("DocVer", "0")
+        id = self.fields.getvalue(DOCID)
+        if not id:
+            self.bail("No document selected")
+        try:
+            id = Doc.extract_id(id)
+        except Exception:
+            self.bail("Unrecognized document ID format")
+        version = self.fields.getvalue("DocVer", "0")
 
-            # If no version is specified the default version is the CWD
-            # which is indicated with a version=None.  Need to allow
-            # "None" as a valid value.
-            allowed = "None", "last", "lastp"
-            if not version.isdigit() and version not in allowed:
-                self.bail(f"Invalid version {version!r}")
-            self._doc = Doc(self.session, id=id, version=version)
-        return self._doc
+        # If no version is specified the default version is the CWD
+        # which is indicated with a version=None.  Need to allow
+        # "None" as a valid value.
+        allowed = "None", "last", "lastp"
+        if not version.isdigit() and version not in allowed:
+            self.bail(f"Invalid version {version!r}")
+        return Doc(self.session, id=id, version=version)
 
-    @property
+    @cached_property
     def dtd(self):
         """Object for validating the filtered CDR document."""
 
-        if not hasattr(self, "_dtd"):
-            path = self.fields.getvalue("newdtd", DEFAULT_DTD)
-            if "/" not in path and "\\" not in path:
-                path = f"{PDQDTDPATH}/{path}"
-            try:
-                with open(path) as fp:
-                    self._dtd = etree.DTD(fp)
-            except Exception as e:
-                self.logger.exception("Failure loading %s", path)
-                self.bail("Failure loading {path}: {e}")
-        return self._dtd
+        path = self.fields.getvalue("newdtd", DEFAULT_DTD)
+        if "/" not in path and "\\" not in path:
+            path = f"{PDQDTDPATH}/{path}"
+        try:
+            with open(path) as fp:
+                return etree.DTD(fp)
+        except Exception as e:
+            self.logger.exception("Failure loading %s", path)
+            self.bail(f"Failure loading {path}: {e}")
 
-    @property
+    @cached_property
     def filter_ids(self):
         """CDR document IDs for filters selected directly for this report."""
+        return {s.filter_id for s in self.filter_specs if s.filter_id}
 
-        if not hasattr(self, "_filter_ids"):
-            specs = self.filter_specs
-            self._filter_ids = {s.filter_id for s in specs if s.filter_id}
-        return self._filter_ids
-
-    @property
+    @cached_property
     def filter_result(self):
         """Object with the result_tree, warning messages, and errors."""
 
-        if not hasattr(self, "_filter_result"):
-            specs = [spec.identifier for spec in self.filter_specs]
-            try:
-                self._filter_result = self.doc.filter(*specs, parms=self.parms)
-            except Exception as e:
-                self.logger.exception("filtering %s", self.doc.cdr_id)
-                self.bail(f"failure filtering {self.doc.cdr_id}: {e}")
-        return self._filter_result
+        specs = [spec.identifier for spec in self.filter_specs]
+        try:
+            return self.doc.filter(*specs, parms=self.parms)
+        except Exception as e:
+            self.logger.exception("filtering %s", self.doc.cdr_id)
+            self.bail(f"failure filtering {self.doc.cdr_id}: {e}")
 
-    @property
+    @cached_property
     def filter_set_table(self):
-        """Table showing the filter sets relevant to this filtering job.
+        """Table showing the filter sets relevant to this filtering job."""
 
-        Show the user the filter sets that contain the selected
-        filter(s). Skip over named sets specified by the user.
-        """
+        # If no filters or sets were specified, we behave as if the
+        # "QC Filter Sets" button had been clicked. If there are
+        # filters and/or filter sets identified, and the button was
+        # not clicked, nothing to do here.
+        if self.filter_specs:
+            if self.fields.getvalue("qcFilterSets") != "Y":
+                return None
 
-        if not hasattr(self, "_filter_set_table"):
-            table_requested = self.fields.getvalue("qcFilterSets") == "Y"
+        # Show the sets named by the user, as well as sets which contain
+        # the users's sets.
+        user_sets = [s.set_name for s in self.filter_specs if s.set_name]
+        if user_sets:
+            rows = []
+            for resolved_set in self.resolved_filter_sets:
+                for name in user_sets:
+                    if name == resolved_set.name:
+                        rows.append(resolved_set.row)
+                    elif name in self.get_member_sets(resolved_set.name):
+                        rows.append(resolved_set.row)
 
-            if table_requested or not self.filter_specs:
-                columns = "Set Name", "Action", "Set Detail"
-                rows = []
-                # Step through all filter sets and decide which ones need
-                # to be displayed
-                for filter_set in self.resolved_filter_sets:
-                    # Filter IDs and filter names use the in_scope attribute
-                    if not self.contains_filter_set and filter_set.in_scope:
-                        rows.append(filter_set.row)
-                    # Filter sets need to be checked differently
-                    elif self.contains_filter_set:
-                        # Stepping through the entered input. If both,
-                        # a filter name and filter set have been specified,
-                        # only the related filter sets will be included.
-                        for input_set in self.filter_specs:
-                            # Adding the filter set itself
-                            # The set name is the first element of the row content.
-                            if (input_set.set_name and
-                                  input_set.set_name == filter_set.row[0]):
-                                rows.append(filter_set.row)
-                            # Adding all filter sets containing this set
-                            elif (input_set.set_name and
-                                  input_set.set_name in
-                                  self.current_set_members(filter_set.row[0])):
-                                rows.append(filter_set.row)
+        # If the user didn't name any sets, show the sets which match the
+        # filters the user specified.
+        else:
+            rows = [s.row for s in self.resolved_filter_sets if s.in_scope]
 
-                # Display an error message for sets or filter names
-                # We typically won't see this error because a missing or misspelled
-                # filter or filter set will be caught prior to this.
-                if not rows:
-                    if self.contains_filter_set:
-                        columns = ["Filter set doesn't exist"]
-                    else:
-                        columns = ["No filter sets include all selected filters"]
-                opts = dict(columns=columns)
-                self._filter_set_table = self.Reporter.Table(rows, **opts)
+        # Assemble the table.
+        if rows:
+            columns = "Set Name", "Action", "Set Detail"
+        else:
+            if user_sets:
+                columns = ["Specified filter sets not found"]
             else:
-                self._filter_set_table = None
-        return self._filter_set_table
+                columns = ["No filter sets include all selected filters"]
+        return self.Reporter.Table(rows, columns=columns)
 
-    @property
-    def contains_filter_set(self):
-        """Testing if the input includes a filter set (True) or
-           only filter IDs or filter names (False)."""
-
-        if not hasattr(self, "_contains_filter_set"):
-            self._contains_filter_set = True
-            if not self.filter_specs:
-                self._contains_filter_set = False
-            else:
-                for filter_spec in self.filter_specs:
-                    if filter_spec.set_name == None:
-                        self._contains_filter_set = False
-                    else:
-                        self._contains_filter_set = True
-        return self._contains_filter_set
-
-    @property
+    @cached_property
     def filter_specs(self):
         """Filters and filter sets chosen for filtering the CDR document."""
 
-        if not hasattr(self, "_filter_specs"):
-            values = self.fields.getlist("filter")
-            if not values:
-                values = self.fields.getlist("Filter")
-            self._filter_specs = []
-            for value in values:
-                spec = FilterSpec(self, value)
-                if spec.error:
-                    self.bail(spec.error)
-                self._filter_specs.append(spec)
-        return self._filter_specs
+        values = self.fields.getlist("filter") or self.fields.getlist("Filter")
+        specs = []
+        for value in values:
+            spec = FilterSpec(self, value)
+            if spec.error:
+                self.bail(spec.error)
+            specs.append(spec)
+        return specs
 
-    @property
+    @cached_property
     def filtered_xml(self):
         """String for the document's XML, ready to be returned to the user."""
 
-        if not hasattr(self, "_filtered_xml"):
-            xml = str(self.filter_result.result_tree)
-            self._filtered_xml = xml.replace("@@DOCID@@", self.doc.cdr_id)
-        return self._filtered_xml
+        xml = str(self.filter_result.result_tree)
+        return xml.replace("@@DOCID@@", self.doc.cdr_id)
 
     @property
     def glossary(self):
@@ -300,61 +247,58 @@ class Control(Controller):
         """True if level-of-evidence print options are requested."""
         return self.fields.getvalue("loeref") == "true"
 
-    @property
+    @cached_property
     def markup_levels(self):
         """Level(s) of insertion/deletion markup which should be applied."""
 
-        if not hasattr(self, "_markup_levels"):
-            self._markup_levels = []
-            for level in  ("publish", "approved", "proposed", "rejected"):
-                if self.fields.getvalue(level) == "true":
-                    self._markup_levels.append(level)
-        return self._markup_levels
+        levels = []
+        for level in ("publish", "approved", "proposed", "rejected"):
+            if self.fields.getvalue(level) == "true":
+                levels.append(level)
+        return levels
 
-    @property
+    @cached_property
     def parms(self):
         """Pack up the parameters to be fed to the CDR filter module."""
 
-        if not hasattr(self, "_parms"):
-            self._parms = dict(
-                insRevLevels="_".join(self.markup_levels),
-                delRevLevels="N" if self.redline_strikeout else "Y",
-                DisplayComments=self.comments,
-                DisplayGlossaryTermList="Y" if self.glossary else "N",
-                ShowStandardWording="Y" if self.standard_wording else "N",
-                displayBoard="_".join(self.boards),
-                displayAudience="_".join(self.audiences),
-                isPP="Y" if self.is_pp else "N",
-                isQC="Y" if self.is_qc else "N",
-                displayLOETermList="Y" if self.loeref else "N",
-            )
-            if self.vendor_or_qc:
-                self._parms["vendorOrQC"] = "QC"
-            parm_count = int(self.fields.getvalue("parm-count") or "0")
-            for i in range(parm_count):
-                name = self.fields.getvalue(f"parm-name-{i+1}")
-                if name:
-                    value = self.fields.getvalue(f"parm-value-{i+1}", "")
-                    self._parms[name.strip()] = value.strip()
-            self.logger.info("Filter.py(parms=%r)", self._parms)
-        return self._parms
+        parms = dict(
+            insRevLevels="_".join(self.markup_levels),
+            delRevLevels="N" if self.redline_strikeout else "Y",
+            DisplayComments=self.comments,
+            DisplayGlossaryTermList="Y" if self.glossary else "N",
+            ShowStandardWording="Y" if self.standard_wording else "N",
+            displayBoard="_".join(self.boards),
+            displayAudience="_".join(self.audiences),
+            isPP="Y" if self.is_pp else "N",
+            isQC="Y" if self.is_qc else "N",
+            displayLOETermList="Y" if self.loeref else "N",
+        )
+        if self.vendor_or_qc:
+            parms["vendorOrQC"] = "QC"
+        parm_count = int(self.fields.getvalue("parm-count") or "0")
+        for i in range(parm_count):
+            name = self.fields.getvalue(f"parm-name-{i+1}")
+            if name:
+                value = self.fields.getvalue(f"parm-value-{i+1}", "")
+                parms[name.strip()] = value.strip()
+        self.logger.info("Filter.py(parms=%r)", parms)
+        return parms
 
     @property
     def redline_strikeout(self):
         """Default is True, but turned off for a bold/underline report."""
         return self.fields.getvalue("rsmarkup") != "false"
 
-    @property
+    @cached_property
     def resolved_filter_sets(self):
         """Sequence of `ResolvedFilterSet` objects."""
 
-        if not hasattr(self, "_resolved_filter_sets"):
-            filter_sets = expandFilterSets(self.session)
-            self._resolved_filter_sets = []
-            for name in sorted(filter_sets):
-                filter_set = ResolvedFilterSet(self, filter_sets[name])
-                self._resolved_filter_sets.append(filter_set)
-        return self._resolved_filter_sets
+        sets = expandFilterSets(self.session)
+        resolved_sets = []
+        for name in sorted(sets):
+            filter_set = ResolvedFilterSet(self, sets[name])
+            resolved_sets.append(filter_set)
+        return resolved_sets
 
     @property
     def standard_wording(self):
@@ -380,43 +324,36 @@ class Control(Controller):
         """String to let the browser know what type of text we're returning."""
         return "xml" if "<?xml" in self.filtered_xml else "html"
 
-    @property
+    @cached_property
     def validation_table(self):
         """Assemble the table showing the validation results."""
 
-        if not hasattr(self, "_validation_table"):
-            if self.fields.getvalue("validate") == "Y":
-                self.dtd.validate(self.filter_result.result_tree)
-                errors = self.dtd.error_log.filter_from_errors()
-                rows = []
-                for message in self.filter_result.messages:
-                    rows.append(("Warning", self.doc.cdr_id, "N/A", message))
-                for error in errors:
-                    rows.append([
-                        error.level_name,
-                        self.doc.cdr_id,
-                        error.line,
-                        error.message,
-                    ])
-                columns = "Type", "Document", "Line", "Message"
-                if not rows:
-                    columns = ["Document is valid"]
-                opts = dict(columns=columns)
-                self._validation_table = self.Reporter.Table(rows, **opts)
-            else:
-                self._validation_table = None
-        return self._validation_table
+        if self.fields.getvalue("validate") != "Y":
+            return None
+        self.dtd.validate(self.filter_result.result_tree)
+        errors = self.dtd.error_log.filter_from_errors()
+        rows = []
+        for message in self.filter_result.messages:
+            rows.append(("Warning", self.doc.cdr_id, "N/A", message))
+        for error in errors:
+            rows.append([
+                error.level_name,
+                self.doc.cdr_id,
+                error.line,
+                error.message,
+            ])
+        columns = "Type", "Document", "Line", "Message"
+        if not rows:
+            columns = ["Document is valid"]
+        return self.Reporter.Table(rows, columns=columns)
 
-    @property
+    @cached_property
     def vendor_or_qc(self):
         """Are we filtering for export or for QC review?"""
 
-        if not hasattr(self, "_vendor_or_qc"):
-            if self.fields.getvalue("QC") == "true":
-                self._vendor_or_qc = "QC"
-            else:
-                self._vendor_or_qc = self.fields.getvalue("vendorOrQC", "")
-        return self._vendor_or_qc
+        if self.fields.getvalue("QC") == "true":
+            return "QC"
+        return self.fields.getvalue("vendorOrQC", "")
 
 
 class FilterSpec:
@@ -438,69 +375,63 @@ class FilterSpec:
         """Access to the report's options and report-creation tools."""
         return self.__control
 
-    @property
+    @cached_property
     def error(self):
         """Optional string explaining why this filter spec is unusable."""
 
-        if not hasattr(self, "_error"):
-            self._error = None
-            if self.set_name:
-                if self.set_name.upper() not in self.control.all_filter_sets:
-                    args = self.set_name, self.control.session.tier
-                    message = "{} is not a filter set on the CDR {} server"
-                    self._error = message.format(*args)
-            elif self.filter_name:
-                if self.filter_name.upper() not in self.control.all_filters:
-                    args = self.filter_name, self.control.session.tier
-                    message = "{} is not a filter name on the CDR {} server"
-                    self._error = message.format(*args)
-            elif self.filter_id not in self.control.all_filter_ids:
-                args = self.identifier, self.control.session.tier
-                message = "{} is not a filter ID on the CDR {} server"
-                self._error = message.format(*args)
-        return self._error
+        error = None
+        if self.set_name:
+            if self.set_name.upper() not in self.control.all_filter_sets:
+                args = self.set_name, self.control.session.tier
+                message = "{} is not a filter set on the CDR {} server"
+                error = message.format(*args)
+        elif self.filter_name:
+            if self.filter_name.upper() not in self.control.all_filters:
+                args = self.filter_name, self.control.session.tier
+                message = "{} is not a filter name on the CDR {} server"
+                error = message.format(*args)
+        elif self.filter_id not in self.control.all_filter_ids:
+            args = self.identifier, self.control.session.tier
+            message = "{} is not a filter ID on the CDR {} server"
+            error = message.format(*args)
+        return error
 
-    @property
+    @cached_property
     def filter_id(self):
         """Integer for the ID of a CDR Filter document."""
 
-        if not hasattr(self, "_filter_id"):
-            self._filter_id = None
-            if self.filter_name:
-                key = self.filter_name.upper()
-                self._filter_id = self.control.all_filters[key]
-            elif not self.set_name:
-                try:
-                    self._filter_id = Doc.extract_id(self.identifier)
-                except Exception:
-                    id = self.identifier
-                    self.control.bail(f"{id!r} is not a well-formed CDR ID")
-        return self._filter_id
+        filter_id = None
+        if self.filter_name:
+            key = self.filter_name.upper()
+            filter_id = self.control.all_filters[key]
+        elif not self.set_name:
+            try:
+                filter_id = Doc.extract_id(self.identifier)
+            except Exception:
+                id = self.identifier
+                self.control.bail(f"{id!r} is not a well-formed CDR ID")
+        return filter_id
 
-    @property
+    @cached_property
     def filter_name(self):
         """String for the name of a CDR filter."""
 
-        if not hasattr(self, "_filter_name"):
-            self._filter_name = None
-            if self.identifier.startswith("name:"):
-                self._filter_name = self.identifier[5:]
-        return self._filter_name
+        if self.identifier.startswith("name:"):
+            return self.identifier.removeprefix("name:")
+        return None
 
     @property
     def identifier(self):
         """String identifying the filter or filter set."""
         return self.__identifier
 
-    @property
+    @cached_property
     def set_name(self):
         """String for the name of a CDR filter set."""
 
-        if not hasattr(self, "_set_name"):
-            self._set_name = None
-            if self.identifier.startswith("set:"):
-                self._set_name = self.identifier[4:]
-        return self._set_name
+        if self.identifier.startswith("set:"):
+            return self.identifier.removeprefix("set:")
+        return None
 
 
 class ResolvedFilterSet:
@@ -521,16 +452,12 @@ class ResolvedFilterSet:
         self.__control = control
         self.__set = filter_set
 
-    @property
+    @cached_property
     def filter_ids(self):
         """Sequence of filter ID integers for this set."""
+        return [Doc.extract_id(m.id) for m in self.__set.members]
 
-        if not hasattr(self, "_filter_ids"):
-            members = self.__set.members
-            self._filter_ids = [Doc.extract_id(m.id) for m in members]
-        return self._filter_ids
-
-    @property
+    @cached_property
     def in_scope(self):
         """True if this set should be included on the report.
 
@@ -543,10 +470,14 @@ class ResolvedFilterSet:
         """
 
         user_ids = self.__control.filter_ids
-
         if not user_ids:
             return True
         return False if set(user_ids) - set(self.filter_ids) else True
+
+    @property
+    def name(self):
+        """String for the set's name."""
+        return self.__set.name
 
     @property
     def row(self):
@@ -570,7 +501,7 @@ class ResolvedFilterSet:
             B.CLASS("action-buttons"),
         )
         members = [f"{m.id}:{m.name}" for m in self.__set.members]
-        return self.__set.name, buttons, members
+        return self.name, buttons, members
 
 
 if __name__ == "__main__":

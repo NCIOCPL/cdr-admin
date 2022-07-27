@@ -169,7 +169,7 @@ class Control(Controller):
         return B.TABLE(
             B.TR(
                 B.TD(
-                    B.B(B.U("Board Manager Information")),B.BR(),
+                    B.B(B.U("Board Manager Information")), B.BR(),
                     B.B(name or "No Board Manager"), B.BR(),
                     "Office of Cancer Content", B.BR(),
                     "Office of Communications and Public Liaison", B.BR(),
@@ -786,7 +786,6 @@ class BoardMember:
         """String for the date the board member's term began."""
         return self.__row.term_start
 
-
     class Membership:
         """Membership of a particular board."""
 
@@ -824,7 +823,7 @@ class BoardMember:
                     if ref:
                         try:
                             self._board_id = Doc.extract_id(ref)
-                        except:
+                        except Exception:
                             self.__control.logger.exception("board ID")
             return self._board_id
 
@@ -860,6 +859,7 @@ class BoardMember:
                     if name:
                         self._subgroups.add(name)
             return self._subgroups
+
 
 if __name__ == "__main__":
     "Let the script be loaded as a module."

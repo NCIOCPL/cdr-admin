@@ -1,38 +1,42 @@
 #!/usr/bin/env python
 
-#----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 # Send JPEG version of a CDR image to the browser, possibly resized.
 # BZIssue::5001
-#----------------------------------------------------------------------
-import sys, cgi, cdr, cdrcgi
+# ----------------------------------------------------------------------
+import sys
+import cgi
+import cdr
+import cdrcgi
 from io import BytesIO
 from PIL import Image, ImageEnhance
 from cdrapi import db
 
 message = "GetCdrImage: No doc ID found"
-fields  = cgi.FieldStorage()
-width   = fields.getvalue("width")
-res     = fields.getvalue("res")
-fname   = fields.getvalue("fname")
+fields = cgi.FieldStorage()
+width = fields.getvalue("width")
+res = fields.getvalue("res")
+fname = fields.getvalue("fname")
 quality = fields.getvalue("quality") or "85"
 sharpen = fields.getvalue("sharpen")
-pp      = fields.getvalue("pp") or ""
-cdrId   = fields.getvalue("id")      or cdrcgi.bail(message)
+pp = fields.getvalue("pp") or ""
+cdrId = fields.getvalue("id") or cdrcgi.bail(message)
 
-conn    = db.connect()
-cursor  = conn.cursor()
+conn = db.connect()
+cursor = conn.cursor()
 
-#----------------------------------------------------------------------
+
+# ----------------------------------------------------------------------
 # Support for Visuals Online.  Four possible values for res:
 #   300   - full size (for printing)
 #    72   - 24% (viewing on screen)
 #   150   - 1/2 size (in between)
 #   thumb - max 120px on a side (thumbnails)
-#----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 def widthFromRes(size, res):
     width, height = size
     if res == "300":
-        return None # don't resize
+        return None  # don't resize
     elif res == "150":
         return int(round(width / 2.0))
     elif res == "72":
@@ -48,6 +52,7 @@ def widthFromRes(size, res):
     else:
         cdrcgi.bail("invalid res value '%s'" % res)
 
+
 # If the docId comes in in the format 'CDR99999-111.jpg' it is coming
 # from the PublishPreview with a size postfix.
 # We capture the size instructions.
@@ -58,7 +63,7 @@ if cdrId.find('-') > 0:
 else:
     docId = cdrId
 
-intId   = cdr.exNormalize(docId)[1]
+intId = cdr.exNormalize(docId)[1]
 
 # If the docId comes in the format 'CDR000999999' it is coming
 # from the QC report. If it's coming in the format 'CDR999999' it is
@@ -71,7 +76,7 @@ if pp == 'Y':
 elif pp == 'N':
     ppQuery = ""
 elif cdrId.find('CDR0') < 0:
-    ppQuery= "AND publishable = 'Y'"
+    ppQuery = "AND publishable = 'Y'"
 
 query = """\
     SELECT b.data
@@ -99,7 +104,7 @@ if image.mode == 'P':
     image = image.convert('RGB')
 try:
     quality = int(quality)
-except:
+except Exception:
     quality = 85
 if res:
     width = widthFromRes(image.size, res)
@@ -119,7 +124,7 @@ if sharpen:
         sharpen = float(sharpen)
         enh = ImageEnhance.Sharpness(image)
         image = enh.enhance(sharpen)
-    except:
+    except Exception:
         pass
 image.save(newImageFile, "JPEG", quality=quality)
 image_bytes = newImageFile.getvalue()

@@ -68,7 +68,7 @@ class Control(Controller):
         if not hasattr(self, "_days"):
             try:
                 self._days = int(self.fields.getvalue("days"))
-            except:
+            except Exception:
                 self._days = 365
         return self._days
 
@@ -114,8 +114,8 @@ class Control(Controller):
         if not hasattr(self, "_max"):
             try:
                 self._max = int(self.fields.getvalue("max"))
-            except:
-                self._max  = 1000
+            except Exception:
+                self._max = 1000
         return self._max
 
     @property
@@ -133,7 +133,6 @@ class Control(Controller):
         if not hasattr(self, "_today"):
             self._today = datetime.date.today()
         return self._today
-
 
     class Doc:
         def __init__(self, row):

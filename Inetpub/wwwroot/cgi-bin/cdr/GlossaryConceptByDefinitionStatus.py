@@ -1055,7 +1055,8 @@ class PublishedDefinition(Definition):
     @property
     def not_found(self):
         """String displayed for a dummy definition object."""
-        return f"NO PUBLISHED DEFINITION FOUND"
+        return "NO PUBLISHED DEFINITION FOUND"
+
 
 if __name__ == "__main__":
     """Only execute if loaded as a script."""

@@ -12,6 +12,7 @@ from lxml import etree
 from cdr import get_text
 from cdrapi import db
 
+
 class Partner:
     INFO = "LicenseeInformation/"
     TYPE = INFO + "LicenseeType"
@@ -72,6 +73,7 @@ class Partner:
                 self.id = detail.get("{cips.nci.nih.gov/cdr}id")
                 self.email = get_text(detail.find("Email"), "").strip()
 
+
 cursor = db.connect(user="CdrGuest").cursor()
 query = db.Query("query_term", "doc_id")
 query.where("path = '/Licensee/LicenseeInformation/LicenseeStatus'")
@@ -87,7 +89,7 @@ for doc_id in doc_ids:
         partner = Partner(doc_id, root)
         if partner.status and not partner.deactivated:
             partners.append(partner)
-    except:
+    except Exception:
         pass
 fields = "email_addr", "MAX(notif_date) AS notif_date"
 query = db.Query("data_partner_notification", *fields)

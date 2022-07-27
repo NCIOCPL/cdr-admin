@@ -13,6 +13,7 @@
 from cdrcgi import Controller
 from cdrapi.docs import Doc, Link
 
+
 class Control(Controller):
     """Contains the top-level logic for this report."""
 
@@ -119,7 +120,7 @@ class Control(Controller):
             board = self.fields.getvalue("board")
             try:
                 self._board = int(board)
-            except:
+            except Exception:
                 self._board = None
         return self._board
 
@@ -209,9 +210,6 @@ class BoardMember:
         if not hasattr(self, "_boards"):
             self._boards = []
             for node in self.doc.root.findall("BoardMembershipDetails"):
-                #board = self.Board(self, node)
-                #if board.id in self.__boards:
-                #    self._boards.append(board)
                 self._boards.append(self.Board(self, node))
         return self._boards
 
@@ -245,10 +243,8 @@ class BoardMember:
         if not hasattr(self, "_in_scope"):
             self._in_scope = True if self.boards and self.name else False
             exclusions = self.control.exclusions
-            args = self.name, self.control.exclusions
             if self._in_scope and exclusions:
                 for board in self.boards:
-                    args = board.name, board.current
                     if board.current:
                         if "advisory" in board.name.lower():
                             if self.control.EXCLUDE_ADVISORY in exclusions:
@@ -314,7 +310,6 @@ class BoardMember:
             if member.in_scope:
                 result.append(member)
         return sorted(result)
-
 
     class Board:
         """Information about a board member's membership in a PDQ board."""

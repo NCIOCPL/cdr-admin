@@ -341,6 +341,7 @@ class Control(Controller):
                 def __init__(self, control):
                     self.__control = control
                     UserDict.__init__(self)
+
                 def __getitem__(self, key):
                     if key not in self.data:
                         query = self.__control.Query("query_term", "value")
@@ -359,6 +360,7 @@ class Control(Controller):
         if self.request == self.SUBMIT:
             return self.subtitle
         return self.TITLE
+
 
 class BoardMember:
     """Information about one of the PDQ board's members."""

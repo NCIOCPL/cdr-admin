@@ -142,12 +142,12 @@ class Control(Controller):
                 "document."
             ),
             self.HTMLPage.B.DT("Removed"),
-	    self.HTMLPage.B.DD(
+            self.HTMLPage.B.DD(
                 "This number includes documents that have been removed "
                 "from Cancer.gov."
             ),
             self.HTMLPage.B.DT("Total"),
-	    self.HTMLPage.B.DD(
+            self.HTMLPage.B.DD(
                 "This number sums up all columns (except for the column "
                 "Updated*) to only count a document once per time frame "
                 "specified."
@@ -216,7 +216,7 @@ class Control(Controller):
         for doctype in doctypes:
             renewed = self.resurrected.get(doctype, 0)
             new = self.new.get(doctype, 0)
-            updated = self.updated.get(doctype, [0,0])
+            updated = self.updated.get(doctype, [0, 0])
             removed = self.removed.get(doctype, 0)
             total = renewed + new + updated[0] + removed
             rows.append([

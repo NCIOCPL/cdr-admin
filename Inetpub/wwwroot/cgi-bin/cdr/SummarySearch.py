@@ -5,6 +5,7 @@
 
 from cdrcgi import AdvancedSearch
 
+
 class SummarySearch(AdvancedSearch):
     """Customize search for this document type."""
 
@@ -25,6 +26,7 @@ class SummarySearch(AdvancedSearch):
         AdvancedSearch.__init__(self)
         for name in self.PATHS:
             setattr(self, name, self.fields.getvalue(name))
+        # pylint: disable=no-member
         if self.section_type and self.section_type not in self.section_types:
             raise Exception("Tampering with form values")
         if self.audience and self.audience not in self.audiences:
@@ -36,6 +38,7 @@ class SummarySearch(AdvancedSearch):
         if self.diagnosis:
             if self.diagnosis not in [d[0] for d in self.diagnoses]:
                 raise Exception("Tampering with form values")
+        # pylint: enable=no-member
         types = [""] + self.section_types
         self.search_fields = (
             self.text_field("title"),

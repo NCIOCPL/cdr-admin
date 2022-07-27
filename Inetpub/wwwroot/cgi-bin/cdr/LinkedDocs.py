@@ -41,7 +41,6 @@ class Control(Controller):
         else:
             return [self.target_table] + self.linking_tables
 
-
     def populate_form(self, page):
         """Put the fields for the report options on the form.
 
@@ -231,7 +230,7 @@ class Control(Controller):
             if self.doc_id:
                 try:
                     self._target_id = Doc.extract_id(self.doc_id)
-                except:
+                except Exception:
                     self.bail("invalid document ID format")
             elif len(self.titles) == 1:
                 self._target_id = self.titles[0].id
@@ -262,6 +261,7 @@ class Control(Controller):
                     query.join("doc_type t", "t.id = d.doc_type")
                     query.where(query.Condition("t.name", self.linked_type))
                 query.where(query.Condition("d.title", pattern, "LIKE"))
+
                 class DocTitle:
                     def __init__(self, row):
                         self.id = row.id

@@ -13,7 +13,7 @@ from cdrapi.docs import Doc
 
 
 class Control(Controller):
-    "Report logic."""
+    """Report logic."""
 
     SUBTITLE = ("Report on Links From One Section of a Summary "
                 "to Another Section")
@@ -130,7 +130,7 @@ class Control(Controller):
                             self._targets[link.id] = Target(*args)
                         else:
                             self.logger.warning("cdr:id %s not found", link.id)
-                            dead.add(link.id)
+                            dead_links.add(link.id)
                     if link.id in self._targets:
                         self._targets[link.id].add(link)
         return self._targets

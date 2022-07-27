@@ -69,7 +69,8 @@ class Control(Controller):
         # The top two blocks of radio buttons are always available.
         fieldset = page.fieldset("Report Type")
         for rt in self.REPORT_TYPES:
-            opts = dict(value=rt, label=rt, checked=rt==self.BROKEN_URLS)
+            checked = rt == self.BROKEN_URLS
+            opts = dict(value=rt, label=rt, checked=checked)
             fieldset.append(page.radio_button("report-type", **opts))
         page.form.append(fieldset)
         fieldset = page.fieldset("Selection Method")
@@ -255,7 +256,7 @@ class Control(Controller):
             if self._doc_id:
                 try:
                     self._doc_id = Doc.extract_id(self._doc_id)
-                except:
+                except Exception:
                     self.bail("Invalid document ID")
         return self._doc_id
 
@@ -355,7 +356,6 @@ class Control(Controller):
             self._timeouts = self.Timeouts(self)
         return self._timeouts
 
-
     class Throttles:
         """Values for scaling back the report for testing."""
 
@@ -366,10 +366,9 @@ class Control(Controller):
                 name = f"max-{key}"
                 try:
                     value = int(fields.getvalue(name) or defaults[key])
-                except:
+                except Exception:
                     value = defaults[key]
                 setattr(self, key, value)
-
 
     class Timeouts:
         """Controls for how patiently we'll wait."""
@@ -379,7 +378,7 @@ class Control(Controller):
             try:
                 self.connect = int(fields.getvalue("connect-timeout") or "5")
                 self.read = int(fields.getvalue("read-timeout") or "30")
-            except:
+            except Exception:
                 control.bail("timeout value must be an integer")
 
 

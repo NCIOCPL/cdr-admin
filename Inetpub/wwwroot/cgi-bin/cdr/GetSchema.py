@@ -63,6 +63,7 @@ class Control(Controller):
             query = self.Query("document d", "d.id", "d.title").order(2)
             query.join("doc_type t", "t.id = d.doc_type")
             query.where("t.name = 'Schema'")
+
             class Schema:
                 def __init__(self, row):
                     self.id = row.id

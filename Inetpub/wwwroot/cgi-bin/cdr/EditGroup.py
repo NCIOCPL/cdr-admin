@@ -6,6 +6,7 @@
 from cdrcgi import Controller, navigateTo, bail
 from cdrapi.docs import Doctype
 
+
 class Control(Controller):
     """Top-level logic for editing interface."""
 
@@ -176,12 +177,12 @@ fieldset#independent-actions div { width: 300px; }
             if name:
                 self._group = self.session.get_group(name)
             else:
-               opts = dict(
-                   name=self.name,
-                   comment=self.comment,
-                   session=self.session
-               )
-               self._group = self.session.Group(**opts)
+                opts = dict(
+                    name=self.name,
+                    comment=self.comment,
+                    session=self.session
+                )
+                self._group = self.session.Group(**opts)
         return self._group
 
     @group.setter

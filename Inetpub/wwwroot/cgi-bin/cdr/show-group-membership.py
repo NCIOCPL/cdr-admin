@@ -71,7 +71,6 @@ class Control(Controller):
             self._users = sorted([self.User(row) for row in rows])
         return self._users
 
-
     class Group:
         """Group of CDR user accounts with specific permissions."""
 
@@ -120,7 +119,6 @@ class Control(Controller):
                     else:
                         self._row.append("")
             return self._row
-
 
     class User:
         """Active non-machine CDR account."""

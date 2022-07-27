@@ -215,7 +215,6 @@ class Drug:
                 self._title = self.doc.title.split(";")[0]
         return self._title
 
-
     class Status:
         """A ProcessingStatus block from the DIS document."""
 
@@ -283,7 +282,6 @@ class Drug:
                 node = self.__node.find("ProcessingStatusValue")
                 self._value = Doc.get_text(node)
             return self._value
-
 
 
 if __name__ == "__main__":

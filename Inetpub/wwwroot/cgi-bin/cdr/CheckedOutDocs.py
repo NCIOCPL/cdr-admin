@@ -6,6 +6,7 @@
 from cdrcgi import Controller, Reporter
 from cdrapi.db import Query
 
+
 class Control(Controller):
 
     SUBTITLE = "Checked Out Documents"

@@ -320,7 +320,7 @@ class Control(Controller):
             query = self.Query("query_term", "doc_id").unique()
             query.where(query.Condition("path", paths, "IN"))
             query.where(query.Condition("int_val", self.doc_id))
-            rows  = query.execute(self.cursor).fetchall()
+            rows = query.execute(self.cursor).fetchall()
             self._media_by_docid = [row.doc_id for row in rows]
         return self._media_by_docid
 
@@ -336,7 +336,7 @@ class Control(Controller):
             else:
                 path = self.USAGE_PATHS[self.doctype]
                 query.where(query.Condition("path", path))
-            rows  = query.execute(self.cursor).fetchall()
+            rows = query.execute(self.cursor).fetchall()
             self._media_by_doctype = [row.doc_id for row in rows]
         return self._media_by_doctype
 
@@ -363,7 +363,7 @@ class Control(Controller):
                     query.where(query.Condition("t.path", t_path))
                 query.where(query.Condition("b.path", b_path))
                 query.where(query.Condition("b.int_val", self.board, "IN"))
-            rows  = query.execute(self.cursor).fetchall()
+            rows = query.execute(self.cursor).fetchall()
             self._media_by_summary = [row.doc_id for row in rows]
         return self._media_by_summary
 
@@ -380,7 +380,6 @@ class Control(Controller):
             for doc in docs:
                 if doc.in_scope:
                     title_key = doc.title.lower()
-                    media = [doc.title.lower(), doc]
                     for approval in doc.approvals:
                         approval = str(approval)
                         key = approval.lower(), title_key, len(values)
@@ -681,7 +680,6 @@ class Media:
         if not hasattr(self, "_sort_key"):
             self._sort_key = self.title.lower()
         return self._sort_key
-
 
     class Approval:
         """Identification of a document for which use is authorized."""

@@ -422,7 +422,6 @@ class Job:
             )
         return self._row
 
-
     @property
     def spanish_id(self):
         """Integer for the CDR ID of the translated summary document."""

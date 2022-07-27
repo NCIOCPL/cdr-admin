@@ -3,10 +3,11 @@
 """Show the tables of contents for one or more Cancer Information Summaries.
 """
 
-from cdrcgi import Controller, Reporter, HTMLPage, bail
+from cdrcgi import Controller, HTMLPage, bail
 from cdrapi import db
 from cdrapi.docs import Doc
 from cdr import Board
+
 
 class Control(Controller):
     """Top-level logic for the report.
@@ -253,7 +254,6 @@ jQuery(function() {
         fieldset = page.fieldset("Select Document Version")
         fieldset.set("style", "width: 600px")
         options = [(v.id, v.description) for v in self.versions]
-        default = -1
         fieldset.append(page.select("version", options=options))
         page.form.append(fieldset)
         page.send()
@@ -307,6 +307,7 @@ jQuery(function() {
             query.where("t.name = 'Summary'")
             query.where(query.Condition("d.title", pattern, "LIKE"))
             self._fragment_matches = []
+
             class Summary:
                 def __init__(self, doc_id, display, tooltip=None):
                     self.id = doc_id
@@ -454,6 +455,7 @@ jQuery(function() {
             elif self.id and len(self.versions) == 1:
                 self._version = self.versions[0].number
         return self._version
+
     @property
     def versions(self):
         """Version numbers with descriptions for the picklist."""

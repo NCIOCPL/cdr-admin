@@ -3,7 +3,8 @@
 """Menu for editing CDR actions.
 """
 
-from cdrcgi import Controller, navigateTo
+from cdrcgi import Controller
+
 
 class Control(Controller):
     """Encapsulates processing logic for building the menu page."""
@@ -19,7 +20,7 @@ class Control(Controller):
     def run(self):
         """Override base class to add action for new button."""
         if self.request == self.ADD_NEW_ACTION:
-            navigateTo(self.EDIT_ACTION, self.session.name)
+            self.navigate_to(self.EDIT_ACTION, self.session.name)
         else:
             Controller.run(self)
 

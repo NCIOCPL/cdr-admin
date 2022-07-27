@@ -3,7 +3,8 @@
 """Main menu for advanced search forms.
 """
 
-from cdrcgi import Controller, navigateTo
+from cdrcgi import Controller
+
 
 class Control(Controller):
     """Logic for dynamic construction of the top-level CDR admin menu."""
@@ -34,7 +35,7 @@ class Control(Controller):
             script = "GuestUsers.py"
             links = [page.B.LI(page.menu_link(script, "Guest User"))]
         if len(links) == 1:
-            navigateTo(script, self.session.name)
+            self.navigate_to(script, self.session.name)
         page.form.append(page.B.OL(*links))
 
     @property

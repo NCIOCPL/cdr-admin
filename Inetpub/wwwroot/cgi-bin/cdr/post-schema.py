@@ -8,6 +8,7 @@ from cdrapi.docs import Doc
 from os.path import basename
 from cdr import run_command
 
+
 class Control(Controller):
     """Access to the current CDR login session and page-building tools."""
 

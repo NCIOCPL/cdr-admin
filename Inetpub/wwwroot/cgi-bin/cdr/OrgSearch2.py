@@ -5,6 +5,7 @@
 
 from cdrcgi import AdvancedSearch
 
+
 class OrganizationSearch(AdvancedSearch):
     """Customize search for this document type."""
 
@@ -33,12 +34,14 @@ class OrganizationSearch(AdvancedSearch):
         AdvancedSearch.__init__(self)
         for name in self.PATHS:
             setattr(self, name, self.fields.getvalue(name))
+        # pylint: disable=no-member
         if self.type and self.type not in self.types:
             raise Exception("Tampering with form values")
         if self.state and self.state not in [s[0] for s in self.states]:
             raise Exception("Tampering with form values")
         if self.country and self.country not in [c[0] for c in self.countries]:
             raise Exception("Tampering with form values")
+        # pylint: enable=no-member
         self.search_fields = (
             self.text_field("name"),
             self.select("type", options=[""]+self.types),

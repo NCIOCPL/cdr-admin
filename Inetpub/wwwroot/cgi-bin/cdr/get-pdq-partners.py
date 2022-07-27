@@ -12,6 +12,7 @@ from lxml import etree
 from cdr import get_text
 from cdrapi import db
 
+
 class Partner:
     INFO = "LicenseeInformation/"
     TYPE = INFO + "LicenseeType"
@@ -41,6 +42,7 @@ class Partner:
         if self.username is not None:
             self.username = self.normalize(self.username)
         self.key = self.status, self.name.lower()
+
     def __lt__(self, other):
         return self.key < other.key
 
@@ -49,6 +51,7 @@ class Partner:
         if me is None:
             return ""
         return re.sub(r"\s+", " ", me).strip()
+
 
 cursor = db.connect(user="CdrGuest").cursor()
 query = db.Query("document d", "d.id")
@@ -59,13 +62,9 @@ partners = []
 select = "SELECT xml FROM document WHERE id = ?"
 for doc_id in doc_ids:
     cursor.execute(select, (doc_id,))
-    try:
-        xml = cursor.fetchone().xml
-        root = etree.fromstring(xml.encode("utf-8"))
-        partners.append(Partner(doc_id, root))
-    except:
-        raise
-        pass
+    xml = cursor.fetchone().xml
+    root = etree.fromstring(xml.encode("utf-8"))
+    partners.append(Partner(doc_id, root))
 root = etree.Element("partners")
 for partner in sorted(partners):
     contact = etree.SubElement(root, "org_id", oid=str(partner.doc_id))

@@ -106,7 +106,7 @@ class Control(Controller):
             page.form.append(page.hidden_field("system", self.system.id))
             legend = f"Select {self.system.name} Publication System Subset"
             fieldset = page.fieldset(legend)
-            checked=True
+            checked = True
             for subset in self.system.subsets:
                 if subset.name != "Republish-Export":
                     description = subset.description.replace("\r", "")
@@ -128,7 +128,7 @@ class Control(Controller):
 
             # Ask the user to pick a publishing system.
             fieldset = page.fieldset("Select a Publishing System")
-            checked=True
+            checked = True
             for system in sorted(self.systems.values()):
                 opts = dict(
                     label=f"{system.name} [Version {system.doc.version:d}]",
@@ -442,7 +442,6 @@ class PublishingSystem:
                 self._subsets.append(self.Subset(self, node))
         return self._subsets
 
-
     class Subset:
         """Publishing job type available from this system."""
 
@@ -508,7 +507,6 @@ class PublishingSystem:
                     self._user_can_select_docs = True
             return self._user_can_select_docs
 
-
         class Parameter:
             """Option which can be specified for jobs of this type."""
 
@@ -555,7 +553,6 @@ class PublishingSystem:
                 if not hasattr(self, "_name"):
                     self._name = Doc.get_text(self.__node.find("ParmName"))
                 return self._name
-
 
     class ParamInfo:
         """Metadata about publishing job parameters.

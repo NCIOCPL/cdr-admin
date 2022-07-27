@@ -3,11 +3,12 @@
 """Request form for generating RTF letters to board members.
 """
 
-from json import dumps
+from json import dumps, loads
 from cdr import getControlValue
 from cdrcgi import Controller, navigateTo
 from cdrapi.docs import Doc
 from cdrapi.publishing import Job
+
 
 class Control(Controller):
     """Logic for generating board member mailer letters."""
@@ -21,7 +22,6 @@ class Control(Controller):
 
     def build_tables(self):
         """Create the publishing job and list the mailer recipients."""
-
 
     def populate_form(self, page):
         """Add the parameters for mailer generation.
@@ -115,7 +115,6 @@ function show_status() {{
         if not hasattr(self, "_boards"):
             self._boards = Boards(self)
         return self._boards
-
 
     @property
     def board_members(self):
@@ -247,6 +246,7 @@ class Boards:
             def __init__(self, boards):
                 self.__index = 0
                 self.__boards = boards
+
             def __next__(self):
                 if self.__index >= len(self.__boards):
                     raise StopIteration
@@ -348,7 +348,6 @@ class Boards:
                 else:
                     self._type = "editorial"
             return self._type
-
 
         class Member:
             """One of the members of a PDQ board."""

@@ -63,7 +63,7 @@ class Control(Controller):
                 for id in ids.split():
                     try:
                         self._ids.append(Doc.extract_id(id))
-                    except:
+                    except Exception:
                         self.bail("Invalid document ID")
         return self._ids
 
@@ -117,7 +117,7 @@ class Control(Controller):
         """New status for the documents (Active or Inactive)."""
         if not hasattr(self, "_status"):
             self._status = self.fields.getvalue("status", "I")
-            if not self._status in "IA":
+            if self._status not in "IA":
                 self.bail()
         return self._status
 

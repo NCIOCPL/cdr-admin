@@ -8,6 +8,7 @@ from cdrapi.docs import Doc
 from datetime import datetime
 import json
 
+
 class Control(Controller):
     """Encapsulate the logic for this report."""
 
@@ -132,7 +133,7 @@ function view_doc(id) {{
                 if new_id:
                     try:
                         doctype = Doc(self.session, id=new_id).doctype
-                    except:
+                    except Exception:
                         doctype = None
                     if not doctype:
                         problems.append(f"CDR document {new_id} not found")
@@ -162,7 +163,7 @@ function view_doc(id) {{
                 elif mapping.mappable:
                     diffs.append("Mappable flag cleared")
             elif not mapping.mappable:
-                    diffs.append("Mappable flag set")
+                diffs.append("Mappable flag set")
 
             # If we found any problems, we won't save any changes.
             if problems:
@@ -258,9 +259,7 @@ function view_doc(id) {{
         if not self.usage:
             headers.insert(0, B.TH("Usage"))
         table = B.TABLE(
-            B.E("header",
-                B.TR(*headers)
-            ),
+            B.E("header", B.TR(*headers)),
             B.TBODY(*rows)
         )
         elapsed = datetime.now() - self.started
@@ -363,7 +362,7 @@ function view_doc(id) {{
         if not hasattr(self, "_usage"):
             try:
                 self._usage = int(self.fields.getvalue("usage"))
-            except:
+            except Exception:
                 self._usage = None
         return self._usage
 

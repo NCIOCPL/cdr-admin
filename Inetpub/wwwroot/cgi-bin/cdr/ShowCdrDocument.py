@@ -80,10 +80,8 @@ class Control(Controller):
             checked = True
             for value, label in self.VERSION_TYPES.items():
                 opts = dict(value=value, label=label, checked=checked)
-                #if value == "num":
-                #    opts["wrapper_id"] = "num-div"
                 fieldset.append(page.radio_button("vtype", **opts))
-                checked=False
+                checked = False
             page.form.append(fieldset)
             fieldset = page.fieldset("Version Number")
             fieldset.set("id", "version-number-block")
@@ -187,6 +185,7 @@ class Control(Controller):
                 else:
                     self.logger.info("matching title fragment %r", fragment)
                 rows = query.order("d.id").execute(self.cursor).fetchall()
+
                 class Doc:
                     def __init__(self, row):
                         self.value = row.id

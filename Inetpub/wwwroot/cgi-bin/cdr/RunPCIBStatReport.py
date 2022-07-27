@@ -76,7 +76,6 @@ class Control(Controller):
         Tell the user when we're done.
         """
 
-        sections = [s.lower() for s in self.sections]
         opts = {
             "mode": "live",
             "recips": self.recips,
@@ -91,7 +90,7 @@ class Control(Controller):
             cdr_stats.Control(opts).run()
         except Exception as e:
             self.logger.exception("Report failure")
-            cdrcgi.bail("failure: %s" % e)
+            self.bail("failure: %s" % e)
         fieldset = self.HTMLPage.fieldset("Report Status")
         para = self.HTMLPage.B.P("The report has been sent to you by email.")
         para.set("class", "center")
@@ -107,7 +106,7 @@ class Control(Controller):
         if end:
             try:
                 return str(self.parse_date(end))
-            except:
+            except Exception:
                 self.bail("Invalid date string")
         return str(datetime.date.today())
 
@@ -119,7 +118,7 @@ class Control(Controller):
         if max_docs:
             try:
                 return int(max_docs)
-            except:
+            except Exception:
                 self.bail("Max docs must be an integer")
         return None
 
@@ -162,7 +161,7 @@ class Control(Controller):
         if start:
             try:
                 return str(self.parse_date(start))
-            except:
+            except Exception:
                 self.bail("Invalid date string")
         today = datetime.date.today()
         return datetime.date(today.year, 1, 1)

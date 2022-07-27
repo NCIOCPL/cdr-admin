@@ -52,7 +52,7 @@ class Control(Controller):
             if name in self.new.tables:
                 self.compare_table(page, name)
             else:
-                body.append(page.B.UL(page.B.LI(page.B.B("TABLE LOST"))))
+                page.form.append(page.B.UL(page.B.LI(page.B.B("TABLE LOST"))))
 
     def compare_docs(self, page):
         """Describe the differences between the old and the new documents.
@@ -183,9 +183,9 @@ class Control(Controller):
             new_only = [(row, "added") for row in (new_rows - old_rows)]
             deltas = old_only + new_only
             try:
-                for row, which_set in sorted(deltas, key=lambda v:str(v)):
+                for row, which_set in sorted(deltas, key=lambda v: str(v)):
                     items.append(page.B.LI(f"{which_set}: {row}"))
-            except:
+            except Exception:
                 print(deltas)
                 raise
         if items:

@@ -111,7 +111,7 @@ class Control(Controller):
 
     @property
     def boards(self):
-        "Dictionary of the active boards (indexed by CDR document ID)."""
+        """Dictionary of the active boards (indexed by CDR document ID)."""
 
         if not hasattr(self, "_boards"):
             self._boards = dict(getBoardNames(display="short"))
@@ -183,6 +183,7 @@ class Control(Controller):
                 def __init__(self, control):
                     self.__control = control
                     UserDict.__init__(self)
+
                 def __getitem__(self, key):
                     if key not in self.data:
                         self.data[key] = Person(self.__control, key)

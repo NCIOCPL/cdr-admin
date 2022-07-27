@@ -605,7 +605,7 @@ class Board:
             query.where(query.Condition("doc_id", self.id))
             rows = query.execute(self.control.cursor).fetchall()
             if not rows:
-                message =f"No name found for board document CDR{self.id:d}"
+                message = f"No name found for board document CDR{self.id:d}"
                 self.control.bail(message)
             self._name = rows[0][0]
         return self._name

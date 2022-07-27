@@ -5,6 +5,7 @@
 
 from cdrcgi import Controller
 
+
 class Control(Controller):
     """Provide extra nesting for this, the most complex of the CDR menus."""
 

@@ -5,7 +5,6 @@
 
 from cdrcgi import Controller
 from cdrapi import db
-from cdrapi.docs import Doc, Doctype
 import datetime
 
 
@@ -614,10 +613,9 @@ class JobDetails:
             parsed = eval(messages)
             if isinstance(parsed, (list, tuple)):
                 return parsed
-        except:
+        except Exception:
             pass
         return str(messages)
-
 
     class Doc:
         """Document from a publishing job."""

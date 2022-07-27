@@ -144,7 +144,7 @@ class Control(Controller):
             for job in self.jobs:
                 try:
                     formatted_schedule = job.formatted_schedule
-                except:
+                except Exception:
                     formatted_schedule = job.schedule
                 url = self.make_url(self.script, id=job.id)
                 row = page.B.TR(
@@ -152,7 +152,7 @@ class Control(Controller):
                     page.B.TD(job.job_class),
                     page.B.TD("Yes" if job.enabled else "No",
                               page.B.CLASS("center")),
-                    page.B.TD(job.formatted_schedule)
+                    page.B.TD(formatted_schedule)
                 )
                 table.append(row)
             fieldset = page.fieldset("Jobs")
@@ -330,7 +330,7 @@ class Control(Controller):
         if not hasattr(self, "_num_opts"):
             try:
                 self._num_opts = int(self.fields.getvalue("num-opts", "0"))
-            except Exception as e:
+            except Exception:
                 self.bail("Internal error (invalid option count)")
         return self._num_opts
 
@@ -447,7 +447,7 @@ class Job:
 
         if not hasattr(self, "_enabled"):
             if self.__row:
-                self._enabled =  True if self.__row.enabled else False
+                self._enabled = True if self.__row.enabled else False
             else:
                 self._enabled = self.__control.enabled
         return self._enabled

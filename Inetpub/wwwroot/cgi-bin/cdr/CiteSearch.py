@@ -9,6 +9,7 @@ from cdr import prepare_pubmed_article_for_import
 from cdrcgi import AdvancedSearch, bail
 from cdrapi.docs import Doc
 
+
 class CitationSearch(AdvancedSearch):
     """Customize search for this document type."""
 
@@ -47,7 +48,7 @@ class CitationSearch(AdvancedSearch):
     IMP_BTN = "pubmed-import-button"
     JS = """\
 function chk_cdrid() {
-    if (jQuery("#cdrid").val().replace(/\D/g, "").length === 0)
+    if (jQuery("#cdrid").val().replace(/\\D/g, "").length === 0)
         jQuery("#pubmed-import-button input").val("Import");
     else
         jQuery("#pubmed-import-button input").val("Update");
@@ -261,6 +262,7 @@ class Citation:
         query.where(query.Condition("value", pmid))
         rows = query.execute(self.control.session.cursor).fetchall()
         return f"{rows[0].doc_id:010d}" if rows else None
+
 
 if __name__ == "__main__":
     CitationSearch().run()

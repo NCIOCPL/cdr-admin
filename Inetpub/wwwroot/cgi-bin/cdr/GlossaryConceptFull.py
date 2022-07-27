@@ -133,7 +133,7 @@ class Concept:
     """Subject of the report."""
 
     TITLE = "Glossary Term Concept"
-    SUBTITLE  = "Glossary Term Concept - Full"
+    SUBTITLE = "Glossary Term Concept - Full"
     DEFINITION_ELEMENTS = "TermDefinition", "TranslatedTermDefinition"
     GUEST = Session("guest")
     LANGUAGES = dict(en="English", es="Spanish")
@@ -179,7 +179,8 @@ class Concept:
             for name in self.DEFINITION_ELEMENTS:
                 for node in self.doc.root.findall(name):
                     definition = self.Definition(self, node)
-                    self._definitions[definition.langcode].update({definition.audience : definition})
+                    entry = {definition.audience: definition}
+                    self._definitions[definition.langcode].update(entry)
         return self._definitions
 
     @property
@@ -293,17 +294,18 @@ class Concept:
             concept_id = B.P(f"CDR{self.doc.id}", id="concept-id")
             wrapper = body = B.BODY(B.E("header", B.H1(*args)), concept_id)
             self._report = B.HTML(head, body)
+            sortopts = dict(reverse=True)
             for langcode in sorted(self.definitions):
                 language = self.LANGUAGES[langcode]
                 if self.parallel:
                     wrapper = B.DIV(B.CLASS("lang-wrapper"))
                     body.append(wrapper)
-                for audience in sorted(self.definitions[langcode], reverse=True):
-                    aud = self.definitions[langcode][audience].audience
-                    section = f"{language} - {aud.title()}"
+                for audience in sorted(self.definitions[langcode], **sortopts):
+                    definition = self.definitions[langcode][audience]
+                    section = f"{language} - {definition.audience.title()}"
                     wrapper.append(B.H2(section))
-                    wrapper.append(self.definitions[langcode][audience].term_table)
-                    wrapper.append(self.definitions[langcode][audience].info_table)
+                    wrapper.append(definition.term_table)
+                    wrapper.append(definition.info_table)
             if self.media_table is not None:
                 body.append(self.media_table)
             body.append(self.term_type_table)
@@ -385,7 +387,6 @@ jQuery(function() {
             nodes = self.doc.root.findall("EmbeddedVideo")
             self._videos = [Concept.Video(node) for node in nodes]
         return self._videos
-
 
     class Definition:
         """One concept definition for a specifc language/audience combo."""
@@ -643,7 +644,6 @@ jQuery(function() {
                 values = builder.TD(*args)
                 rows.append(builder.TR(label, values))
 
-
         class Comment:
             """Comment associated with the definition."""
 
@@ -667,7 +667,6 @@ jQuery(function() {
                     result = doc.filter(Concept.FILTER)
                     self._row = html.fromstring(str(result.result_tree))
                 return self._row
-
 
     class Link:
         """Link to be displayed in the concept's table for related info."""
@@ -742,7 +741,6 @@ jQuery(function() {
                 label = ""
             return links
 
-
     class MediaLink:
         """Link to an image used by the glossary term."""
 
@@ -767,7 +765,7 @@ jQuery(function() {
                 node = self.node.find("MediaID")
                 try:
                     self._id = Doc.extract_id(node.get(f"{{{Doc.NS}}}ref"))
-                except:
+                except Exception:
                     self._id = None
                 if not hasattr(self, "_text"):
                     self._text = Doc.get_text(node, "").strip()
@@ -799,10 +797,9 @@ jQuery(function() {
                 if not hasattr(self, "_id"):
                     try:
                         self._id = Doc.extract_id(node.get(self.CDR_REF))
-                    except:
+                    except Exception:
                         self._id = None
             return self._text
-
 
     class Name:
         """Information needed from a GlossaryTermName document."""
@@ -1050,7 +1047,7 @@ jQuery(function() {
                 if node is not None:
                     try:
                         self._id = Doc.extract_id(node.get(f"{{{Doc.NS}}}ref"))
-                    except:
+                    except Exception:
                         pass
             return self._id
 

@@ -50,7 +50,6 @@ class Control(Controller):
             self._host = self.fields.getvalue("host") or default
         return self._host
 
-
     class Summary:
         """PDQ summary document for the report."""
 

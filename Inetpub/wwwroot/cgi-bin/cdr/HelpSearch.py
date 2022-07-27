@@ -5,6 +5,7 @@
 
 from cdrcgi import AdvancedSearch
 
+
 class DocumentationSearch(AdvancedSearch):
     """Customize search for this document type."""
 
@@ -41,6 +42,7 @@ class DocumentationSearch(AdvancedSearch):
                 raise Exception("Tampering with form values")
             setattr(self, f"{name}s", [""] + values)
         self.search_fields = (
+            # pylint: disable=no-member
             self.select("doctype", label="Doc Type", options=self.doctypes),
             self.select("function", options=self.functions),
             self.text_field("keyword"),

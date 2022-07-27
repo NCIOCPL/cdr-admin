@@ -6,6 +6,7 @@
 from cdrapi.docs import Doc
 from cdrcgi import AdvancedSearch, BASE, SESSION
 
+
 class PersonSearch(AdvancedSearch):
     """Coordination of the processing flow."""
 
@@ -51,7 +52,7 @@ class PersonSearch(AdvancedSearch):
         filter_parms = dict(repName="dummy", includeHomeAddresses="yes")
 
         # Walk through each row in the results set.
-        for i, row  in enumerate(self.rows):
+        for i, row in enumerate(self.rows):
             doc = Doc(self.session, id=row[0])
             title = row[1]
             url = f"{BASE}/QcReport.py?DocId={doc.cdr_id}{session_parm}"

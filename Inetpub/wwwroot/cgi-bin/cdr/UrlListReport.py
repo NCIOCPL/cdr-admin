@@ -34,7 +34,6 @@ class Control(Controller):
         page.form.append(fieldset)
         page.add_output_options(default="html")
 
-
     def build_tables(self):
         """Show the report's only table."""
 

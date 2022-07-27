@@ -138,7 +138,6 @@ class Control(Controller):
             )
             self.logger.info("comparing %s with %s", *tiers)
             for line in differ.compare(*filters):
-                cls = ""
                 if line[0] != "?":
                     line += "\n"
                 if line[0] in self.CLASSES:

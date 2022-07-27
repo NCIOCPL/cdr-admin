@@ -61,7 +61,7 @@ class Control(Controller):
         """Get each summary to assemble its table(s)."""
 
         if not self.summaries:
-            cdrcgi.bail("No summaries found for report")
+            self.bail("No summaries found for report")
         tables = []
         for summary in self.summaries:
             tables += summary.tables
@@ -90,7 +90,8 @@ class Control(Controller):
             fieldset = page.fieldset("Enter Document ID", id="doc-id-box")
             fieldset.append(page.text_field("doc-id", label="Doc ID"))
             page.form.append(fieldset)
-            fieldset = page.fieldset("Enter Document Title", id="doc-title-box")
+            opts = dict(id="doc-title-box")
+            fieldset = page.fieldset("Enter Document Title", **opts)
             fieldset.set("class", "hidden")
             fieldset.append(page.text_field("doc-title", label="Doc Title"))
             page.form.append(fieldset)
@@ -167,6 +168,7 @@ class Control(Controller):
                 def __init__(self, control):
                     self.__control = control
                     UserDict.__init__(self)
+
                 def __getitem__(self, key):
                     if key not in self.data:
                         query = self.__control.Query("query_term", "value")
@@ -585,7 +587,6 @@ class Summary:
             self._type = Doc.get_text(node)
         return self._type
 
-
     class Section:
         """Nested class for all the sections of the summary."""
 
@@ -694,7 +695,6 @@ class Summary:
                 for node in self.__node.findall("SectMetaData/SectionType"):
                     self._types.append(Doc.get_text(node))
             return self._types
-
 
     class Link:
         """Holds the label and URL for the summary link."""

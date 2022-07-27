@@ -179,7 +179,7 @@ class Control(Controller):
             if string_value:
                 try:
                     self._position = int(string_value)
-                except:
+                except Exception:
                     self.bail("position must be an integer")
             if isinstance(self._position, int):
                 for value in self.map.values():

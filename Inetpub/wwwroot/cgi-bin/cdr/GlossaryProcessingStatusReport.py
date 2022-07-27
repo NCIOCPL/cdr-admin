@@ -181,6 +181,7 @@ class Control(Controller):
             values = set()
             for name in ("GlossaryTermName", "GlossaryTermConcept"):
                 doctype = Doctype(self.session, name=name)
+                # pylint: disable-next=unsubscriptable-object
                 values |= set(doctype.vv_lists["ProcessingStatusValue"])
             self._statuses = sorted(values, key=str.lower)
         return self._statuses

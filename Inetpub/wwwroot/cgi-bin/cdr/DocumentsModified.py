@@ -10,6 +10,7 @@ frame."
 from cdrcgi import Controller
 import datetime
 
+
 class Control(Controller):
 
     SUBTITLE = "Documents Modified Report"
@@ -60,7 +61,7 @@ class Control(Controller):
         try:
             start = self.fields.getvalue("start")
             return self.parse_date(start)
-        except:
+        except Exception:
             self.logger.exception("invalid start date")
             self.bail("Invalid starting date")
 
@@ -71,7 +72,7 @@ class Control(Controller):
         try:
             end = self.fields.getvalue("end")
             return self.parse_date(end)
-        except:
+        except Exception:
             self.logger.exception("invalid end date")
             self.bail("Invalid ending date")
 
@@ -86,7 +87,7 @@ class Control(Controller):
             if self._doctype:
                 try:
                     self._doctype = int(self._doctype)
-                except:
+                except Exception:
                     self.bail()
                 if self._doctype not in [pair[0] for pair in self.doctypes]:
                     self.bail()

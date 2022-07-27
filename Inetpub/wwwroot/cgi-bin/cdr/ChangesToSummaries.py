@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from cdrcgi import Controller, sendPage
+from cdrcgi import Controller
 import cdr
 import datetime
 import lxml.html
@@ -30,11 +30,10 @@ class Control(Controller):
         """
 
         if self.debug:
-            form.add_hidden_field("debug", True)
+            page.form.append(page.hidden_field("debug", True))
         end = datetime.date.today()
         start = end - datetime.timedelta(7)
         fieldset = page.fieldset("Select PDQ Board For Report")
-        options = ["all", "All"] + self.boards
         fieldset.append(page.select("board", options=["All"]+self.boards))
         page.form.append(fieldset)
         fieldset = page.fieldset("Select Audience")
@@ -167,7 +166,7 @@ class Control(Controller):
         if not hasattr(self, "_end"):
             try:
                 self._end = self.parse_date(self.fields.getvalue("end"))
-            except:
+            except Exception:
                 self.bail()
         return self._end
 
@@ -188,7 +187,7 @@ class Control(Controller):
         if not hasattr(self, "_start"):
             try:
                 self._start = self.parse_date(self.fields.getvalue("start"))
-            except:
+            except Exception:
                 self.bail()
         return self._start
 
@@ -254,6 +253,7 @@ class Summary:
 
     PATTERN = compile("<DateLastModified[^>]*>([^<]+)</DateLastModified>")
     SUMMARIES_EXAMINED = VERSIONS_EXAMINED = 0
+
     def __init__(self, control, doc_id):
         Summary.SUMMARIES_EXAMINED += 1
         self.control = control
@@ -266,7 +266,6 @@ class Summary:
         query = control.Query("publishable_version", "num")
         query.order("num DESC")
         query.where(query.Condition("id", doc_id))
-        #start = datetime.datetime.strptime(control.start, "%Y-%m-%d")
         cutoff = control.start - datetime.timedelta(365)
         end = f"{control.end} 23:59:59"
         query.where(query.Condition("dt", str(cutoff), ">="))

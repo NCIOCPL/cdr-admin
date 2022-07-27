@@ -124,9 +124,7 @@ class Control(Controller):
         if not hasattr(self, "_term_docs"):
             self._term_docs = {}
 
-            # Don't log skipping the same term name document multiple times.
-            skipped = set()
-
+            # Process each zip archive.
             for path in self.zipfiles:
                 zipfile = ZipFile(f"{self.directory}/{path}")
 
@@ -153,11 +151,11 @@ class Control(Controller):
                         # Check for unexpected multiple occurrences.
                         key = mp3.filename.lower()
                         if key in filenames:
-                            logger.warning("multiple %r in %s", key, path)
+                            self.logger.warning("multiple %r in %s", key, path)
                         filenames.add(key)
                         key = (mp3.term_id, mp3.name, mp3.language)
                         if key in termnames:
-                            logger.warning("multiple %r in %s", key, path)
+                            self.logger.warning("multiple %r in %s", key, path)
                         termnames.add(key)
 
                         # Add the MP3 file to the term document object.
@@ -248,7 +246,7 @@ class Control(Controller):
 
         try:
             return row[col].value
-        except:
+        except Exception:
             return None
 
 

@@ -5,6 +5,7 @@
 
 from cdrcgi import Controller, navigateTo
 
+
 class Control(Controller):
     """Encapsulates processing logic for building the menu page."""
 
@@ -61,7 +62,7 @@ class Control(Controller):
             users = []
             for name in self.session.list_users():
                 users.append(self.session.User(self.session, name=name))
-            users = sorted(users, key=lambda u:(u.fullname or u.name).lower())
+            users = sorted(users, key=lambda u: (u.fullname or u.name).lower())
             self._users = users
         return self._users
 

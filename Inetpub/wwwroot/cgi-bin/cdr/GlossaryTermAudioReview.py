@@ -421,7 +421,6 @@ class Control(Controller):
                         self._names = names
                     return self._names
 
-
                 class ZipFile:
                     """Information about a single archive of audio files.
 
@@ -495,41 +494,50 @@ class Control(Controller):
                 STARTED = "Started"
                 UNREVIEWED = "Unreviewed"
                 COMPLETED = "Completed"
-                STATUS_SORT = {STARTED:1, UNREVIEWED:2, COMPLETED:3}
+                STATUS_SORT = {STARTED: 1, UNREVIEWED: 2, COMPLETED: 3}
+
                 def __init__(self, control, entry):
                     self.__control = control
                     self.__entry = entry
+
                 def __lt__(self, other):
                     """Sort by status then by filename."""
                     return self.sortkey < other.sortkey
+
                 @property
                 def control(self):
                     return self.__control
+
                 @property
                 def datetime(self):
                     if not hasattr(self, "_datetime"):
                         mtime = self.__entry.stat().st_mtime
                         self._datetime = datetime.fromtimestamp(mtime)
                     return self._datetime
+
                 @property
                 def db_info(self):
                     """Information about this file from the database."""
                     if not hasattr(self, "_db_info"):
                         self._db_info = self.control.zipfiles.get(self.key)
                     return self._db_info
+
                 @property
                 def name(self):
                     return self.__entry.name
+
                 @property
                 def path(self):
                     if not hasattr(self, "_path"):
                         self._path = self.__entry.path.replace("\\", "/")
                     return self._path
+
                 @property
                 def key(self):
                     if not hasattr(self, "_key"):
                         self._key = self.name.lower()
                     return self._key
+
                 @property
                 def sortkey(self):
                     "Major sort by status, subsort by filename"
@@ -537,6 +545,7 @@ class Control(Controller):
                     if not hasattr(self, "_sortkey"):
                         self._sortkey = self.STATUS_SORT[self.status], self.key
                     return self._sortkey
+
                 @property
                 def status(self):
                     if not hasattr(self, "_status"):
@@ -547,6 +556,7 @@ class Control(Controller):
                         else:
                             self._status = self.STARTED
                     return self._status
+
                 @property
                 def row(self):
                     if not hasattr(self, "_row"):
@@ -836,7 +846,7 @@ class AudioSet:
                 continue
             try:
                 values = [set_id, int(value)]
-            except:
+            except Exception:
                 self.control.logger.warning("row %d has %r", row, value)
                 continue
             for col in range(1, 8):
@@ -859,7 +869,6 @@ class AudioSet:
                 if name.endswith(".xlsx"):
                     return name
         return None
-
 
     class MP3:
         """A glossary term name audio pronunciation file to be reviewed."""
@@ -947,7 +956,6 @@ class AudioSet:
             if not hasattr(self, "_row"):
                 B = self.control.HTMLPage.B
                 buttons = []
-                opts = dict(type="radio")
                 spacer = "\xa0" * 2
                 for status in self.STATUSES:
                     name = f"status-{self.id:d}"

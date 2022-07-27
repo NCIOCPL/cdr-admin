@@ -20,7 +20,6 @@ class Control(Controller):
         "li.a { font-variant: normal; }",
     )
 
-
     def show_form(self):
         """Bypass the form, which isn't needed for this report."""
         self.show_report()
@@ -61,7 +60,7 @@ class Control(Controller):
         if not hasattr(self, "_tree"):
             try:
                 self._tree = Tree(self)
-            except Exception as e:
+            except Exception:
                 self.logger.exception("Failure building tree")
         return self._tree
 
@@ -133,8 +132,8 @@ class Tree:
                             break
                     if not alreadyHaveIt:
                         self.terms[parent].children.append(term)
-                except:
-                    cdrcgi.bail("No object for parent %s" % str(parent))
+                except Exception:
+                    self.__control.bail(f"No object for parent {parent}")
 
         # Optionally collect aliases.
         if self.control.flavor != "short":
@@ -198,7 +197,6 @@ class Tree:
             "  JOIN query_term n"
             "    ON n.doc_id = d.id"
             " WHERE n.path = '/Term/PreferredName'")
-
 
     class Term:
         def __init__(self, tree, name):

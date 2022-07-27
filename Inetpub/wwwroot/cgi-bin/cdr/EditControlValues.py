@@ -4,9 +4,9 @@
 """
 
 from json import dumps
-import cdr
-from cdrcgi import Controller, bail
+from cdrcgi import Controller
 from cdrapi.db import Query
+
 
 class Control(Controller):
     """Logic for managing the system control values."""
@@ -27,7 +27,7 @@ class Control(Controller):
         """Override so we can handle some custom commands."""
 
         if not self.session.can_do("SET_SYS_VALUE"):
-            bail("Not authorized to manage control values")
+            self.bail("Not authorized to manage control values")
         if self.request == self.SAVE:
             self.save()
         elif self.request == self.DELETE:
@@ -136,13 +136,13 @@ fieldset { width: 800px; }
         if not name and self.group:
             name = self.group[self.name].name
         if not (group and name):
-            bail("Can't save without both a group and a name.")
+            self.bail("Can't save without both a group and a name.")
         args = self.session, group, name, self.value
         opts = dict(comment=self.comment)
         try:
             self.session.tier.set_control_value(*args, **opts)
         except Exception as e:
-            bail(str(e))
+            self.bail(str(e))
         if self.new_group or self.new_name:
             self._groups = Groups()
             self._group = self.groups[group.lower()]
@@ -156,12 +156,12 @@ fieldset { width: 800px; }
         group = self.fields.getvalue("group")
         name = self.fields.getvalue("name")
         if not (group and name):
-            bail("Nothing to inactivate")
+            self.bail("Nothing to inactivate")
         args = self.session, group, name
         try:
             self.session.tier.inactivate_control_value(*args)
         except Exception as e:
-            bail(str(e))
+            self.bail(str(e))
         names = "_group", "_name", "_value", "_comment"
         self._groups = Groups()
         for name in names:
@@ -332,7 +332,6 @@ class Groups:
         """Make finding a group easier."""
         return self.groups.get(key)
 
-
     class Group:
         def __init__(self, name, key):
             """Capture the caller's values."""
@@ -360,7 +359,6 @@ class Groups:
         def __getitem__(self, name):
             """Make the object more dictionary-like."""
             return self.values.get(name)
-
 
     class Value:
         """Named value in a group."""
