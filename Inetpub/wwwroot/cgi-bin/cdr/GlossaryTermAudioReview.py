@@ -35,7 +35,7 @@ The script is complicated somewhat by the need to track separately
 the information in the database tables, and the information in the
 files on the disk, some of which are not yet reflected in the database.
 Here are the properties containing the information needed about the
-aufio file sets at various stages of processing:
+audio file sets at various stages of processing:
 
    zipfiles
 
@@ -67,11 +67,12 @@ from cdr import run_command
 from cdrcgi import Controller, Excel
 from cdrapi.settings import Tier
 from datetime import datetime
+from io import BytesIO
 from os import scandir
 from sys import stdout
 from re import compile
-from xlrd import open_workbook
 from zipfile import ZipFile
+from openpyxl import load_workbook
 
 
 class Control(Controller):
@@ -136,7 +137,7 @@ class Control(Controller):
                 "Click a hyperlinked mp3 filename to play the sound in "
                 "your browser-configured mp3 player (files which have "
                 "already been reviewed files are at the bottom of the "
-                "list of files.)",
+                "list of files).",
                 "Use the radio buttons to approve or reject a file.",
                 "When finished, click 'Save' to save any changes to "
                 "the database. If all files in the set have been reviewed "
@@ -633,7 +634,7 @@ class AudioSet:
     INSERT = f"INSERT INTO {TABLE} ({FIELD_LIST}) VALUES ({PLACEHOLDERS})"
     UPDATE = "UPDATE term_audio_zipfile SET complete = 'Y' WHERE id = ?"
     LANGUAGE_COL = 3
-    LANGUAGES = {"English", "Spanish"}
+    LANGUAGES = "English", "Spanish"
 
     def __init__(self, control, **opts):
         """Save caller's values.
@@ -824,11 +825,12 @@ class AudioSet:
                 self.control.bail("Excel workbook not found")
             with zipfile.open(book_name) as fp:
                 book_bytes = fp.read()
-        book = open_workbook(file_contents=book_bytes)
+        opts = dict(read_only=True, data_only=True)
+        book = load_workbook(BytesIO(book_bytes), **opts)
         args = book_name, len(book_bytes)
         self.control.logger.info("opened %s with %d bytes", *args)
-        sheet = book.sheet_by_index(0)
-        args = sheet.nrows, sheet.ncols
+        sheet = book.active
+        args = sheet.max_row, sheet.max_column
         self.control.logger.info("sheet has %d rows and %d columns", *args)
         args = diskfile.name, diskfile.datetime
         self.control.logger.info("inserting %s, %s", *args)
@@ -840,23 +842,26 @@ class AudioSet:
         self.control.logger.info("new row id is %d", set_id)
         last_values = [self.control.user_id, self.control.started]
         self.control.logger.info("query: %s", self.INSERT)
-        for row in range(sheet.nrows):
-            value = sheet.cell(row, 0).value
-            if value == "CDR ID":
+        row_number = 1
+        for row in sheet:
+            column_values = [column.value for column in row]
+            if len(column_values) < 8 or column_values[0] == "CDR ID":
                 continue
             try:
-                values = [set_id, int(value)]
+                values = [set_id, int(column_values[0])]
             except Exception:
-                self.control.logger.warning("row %d has %r", row, value)
+                args = row_number, column_values[0]
+                self.control.logger.warning("row %d has %r", *args)
                 continue
-            for col in range(1, 8):
-                values.append(sheet.cell(row, col).value)
+            values += column_values[1:8]
             if values[self.LANGUAGE_COL] not in self.LANGUAGES:
-                args = value[self.LANGUAGE_COL], row
-                self.cursor.bail("Invalid language %s in row %d", *args)
+                language = values[self.LANGUAGE_COL]
+                message = f"Invalid language {language} in row {row_number}"
+                self.control.bail(message)
             values += last_values
             self.control.logger.info("inserting values %s", values)
             self.cursor.execute(self.INSERT, values)
+            row_number += 1
         self.control.conn.commit()
         return set_id
 
