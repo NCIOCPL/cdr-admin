@@ -143,10 +143,9 @@ fieldset { width: 800px; }
             self.session.tier.set_control_value(*args, **opts)
         except Exception as e:
             self.bail(str(e))
-        if self.new_group or self.new_name:
-            self._groups = Groups()
-            self._group = self.groups[group.lower()]
-            self._name = name.lower()
+        self._groups = Groups()
+        self._group = self.groups[group.lower()]
+        self._name = name.lower()
         self.subtitle = "Value successfully saved"
         self.show_form()
 
