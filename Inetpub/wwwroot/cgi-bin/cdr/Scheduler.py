@@ -55,6 +55,7 @@ class Control(Controller):
     JOBS = "Jobs"
     ADD = "Add New Job"
     DELETE = "Delete Job"
+    JSON = "JSON"
     RUN = "Run Job Now"
     SAVE = "Save"
     JS = "/js/Scheduler.js"
@@ -177,6 +178,8 @@ class Control(Controller):
                 self.run_job()
             elif self.request == self.JOBS:
                 navigateTo(self.script, self.session.name)
+            elif self.request == self.JSON:
+                self.json()
             else:
                 Controller.run(self)
         except Exception as e:
@@ -231,12 +234,25 @@ class Control(Controller):
         self.conn.commit()
         navigateTo(self.script, self.session.name)
 
+    def json(self):
+        """Send the serialized jobs to the client."""
+
+        rows = self.cursor.execute("SELECT * FROM scheduled_job ORDER BY name")
+        json = dumps([tuple(row[1:]) for row in rows], indent=2)
+        self.send_page(json, "json")
+
     @property
     def buttons(self):
         """Customize the set of action buttons displayed."""
 
         if not self.job:
-            return self.ADD, self.DEVMENU, self.ADMINMENU, self.LOG_OUT
+            return (
+                self.ADD,
+                self.JSON,
+                self.DEVMENU,
+                self.ADMINMENU,
+                self.LOG_OUT,
+            )
         return (
             self.SAVE,
             self.DELETE,
