@@ -394,8 +394,8 @@ class Drug(Comments, Status):
             if first < last:
                 sheet.merge_range(first, col, last, col, "", cell_format)
             sheet.write_rich_string(first, col, *values, cell_format)
-            self.control.logger.info("write_cell(%d, %d, %d, %s)",
-                                     first, last, col, values)
+            self.control.logger.debug("write_cell(%d, %d, %d, %s)",
+                                      first, last, col, values)
         elif first == last:
             sheet.write(first, col, values, cell_format)
         else:
