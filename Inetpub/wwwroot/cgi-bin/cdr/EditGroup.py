@@ -208,11 +208,7 @@ fieldset#independent-actions div { width: 300px; }
         """Dynamic string for display under the main banner."""
 
         if not hasattr(self, "_subtitle"):
-            if self.name:
-                self._subtitle = f"Editing {self.name!r} group"
-            else:
-                self._subtitle = "Adding New Group"
-            self._subtitle = self.name or "Add New Group"
+            self._subtitle = self.group.name or "Add New Group"
         return self._subtitle
 
     @subtitle.setter
