@@ -10,7 +10,7 @@ import time
 import re
 import cdr
 from cdrcgi import Controller
-
+from functools import cached_property
 
 class Control(Controller):
     """Script master."""
@@ -179,40 +179,36 @@ Content-type: text/plain; charset=utf-8
             self._user_path = self.fields.getvalue("u")
         return self._user_path
 
-    @property
+    @cached_property
     def offsets(self):
         """Sequence of starting positions for each line in the file."""
 
         exceptions = []
-        while not hasattr(self, "_offsets"):
-            encodings = [self.encoding] if self.encoding else self.ENCODINGS
-            for encoding in encodings:
-                try:
-                    with open(self.path, encoding=encoding) as fp:
-                        offset = 0
-                        while True:
-                            try:
-                                line = fp.readline()
-                                break
-                            except UnicodeDecodeError:
-                                offset += 1
-                                if offset > 3:
-                                    self._offsets = None
-                                    return None
-                            fp.seek(offset)
-                        offsets = []
-                        while line:
-                            offsets.append(offset)
-                            offset = fp.tell()
+        encodings = [self.encoding] if self.encoding else self.ENCODINGS
+        for encoding in encodings:
+            offset = 0
+            try:
+                with open(self.path, encoding=encoding) as fp:
+                    while True:
+                        try:
                             line = fp.readline()
-                    self._offsets = offsets
-                    if not self.encoding:
-                        self.encoding = encoding
-                except Exception as e:
-                    exceptions.append(f"encoding {encoding!r}: {e}")
-        if not hasattr(self, "_offsets"):
-            self.bail(f"{self.path}: {exceptions}")
-        return self._offsets
+                            self.encoding = encoding
+                            break
+                        except UnicodeDecodeError as e:
+                            offset += 1
+                            if offset > 3:
+                                raise
+                            fp.seek(offset)
+                    offsets = []
+                    while line:
+                        offsets.append(offset)
+                        offset = fp.tell()
+                        line = fp.readline()
+                    return offsets
+            except Exception as e:
+                exception = f"offset {offset}, encoding {encoding!r}: {e}"
+                exceptions.append(exception)
+        self.bail(f"{self.path}: {exceptions}")
 
     @property
     def stat(self):
