@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 
+"""Update normalized links to selected summary.
+"""
 from cdrcgi import Controller
 from cdrapi.docs import Doc
 from datetime import datetime
+from functools import cached_property
 from lxml import etree
 from ModifyDocs import Job
 
@@ -14,18 +17,47 @@ class Control(Controller):
     LOGNAME = "update-summaryref-titles"
     COLS = "Linking ID", "Outcome"
     CAPTION = "Results"
+    CSS = "th, td { background-color: #e8e8e8; border-color: #bbb; }"
 
     def populate_form(self, page):
         """Ask for CDR ID of linked summary.
 
+        If we have the ID, but the user hasn't seen the list of Summary
+        documents which will be updated, show them. See OCECDR-5154.
         Pass:
             page - object on which we draw the form
         """
 
-        fieldset = page.fieldset("Document ID of Linked Summary")
-        opts = dict(label="CDR ID", value=self.id or "")
-        fieldset.append(page.text_field("id", **opts))
-        page.form.append(fieldset)
+        if not self.id:
+            fieldset = page.fieldset("Document ID of Linked Summary")
+            opts = dict(label="CDR ID", value=self.id or "")
+            fieldset.append(page.text_field("id", **opts))
+            page.form.append(fieldset)
+        else:
+            rows = []
+            for id in self.ids:
+                summary = self.Summary(self, page, id)
+                rows.append(summary.row)
+            table = page.B.TABLE(
+                page.B.CAPTION(
+                    "Summary Documents to be Updated",
+                    page.B.BR(),
+                    "Press 'Confirm' button to proceed with updates",
+                ),
+                page.B.THEAD(
+                    page.B.TR(
+                        page.B.TH("CDR ID"),
+                        page.B.TH("Title"),
+                        page.B.TH("Language"),
+                        page.B.TH("Audience"),
+                    )
+                ),
+                page.B.TBODY(*rows),
+            )
+            page.form.append(table)
+            page.form.append(page.hidden_field("id", self.id))
+            page.form.append(page.hidden_field("confirmed", "true"))
+            page.add_css(self.CSS)
 
     def build_tables(self):
         """Show the linking documents we examined.
@@ -34,7 +66,7 @@ class Control(Controller):
             `Reporter.Table` object
         """
 
-        if not self.id:
+        if not self.confirmed:
             self.show_form()
         self.logger.info("processing links to %s", self.cdr_id)
         job = Updater(self)
@@ -66,6 +98,11 @@ class Control(Controller):
         if not hasattr(self, "_cdr_id"):
             self._cdr_id = Doc.normalize_id(self.id) if self.id else None
         return self._cdr_id
+
+    @cached_property
+    def confirmed(self):
+        """The user has reviewed the list of linking docs and is ready."""
+        return True if self.fields.getvalue("confirmed") else False
 
     @property
     def id(self):
@@ -108,6 +145,47 @@ class Control(Controller):
                 title = rows[0].value if rows else ""
                 self._linked_title = title.strip()
         return self._linked_title
+
+
+    class Summary:
+
+        TITLE = "/Summary/SummaryTitle"
+        LANGUAGE = "/Summary/SummaryMetaData/SummaryLanguage"
+        AUDIENCE = "/Summary/SummaryMetaData/SummaryAudience"
+
+        def __init__(self, control, page, id):
+            """Capture information for linking Summary table row.
+
+            Pass:
+                control - access to the database
+                page - access to HTML-building tools
+                id - CDR ID for the Summary document
+            """
+
+            self.row = page.B.TR(
+                page.B.TD(str(control.id)),
+                page.B.TD(self.lookup(control, id, self.TITLE)),
+                page.B.TD(self.lookup(control, id, self.LANGUAGE)),
+                page.B.TD(self.lookup(control, id, self.AUDIENCE)),
+            )
+
+        def lookup(self, control, id, path):
+            """Find value from the query_term table for this Summary.
+
+            Pass:
+                control - access to the database
+                id - CDR ID for the Summary document
+                path - value for the path column in the query_term table
+
+            Return:
+                string for the requested value
+            """
+
+            query = control.Query("query_term", "value")
+            query.where(query.Condition("doc_id", id))
+            query.where(query.Condition("path", path))
+            row = query.execute(control.cursor).fetchone()
+            return row.value if row else "???"
 
 
 class Updater(Job):

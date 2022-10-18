@@ -43,6 +43,7 @@ class Control(Controller):
         "ReplacementFor",
         "ResponseToComment",
         "SectMetaData",
+        "StandardWording",
         "TypeOfSummaryChange",
     )
     RAW = (
