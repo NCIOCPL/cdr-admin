@@ -527,7 +527,10 @@ function add_file_field() {
             query.outer("pub_proc_cg c", "c.id = d.id")
             query.outer("query_term m", "m.doc_id = d.id",
                         "m.path = '/Summary/@ModuleOnly'")
-            query.where("(c.id IS NOT NULL OR m.value = 'Yes')")
+            query.outer("query_term s", "s.doc_id = d.id",
+                        "s.path = '/Summary/@SVPC'")
+            query.where("(c.id IS NOT NULL OR m.value = 'Yes' "
+                        "OR s.value = 'Yes')")
         query.unique()
         self.logger.debug("query: %s", query)
         return dict(query.execute(self.cursor).fetchall())
