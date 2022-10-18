@@ -16,7 +16,7 @@ class Control(Controller):
     """Script master."""
 
     SUBTITLE = "Log Viewer"
-    DEFAULT_PATH = f"{cdr.DEFAULT_LOGDIR}/PubJob.log"
+    DEFAULT_PATH = f"{cdr.DEFAULT_LOGDIR}/cdrpub.log"
     HEADERS = "Content-type: text/plain; charset=utf-8\n\n".encode("utf-8")
     ENCODINGS = "utf-8", "latin-1"
 

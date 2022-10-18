@@ -610,7 +610,7 @@ class GTN:
             self._head.append(compat)
             self._head.append(self.B.TITLE(self.title))
             for url in self.PRECONNECT:
-                link = self.B.LINK(rel="prevcocnnect", href=url)
+                link = self.B.LINK(rel="preconnect", href=url)
                 if not url.endswith("cancer.gov"):
                     link.set("crossorigin")
                 self._head.append(link)
