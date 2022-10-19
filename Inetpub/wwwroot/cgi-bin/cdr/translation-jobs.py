@@ -28,7 +28,8 @@ class Control(Controller):
         "c.value_name AS change",
         'u.fullname AS "user"',
         "j.state_date",
-        "j.comments"
+        "j.comments",
+        "q.value AS svpc",
     )
 
     def run(self):
@@ -77,7 +78,9 @@ class Control(Controller):
         query.join("document d", "d.id = j.english_id")
         query.join("summary_translation_state s", "s.value_id = j.state_id")
         query.join("summary_change_type c", "c.value_id = j.change_type")
-        query.order("s.value_pos", "u.fullname", "j.state_date")
+        query.outer("query_term q",
+                    "q.doc_id = d.id AND q.path = '/Summary/@SVPC'")
+        query.order("q.value DESC", "s.value_pos", "u.fullname", "j.state_date")
         rows = query.execute(self.cursor).fetchall()
         table = page.B.TABLE(
             page.B.CLASS("report"),
@@ -99,7 +102,9 @@ class Control(Controller):
         page.add_css(
             "th, td {"
             "    background-color: #e8e8e8; border-color: #bbb;"
-            "}")
+            "}"
+            " tr.svpc td, tr.svpc td a { color: green; }"
+        )
 
     @property
     def buttons(self):
@@ -184,7 +189,8 @@ class Job:
             B.TD(self.__row.user),
             B.TD(self.date, B.CLASS("nowrap")),
             B.TD(self.__row.change),
-            B.TD(self.comments)
+            B.TD(self.comments),
+            B.CLASS("svpc" if self.__row.svpc else "pdq"),
         )
 
     @property
