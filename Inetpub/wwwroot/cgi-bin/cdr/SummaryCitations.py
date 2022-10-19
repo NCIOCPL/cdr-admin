@@ -186,7 +186,8 @@ class Control(Controller):
 class Summary:
     """Summary and its citation references."""
 
-    FILTER = "set:Denormalization Summary Set"
+    FILTERS = ("set:QC Insertion/Deletion Set",
+               "set:Denormalization Summary Set")
 
     def __init__(self, control, id, version=None):
         """Remember the caller's values.
@@ -256,7 +257,7 @@ class Summary:
         """Denormalized summary document's DOM root."""
 
         if not hasattr(self, "_root"):
-            self._root = self.doc.filter(self.FILTER).result_tree.getroot()
+            self._root = self.doc.filter(*self.FILTERS).result_tree.getroot()
         return self._root
 
     @property
