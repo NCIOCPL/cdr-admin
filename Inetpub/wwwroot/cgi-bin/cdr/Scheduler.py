@@ -34,8 +34,10 @@ on the landing page for this script.
 
 """
 
+from functools import cached_property
 from importlib import import_module
 from json import loads, dumps
+from cdrapi import db
 from cdrcgi import Controller, navigateTo
 from cdr import ordinal
 from sys import path
@@ -196,7 +198,7 @@ class Control(Controller):
             self.name,
             self.enabled,
             self.job_class,
-            self.opts,
+            dumps(self.opts),
             self.schedule or None,
         ]
         if self.id:
@@ -209,22 +211,35 @@ class Control(Controller):
         self.show_form()
 
     def run_job(self):
-        """Queue up the current job to run immediately and redraw the form."""
+        """Queue up the current job to run immediately and redraw the form.
+
+        Note special handling for stopping the scheduler. See OCECDR-5125.
+        """
 
         if not self.name:
             self.bail("Job name is required")
         if not self.job_class:
             self.bail("Class name for job is required")
-        values = [
-            self.name,
-            True,
-            self.job_class,
-            self.opts,
-        ]
-        self.cursor.execute(
-            "INSERT INTO scheduled_job (name, enabled, job_class, opts)"
-            "     VALUES (?, ?, ?, ?)", values)
-        self.conn.commit()
+        if self.job_class == "stop_scheduler.Stop" and "dbserver" in self.opts:
+            conn = db.connect(server=self.opts["dbserver"])
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO scheduled_job (name, enabled, job_class, opts)"
+                " VALUES(?, 'TRUE', 'stop_scheduler.Stop', '{}')", (self.name,)
+            )
+            conn.commit()
+            self.logger.info("queued stop job in %s db", self.opts["dbserver"])
+        else:
+            values = [
+                self.name,
+                True,
+                self.job_class,
+                dumps(self.opts),
+            ]
+            self.cursor.execute(
+                "INSERT INTO scheduled_job (name, enabled, job_class, opts)"
+                "     VALUES (?, ?, ?, ?)", values)
+            self.conn.commit()
         self.show_form()
 
     def delete_job(self):
@@ -312,9 +327,9 @@ class Control(Controller):
             if self._job_class:
                 if self._job_class.count(".") != 1:
                     self.bail(self.JOB_CLASS_ERROR)
-                    module, name = self._job_class.split(".", 1)
-                    if not module.strip() or not name.strip():
-                        self.bail(self.JOB_CLASS_ERROR)
+                module, name = self._job_class.split(".", 1)
+                if not module.strip() or not name.strip():
+                    self.bail(self.JOB_CLASS_ERROR)
         return self._job_class
 
     @property
@@ -350,29 +365,27 @@ class Control(Controller):
                 self.bail("Internal error (invalid option count)")
         return self._num_opts
 
-    @property
+    @cached_property
     def opts(self):
         """Dictionary of named job parameters."""
 
-        if not hasattr(self, "_opts"):
-            opts = {}
-            i = 1
-            while i <= self.num_opts:
-                name = self.fields.getvalue(f"opt-name-{i:d}", "").strip()
-                value = self.fields.getvalue(f"opt-value-{i:d}", "").strip()
-                if name and value:
-                    if name in opts:
-                        self.bail(f"Duplicate option {name!r}")
-                    elif self.supported_parameters is not None:
-                        if name not in self.supported_parameters:
-                            message = f"Parameter {name!r} not supported"
-                            supported = ", ".join(self.supported_parameters)
-                            extra = [f"Supported parameters: {supported}"]
-                            self.bail(message, extra=extra)
-                    opts[name] = value
-                i += 1
-            self._opts = dumps(opts)
-        return self._opts
+        opts = {}
+        i = 1
+        while i <= self.num_opts:
+            name = self.fields.getvalue(f"opt-name-{i:d}", "").strip()
+            value = self.fields.getvalue(f"opt-value-{i:d}", "").strip()
+            if name and value:
+                if name in opts:
+                    self.bail(f"Duplicate option {name!r}")
+                elif self.supported_parameters is not None:
+                    if name not in self.supported_parameters:
+                        message = f"Parameter {name!r} not supported"
+                        supported = ", ".join(self.supported_parameters)
+                        extra = [f"Supported parameters: {supported}"]
+                        self.bail(message, extra=extra)
+                opts[name] = value
+            i += 1
+        return opts
 
     @property
     def schedule(self):
@@ -479,21 +492,18 @@ class Job:
                 self._job_class = self.__control.job_class
         return self._job_class
 
-    @property
+    @cached_property
     def opts(self):
         """Dictionary of named job parameters."""
 
-        if not hasattr(self, "_opts"):
-            if self.__row:
-                opts = self.__row.opts or "{}"
-            else:
-                opts = self.__control.opts
-            try:
-                self._opts = loads(opts)
-            except Exception:
-                self.__control.logger.exception(opts)
-                self._opts = {}
-        return self._opts
+        if not self.__row:
+            return self.__control.opts
+        opts = self.__row.opts or "{}"
+        try:
+            return loads(opts)
+        except Exception:
+            self.__control.logger.exception(opts)
+            return dict()
 
     @property
     def schedule(self):
