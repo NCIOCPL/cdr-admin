@@ -233,10 +233,12 @@ class Control(Controller):
             for node in root.xpath(self.CHANGES):
                 first = True
                 for child in node.findall("*"):
-                    if child.tag == "Para":
+                    if child.tag == "Para" and first:
                         first = False
-                    elif child.tag not in ("Title", "SectMetaData"):
-                        node.remove(child)
+                        continue
+                    elif child.tag in ("Title", "SectMetaData"):
+                        continue
+                    node.remove(child)
             etree.strip_elements(root, with_tail=False, *self.STRIP)
             etree.strip_attributes(root, "PdqKey")
             opts = dict(pretty_print=True, encoding="unicode")
