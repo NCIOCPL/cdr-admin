@@ -6,6 +6,7 @@ Provides a form with checkboxes to select drug terms to be refreshed from
 the EVS.
 """
 
+from collections import defaultdict
 from datetime import datetime
 from functools import cached_property
 from cdrapi.docs import Doc
@@ -19,6 +20,8 @@ class Control(Controller):
     SUBTITLE = "Drug Term Refresh"
     LOGNAME = "updates-from-evs"
     CSS = "../../stylesheets/RefreshDrugTermsFromEVS.css"
+    SORT_BY_NAME = "Sort By Name"
+    SORT_BY_ID = "Sort By CDR ID"
 
     def populate_form(self, page):
         """Show terms differing from the EVS.
@@ -35,8 +38,9 @@ class Control(Controller):
         if actions:
             EVS.show_updates(self, page, actions)
 
-        # Remember where we cached the concepts retrieved from the EVS.
+        # Remember settings which should be carried forward.
         page.form.append(page.hidden_field("concepts", self.concepts_path))
+        page.form.append(page.hidden_field("sort", self.sort))
 
         # Start building the form.
         start = datetime.now()
@@ -45,7 +49,19 @@ class Control(Controller):
 
         # Check each of the EVS concepts for deltas with the CDR documents.
         terms = 0
-        for concept in sorted(self.concepts.values()):
+        if self.sort == "name":
+            concepts = sorted(self.concepts.values())
+        else:
+            doc_ids = defaultdict(list)
+            for concept in self.concepts.values():
+                doc_id = self.codes.get(concept.code)
+                if doc_id:
+                    doc_ids[doc_id].append(concept)
+            concepts = []
+            for doc_id in sorted(doc_ids):
+                if len(doc_ids[doc_id]) == 1:
+                    concepts.append(doc_ids[doc_id][0])
+        for concept in concepts:
             doc = self.__doc_for_code(concept.code)
             if not doc:
                 continue
@@ -134,9 +150,29 @@ class Control(Controller):
         body.append(row)
         page.form.append(table)
 
+    def run(self):
+        """Allow the user to change the sort order."""
+        if self.request == self.SORT_BY_ID:
+            self.redirect(self.script, sort="id", concepts=self.concepts_path)
+        elif self.request == self.SORT_BY_NAME:
+            self.redirect(self.script, sort="name", concepts=self.concepts_path)
+        else:
+            Controller.run(self)
+
     def show_report(self):
         """Everything is shown on the form page."""
         self.show_form()
+
+    @cached_property
+    def buttons(self):
+        """Custom list of action buttons."""
+
+        standard = [self.SUBMIT, self.SUBMENU, self.ADMINMENU, self.LOG_OUT]
+        if self.sort == "id":
+            buttons = [self.SORT_BY_NAME]
+        else:
+            buttons = [self.SORT_BY_ID]
+        return buttons + standard
 
     @cached_property
     def codes(self):
@@ -173,6 +209,11 @@ class Control(Controller):
     def evs(self):
         """Access to common EVS utilities."""
         return EVS()
+
+    @cached_property
+    def sort(self):
+        """How will the terms be sorted?"""
+        return "id" if self.fields.getvalue("sort") == "id" else "name"
 
     def __doc_for_code(self, code):
         """Fetch the CDR document matching the caller's EVS concept code.
