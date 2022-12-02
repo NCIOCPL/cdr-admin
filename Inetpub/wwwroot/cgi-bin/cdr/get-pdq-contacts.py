@@ -77,7 +77,7 @@ class Partner:
 cursor = db.connect(user="CdrGuest").cursor()
 query = db.Query("query_term", "doc_id")
 query.where("path = '/Licensee/LicenseeInformation/LicenseeStatus'")
-query.where("value NOT LIKE '%inactive%'")
+query.where("value NOT IN ('Production-terminated', 'Test-expired', 'NA-Storefront')")
 doc_ids = [row.doc_id for row in query.execute(cursor).fetchall()]
 partners = []
 select = "SELECT xml FROM document WHERE id = ?"
