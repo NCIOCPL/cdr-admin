@@ -36,13 +36,11 @@ class Control(Controller):
         "Comment",
         "ComprehensiveReview",
         "DateLastModified",
-        "MediaLink",
         "PMID",
         "PdqKey",
         "RelatedDocuments",
         "ReplacementFor",
         "ResponseToComment",
-        "SectMetaData",
         "StandardWording",
         "TypeOfSummaryChange",
     )
@@ -233,8 +231,14 @@ class Control(Controller):
                     parent = node.getparent()
                     parent.remove(node)
             for node in root.xpath(self.CHANGES):
-                parent = node.getparent()
-                parent.remove(node)
+                first = True
+                for child in node.findall("*"):
+                    if child.tag == "Para" and first:
+                        first = False
+                        continue
+                    elif child.tag in ("Title", "SectMetaData"):
+                        continue
+                    node.remove(child)
             etree.strip_elements(root, with_tail=False, *self.STRIP)
             etree.strip_attributes(root, "PdqKey")
             opts = dict(pretty_print=True, encoding="unicode")
