@@ -18,6 +18,9 @@ class Control(Controller):
         for display, script in (
             ("Batch Job Status", "getBatchStatus.py"),
             ("Clear FileSweeper Lock File", "clear-filesweeper-lockfile.py"),
+            ("Client Files - Fetch", "FetchClientFile.py"),
+            ("Client Files - Install", "InstallClientFile.py"),
+            ("Client Files - Remove", "RemoveClientFile.py"),
             ("Delete CDR Documents", "del-some-docs.py"),
             ("Email Logged-in Users", "MessageLoggedInUsers.py"),
             ("Fetch Tier Settings", "fetch-tier-settings.py"),
@@ -49,7 +52,8 @@ class Control(Controller):
             ("Unblock Documents", "UnblockDoc.py"),
             ("Unlock Media", "UnlockMedia.py"),
             ("Update Mapping Table", "EditExternalMap.py"),
-            ("View Logs", "log-tail.py"),
+            ("View Client Logs", "ShowClientLogs.py"),
+            ("View Server Logs", "log-tail.py"),
         ):
             ol.append(page.B.LI(page.menu_link(script, display)))
         page.form.append(ol)
