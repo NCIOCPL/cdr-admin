@@ -19,10 +19,7 @@ class Control(Controller):
         "(including the filename), relative to {}, for the location where "
         "the file is to be installed. For example, Macros\\cdr.xml, or "
         "(for a file to be installed directly in the root of the client "
-        "files area) certificate.png. The file name in the location path "
-        "need not match that of the original file being uploaded, but it "
-        "must be included in the location field's value even if it does "
-        "match the original file name."
+        "files area) certificate.png."
     )
 
     def populate_form(self, page):
