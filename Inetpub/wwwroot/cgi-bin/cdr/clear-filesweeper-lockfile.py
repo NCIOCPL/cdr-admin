@@ -4,7 +4,7 @@
 # Release lock blocking future Hoover runs.
 # JIRA::OCECDR-4196
 # ----------------------------------------------------------------------
-import cgi
+
 import os
 import cdr
 import cdrcgi
@@ -16,7 +16,7 @@ def report(what):
     print(f"Content-type: text/plain\n\n{what}")
 
 
-fields = cgi.FieldStorage()
+fields = cdrcgi.FieldStorage()
 session = cdrcgi.getSession(fields)
 if not session or not cdr.canDo(session, "MANAGE SCHEDULER"):
     report("Not authorized")

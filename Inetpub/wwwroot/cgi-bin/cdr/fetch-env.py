@@ -3,13 +3,13 @@
 # ----------------------------------------------------------------------
 # Dump the server environment variables as json. Requires permission.
 # ----------------------------------------------------------------------
-import cgi
+
 import json
 import os
 import cdr
 import cdrcgi
 
-fields = cgi.FieldStorage()
+fields = cdrcgi.FieldStorage()
 session = cdrcgi.getSession(fields)
 if not session or not cdr.canDo(session, "GET SYS CONFIG"):
     cdrcgi.bail("go away")

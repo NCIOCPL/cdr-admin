@@ -5,7 +5,6 @@
 
 from sys import stdout
 from difflib import unified_diff
-import cgi
 from lxml import etree
 import json
 import requests
@@ -81,7 +80,7 @@ class Control:
         """CGI parameters."""
 
         if not hasattr(self, "_fields"):
-            self._fields = cgi.FieldStorage()
+            self._fields = cdrcgi.FieldStorage()
         return self._fields
 
     @property

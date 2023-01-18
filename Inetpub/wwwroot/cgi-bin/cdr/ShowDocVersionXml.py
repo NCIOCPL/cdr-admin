@@ -4,10 +4,9 @@
 # Display the XML for a CDR document version.
 # ---------------------------------------------------------------------
 
-from cgi import FieldStorage
 from sys import stdout
 from cdrapi import db
-from cdrcgi import bail
+from cdrcgi import bail, FieldStorage
 
 # ---------------------------------------------------------------------
 # Get the parameters from the request.

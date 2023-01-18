@@ -4,7 +4,6 @@
 # Collect settings from this tier as JSON.
 # OCECDR-4101
 # ----------------------------------------------------------------------
-import cgi
 import hashlib
 import json
 import os
@@ -162,7 +161,7 @@ class Settings:
 
 
 if __name__ == "__main__":
-    fields = cgi.FieldStorage()
+    fields = cdrcgi.FieldStorage()
     session = cdrcgi.getSession(fields)
     if not session or not cdr.canDo(session, "GET SYS CONFIG"):
         print("Status: 403\n\nUser not authorized for viewing system settings")

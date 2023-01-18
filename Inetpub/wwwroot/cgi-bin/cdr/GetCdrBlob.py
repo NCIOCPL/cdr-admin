@@ -7,7 +7,6 @@
 #
 # BZIssue::4767
 # ----------------------------------------------------------------------
-import cgi
 import cdrcgi
 import cdr
 import sys
@@ -118,7 +117,7 @@ class DocInfo:
 
 
 cursor = db.connect(user='CdrGuest').cursor()
-fields = cgi.FieldStorage()
+fields = cdrcgi.FieldStorage()
 docId = fields.getvalue('id') or cdrcgi.bail("Missing required 'id' parameter")
 docVer = fields.getvalue('ver') or ''
 disp = fields.getvalue("disp") or "attachment"

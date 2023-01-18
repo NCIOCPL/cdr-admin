@@ -49,7 +49,7 @@
 # JIRA::OCECDR-4190 - Let user pick version for DIS QC report
 #
 #----------------------------------------------------------------------
-import cgi
+
 import cdr
 import cdrcgi
 import os
@@ -98,7 +98,7 @@ filters = cdr.FILTERS
 # Get the parameters from the request.
 #----------------------------------------------------------------------
 repTitle = "CDR QC Report"
-fields   = cgi.FieldStorage() or cdrcgi.bail("No Request Found", repTitle)
+fields   = cdrcgi.FieldStorage() or cdrcgi.bail("No Request Found", repTitle)
 debug    = fields.getvalue("debug") and True or False
 if debug:
     os.environ["CDR_LOGGING_LEVEL"] = "DEBUG"
