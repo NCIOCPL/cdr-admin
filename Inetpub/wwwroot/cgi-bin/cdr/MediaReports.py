@@ -20,6 +20,8 @@ class Control(Controller):
         for display, script in (
             ("Board Meeting Recording Tracking Report",
              "RecordingTrackingReport.py"),
+            ("Image Demographic Information Report",
+             "ImageDemographicInformationReport.py"),
             ("Linked Media Documents", "MediaLinks.py"),
             ("Media Caption and Content Report", "MediaCaptionContent.py"),
             ("Media Doc Publishing Report", "PublishedMediaDocuments.py"),
