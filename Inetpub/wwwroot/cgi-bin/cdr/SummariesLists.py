@@ -3,6 +3,7 @@
 """Report on lists of summaries for selected PDQ boards.
 """
 
+from functools import cached_property
 from operator import itemgetter
 from cdrcgi import Controller
 
@@ -14,6 +15,7 @@ class Control(Controller):
         ("a", "Summaries and modules", False),
         ("s", "Summaries only", True),
         ("m", "Modules only", False),
+        ("p", "SVPC summaries", False),
     )
     ID_DISPLAY = (
         ("N", "Without CDR ID", True),
@@ -196,6 +198,7 @@ class Board:
     TABLES = (
         ("sa", "summary", "summaries"),
         ("ma", "module", "modules"),
+        ("p", "summary", "summaries"),
     )
 
     def __init__(self, control, doc_id):
@@ -227,7 +230,12 @@ class Board:
             query_term = "query_term"
             if not control.show_all:
                 query_term += "_pub"
-            cols = ["t.doc_id", "t.value AS title", "m.value AS module_only"]
+            cols = [
+                "t.doc_id",
+                "t.value AS title",
+                "m.value AS module_only",
+                "s.value as svpc",
+            ]
             if control.language != "English":
                 cols.append("o.value AS original_title")
             query = control.Query(f"{query_term} t", *cols).unique()
@@ -247,6 +255,8 @@ class Board:
                 query.join(f"{query_term} o", "o.doc_id = e.int_val")
                 query.where("e.path = '/Summary/TranslationOf/@cdr:ref'")
                 query.where("o.path = '/Summary/SummaryTitle'")
+            query.outer(f"{query_term} s", "s.doc_id = t.doc_id",
+                        "s.path = '/Summary/@SVPC'")
             b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
             query.where(query.Condition("b.path", b_path))
             query.where(query.Condition("b.int_val", self.id))
@@ -277,6 +287,11 @@ class Board:
             self._name = f"{self.control.boards[self.id]} Editorial Board"
         return self._name
 
+    @cached_property
+    def svpc(self):
+        """Which summaries are SVPC summaries?"""
+        return [doc for doc in self.docs if doc.svpc]
+
     @property
     def summaries(self):
         """Summary documents which can be published independently."""
@@ -296,9 +311,14 @@ class Board:
             self._tables = []
             for included, singular, plural in self.TABLES:
                 if self.control.included in included:
-                    docs = getattr(self, plural)
+                    if included == "p":
+                        docs = self.svpc
+                    else:
+                        docs = getattr(self, plural)
                     if docs:
                         what = singular if len(docs) == 1 else plural
+                        if included == "p":
+                            what = f"SVPC {what}"
                         caption = f"{self.name} ({len(docs)} {what})"
                         rows = []
                         for doc in sorted(docs):
@@ -353,6 +373,11 @@ class Summary:
             return self.__row.original_title
         except Exception:
             return None
+
+    @cached_property
+    def svpc(self):
+        """ True if this summary is an SVPC summary."""
+        return self.__row.svpc == "Yes"
 
     @property
     def title(self):
