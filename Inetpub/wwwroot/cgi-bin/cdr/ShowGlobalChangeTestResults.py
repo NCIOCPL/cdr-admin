@@ -185,6 +185,9 @@ class Control(Controller):
                 xml = etree.tostring(doc.root, **opts).replace("\r", "")
                 lines = [line for line in xml.split("\n") if line.strip()]
                 self._text = "\n".join(lines)
+            else:
+                nbsp = "[NON-BREAKING SPACE]"
+                self._text = self._text.replace("\xa0", nbsp)
         return self._text
 
 
