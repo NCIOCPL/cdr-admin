@@ -23,6 +23,8 @@ class Control(Controller):
             ("Audio Request Spreadsheet", "AudioRequestSpreadsheet.py"),
             ("Audio Review Glossary Term", "GlossaryTermAudioReview.py"),
             ("Batch Job Status", "getBatchStatus.py"),
+            ("Create Spanish Spellcheck Files for use with XMetaL",
+             "SpanishSpellcheckerFiles.py"),
             ("Create World Server Translated Summary",
              "post-translated-summary.py"),
             ("Fetch English Summary For Translation",
