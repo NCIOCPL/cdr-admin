@@ -45,6 +45,7 @@ class Control(Controller):
              "MatchDrugTermsByName.py"),
             ("Term Hierarchy Tree", "TermHierarchyTree.py"),
             ("Thesaurus Concepts Not Marked Public", "ocecdr-3588.py"),
+            ("Unsuppress Drug Terms", "SuppressedDrugTerms.py"),
         ):
             if len(item) == 3:
                 display, script, parms = item
