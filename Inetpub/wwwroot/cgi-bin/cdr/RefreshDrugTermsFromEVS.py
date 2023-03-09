@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 """Show drug terms which differ from their EVS counterparts.
 
