@@ -13,6 +13,7 @@ class Control(Controller):
     LOGNAME = "MediaLists"
     DIAGNOSIS_PATH = "/Media/MediaContent/Diagnoses/Diagnosis/@cdr:ref"
     CATEGORY_PATH = "/Media/MediaContent/Categories/Category"
+    MEDIA_TYPES = "Any", "Image", "Sound", "Video"
 
     def build_tables(self):
         """Assemble the report and return it."""
@@ -67,13 +68,22 @@ class Control(Controller):
         fieldset.append(page.checkbox("language", label="English", value="en"))
         fieldset.append(page.checkbox("language", label="Spanish", value="es"))
         page.form.append(fieldset)
+        fieldset = page.fieldset("Media Type")
+        checked = True
+        for t in self.MEDIA_TYPES:
+            opts = dict(label=t, value=t, checked=checked)
+            checked = False
+            fieldset.append(page.radio_button("type", **opts))
+        page.form.append(fieldset)
 
     @property
     def caption(self):
         """Strings to be displayed immediately above the report table."""
 
         if not hasattr(self, "_caption"):
+            s = "" if len(self.rows) == 1 else "s"
             self._caption = [
+                f"{len(self.rows)} Media Document{s}",
                 "Report Filtering",
                 f"Diagnosis: {self.diagnosis_names}",
                 f"Condition: {self.category_names}",
@@ -93,7 +103,7 @@ class Control(Controller):
 
         query = self.Query("query_term", "value").order("value").unique()
         query.where("path = '/Media/MediaContent/Categories/Category'")
-        query.where("value <> ''")
+        query.where("value <> '' AND value <> 'meeting recording'")
         return [row.value for row in query.execute(self.cursor).fetchall()]
 
     @property
@@ -199,6 +209,11 @@ class Control(Controller):
                 query.join(f"{table} c", "c.doc_id = m.doc_id")
                 query.where(query.Condition("c.path", self.CATEGORY_PATH))
                 query.where(query.Condition("c.value", self.category, "IN"))
+            else:
+                subquery = self.Query("query_term", "doc_id").unique()
+                subquery.where(query.Condition("path", self.CATEGORY_PATH))
+                subquery.where("value = 'meeting recording'")
+                query.where(query.Condition("m.doc_id", subquery, "NOT IN"))
             if self.diagnosis:
                 query.join(f"{table} d", "d.doc_id = m.doc_id")
                 query.where(query.Condition("d.path", self.DIAGNOSIS_PATH))
@@ -211,6 +226,11 @@ class Control(Controller):
                 else:
                     query.join(f"{table} t", "t.doc_id = m.doc_id")
                     query.where("t.path = '/Media/TranslationOf/@cdr:ref'")
+            if self.type != "Any":
+                pt = self.type
+                path = f"/Media/PhysicalMedia/{pt}Data/{pt}Encoding"
+                query.join(f"{table} p", "p.doc_id = m.doc_id")
+                query.where(f"p.path = '{path}'")
             query.log()
             rows = query.execute(self.cursor).fetchall()
             self._rows = [tuple(row) for row in rows]
@@ -248,6 +268,11 @@ class Control(Controller):
                     else:
                         query.join(f"{table} t", "t.doc_id = m.doc_id")
                         query.where("t.path = '/Media/TranslationOf/@cdr:ref'")
+                if self.type != "Any":
+                    pt = self.type
+                    path = "/Media/PhysicalMedia/{pt}Data/{pt}Encoding"
+                    query.join(f"{table} p", "p.doc_id = m.doc_id")
+                    query.where(f"p.path = '{path}'")
                 rows = query.execute(self.cursor).fetchall()
                 self.logger.info(f"{len(rows)} rows for {category} found")
                 category_count[category] = len(rows)
@@ -259,6 +284,10 @@ class Control(Controller):
         """True if we should include another column for the document IDs."""
         return "show_id" in self.options
 
+    @property
+    def type(self):
+        """Type of media to show on the report."""
+        return self.fields.getvalue("type")
 
 if __name__ == "__main__":
     """Don't execute the script if loaded as a module."""
