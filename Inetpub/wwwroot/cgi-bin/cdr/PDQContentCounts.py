@@ -16,8 +16,8 @@ class Control(Controller):
         ("PDQ Spanish HP summaries", "Spanish", "Health professionals", False),
         ("PDQ English patient summaries", "English", "Patients", False),
         ("PDQ Spanish patient summaries", "Spanish", "Patients", False),
-        ("PDQ English SVPC summaries", "English", None, True),
-        ("PDQ Spanish SVPC summaries", "Spanish", None, True),
+        ("English SVPC summaries", "English", None, True),
+        ("Spanish SVPC summaries", "Spanish", None, True),
     ]
     CONCEPT_PATH = "/GlossaryTermName/GlossaryTermConcept/@cdr:ref"
     COLUMNS = "Documents", "Count"
@@ -32,11 +32,17 @@ class Control(Controller):
         # Start by counting the cancer information summaries.
         rows = []
         cursor = db.connect(user="CdrGuest", tier="PROD").cursor()
+
+        # Change in requirements: don't include "module-only" summaries.
+        subquery = self.Query("query_term", "doc_id")
+        subquery.where("path = '/Summary/@ModuleOnly'")
+        subquery.where("value = 'Yes'")
         for title, language, audience, svpc in self.SUMMARIES:
             query = self.Query("query_term_pub l", "COUNT(*) AS n")
             query.where("l.path = '/Summary/SummaryMetaData/SummaryLanguage'")
             query.where(f"l.value = '{language}'")
             query.join("active_doc d", "d.id = l.doc_id")
+            query.where(query.Condition("d.id", subquery, "NOT IN"))
             if audience:
                 query.join("query_term_pub a", "a.doc_id = l.doc_id")
                 query.where(
@@ -78,7 +84,7 @@ class Control(Controller):
                 d_path = f"/GlossaryTermConcept/{definition_path}/Dictionary"
                 query = self.Query("query_term_pub n",
                                    "COUNT(DISTINCT n.doc_id) AS n")
-                query.join("pub_proc_cg p", "p.id = n.doc_id")
+                query.join("active_doc a", "a.id = n.doc_id")
                 query.join("query_term_pub c", "c.doc_id = n.doc_id")
                 query.join("query_term_pub d", "d.doc_id = c.int_val")
                 query.where(f"n.path = '{n_path}'")
@@ -100,19 +106,28 @@ class Control(Controller):
         rows.append([title, self.Reporter.Cell(count, right=True)])
 
         # For media, exclude images which we are reusing from journals, etc.
+        image_encoding_path = "/Media/PhysicalMedia/ImageData/ImageEncoding"
+        video_encoding_path = "/Media/PhysicalMedia/VideoData/VideoEncoding"
         query = self.Query("query_term_pub", "doc_id").unique()
         query.where("path LIKE '/Media/PermissionInformation%'")
         reused = {row.doc_id for row in query.execute(cursor).fetchall()}
+        query = self.Query("query_term_pub", "doc_id").unique()
+        query.where("path = '/Media/TranslationOf/@cdr:ref'")
+        spanish = {row.doc_id for row in query.execute(cursor).fetchall()}
         query = self.Query("query_term_pub e", "e.doc_id").unique()
         query.join("active_doc a", "a.id = e.doc_id")
+        query.where(f"e.path = '{image_encoding_path}'")
         query.where("e.path = '/Media/PhysicalMedia/ImageData/ImageEncoding'")
         images = {row.doc_id for row in query.execute(cursor).fetchall()}
         query = self.Query("query_term_pub e", "e.doc_id").unique()
         query.join("active_doc a", "a.id = e.doc_id")
-        query.where("e.path = '/Media/PhysicalMedia/VideoData/VideoEncoding'")
+        query.where(f"e.path = '{video_encoding_path}'")
         video = {row.doc_id for row in query.execute(cursor).fetchall()}
-        title = "Biomedical Images and Animations"
-        count = len((images - reused) | video)
+        title = "English Biomedical Images and Animations"
+        count = len(((images - reused) | video) ^ spanish)
+        rows.append([title, self.Reporter.Cell(count, right=True)])
+        title = "Spanish Biomedical Images and Animations"
+        count = len(((images - reused) | video) & spanish)
         rows.append([title, self.Reporter.Cell(count, right=True)])
         columns = (
             self.Reporter.Column("Documents", width="250px"),
