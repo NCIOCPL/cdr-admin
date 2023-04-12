@@ -9,7 +9,7 @@ Used for comparing filters across tiers
 from sys import stdout
 import cdr
 from cdrapi import db
-from cdrcgi import FieldStorage()
+from cdrcgi import FieldStorage
 
 logger = cdr.Logging.get_logger("filters")
 fields = FieldStorage()
