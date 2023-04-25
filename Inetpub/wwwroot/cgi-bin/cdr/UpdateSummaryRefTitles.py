@@ -163,7 +163,7 @@ class Control(Controller):
             """
 
             self.row = page.B.TR(
-                page.B.TD(str(control.id)),
+                page.B.TD(str(id)),
                 page.B.TD(self.lookup(control, id, self.TITLE)),
                 page.B.TD(self.lookup(control, id, self.LANGUAGE)),
                 page.B.TD(self.lookup(control, id, self.AUDIENCE)),
