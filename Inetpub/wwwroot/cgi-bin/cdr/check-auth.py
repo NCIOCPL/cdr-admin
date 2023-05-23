@@ -4,9 +4,10 @@
 # Determine whether an account is allowed to perform a CDR action.
 # JIRA::OCECDR-4107 - require authorization for viewing GP emailer list
 # ----------------------------------------------------------------------
-import cgi
+
 import cdr
 from cdrapi import db
+from cdrcgi import FieldStorage
 
 LOGNAME = "check-auth"
 LOGFILE = f"{cdr.DEFAULT_LOGDIR}/{LOGNAME}.log"
@@ -20,7 +21,7 @@ Content-type: text/plain
 {yn}""")
 
 
-fields = cgi.FieldStorage()
+fields = FieldStorage()
 try:
     session = fields.getvalue("Session")
     action = fields.getvalue("action")

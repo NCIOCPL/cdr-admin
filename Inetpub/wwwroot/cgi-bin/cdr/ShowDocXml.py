@@ -4,8 +4,7 @@
 # Sends the raw XML for a document to a browser.  Useful with IE5.x,
 # which by default shows a hierarchical tree display for the data.
 # ---------------------------------------------------------------------
-from cgi import FieldStorage
-from cdrcgi import sendPage, bail, DOCID
+from cdrcgi import sendPage, bail, DOCID, FieldStorage
 from cdrapi.docs import Doc
 from cdrapi.users import Session
 

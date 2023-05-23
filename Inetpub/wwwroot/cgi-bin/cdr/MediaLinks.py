@@ -3,13 +3,14 @@
 """Report listing all document that link to Media documents
 """
 
+from functools import cached_property
 from cdrcgi import Controller
 
 
 class Control(Controller):
 
     SUBTITLE = "Documents that Link to Media Documents"
-    DOCTYPES = "Glossary Term", "Summary"
+    DOCTYPES = "Glossary Terms", "Glossary Definitions", "Summaries"
     COLUMNS = "CDR ID", "Document Title"
 
     def populate_form(self, page):
@@ -30,9 +31,11 @@ class Control(Controller):
         if not self.types:
             self.show_form()
         tables = []
-        if "Glossary Term" in self.types:
+        if "Glossary Terms" in self.types:
             tables.append(self.glossary_terms)
-        if "Summary" in self.types:
+        if "Glossary Definitions" in self.types:
+            tables.append(self.glossary_definitions)
+        if "Summaries" in self.types:
             tables.append(self.summaries)
         return tables
 
@@ -46,41 +49,54 @@ class Control(Controller):
         self.report.page.add_css("\n".join(css))
         self.report.send()
 
-    @property
-    def glossary_terms(self):
+    @cached_property
+    def glossary_definitions(self):
         """Table for glossary terms which link to media documents."""
 
-        if not hasattr(self, "_glossary_terms"):
-            d_path = "/GlossaryTermConcept/TermDefinition/DefinitionText"
-            fields = "d.doc_id", "d.value"
-            query = self.Query("query_term_pub d", *fields).unique()
-            query.join("query_term_pub o", "o.doc_id = d.doc_id")
-            query.join("query_term_pub m", "m.doc_id = o.int_val")
-            query.where(f"d.path = '{d_path}'")
-            query.where("m.path LIKE '%MediaID/@cdr:ref'")
-            rows = query.order("d.value").execute(self.cursor).fetchall()
-            caption = f"Glossary Terms ({len(rows)})"
-            opts = dict(columns=self.COLUMNS, caption=caption)
-            self._glossary_terms = self.Reporter.Table(rows, **opts)
-        return self._glossary_terms
+        d_path = "/GlossaryTermConcept/TermDefinition/DefinitionText"
+        fields = "d.doc_id", "d.value"
+        query = self.Query("query_term_pub d", *fields).unique()
+        #query.join("query_term_pub o", "o.doc_id = d.doc_id")
+        #query.join("query_term_pub m", "m.doc_id = o.int_val")
+        query.join("query_term_pub m", "m.doc_id = d.doc_id")
+        query.where(f"d.path = '{d_path}'")
+        query.where("m.path LIKE '/GlossaryTermConcept/%MediaID/@cdr:ref'")
+        rows = query.order("d.value").execute(self.cursor).fetchall()
+        caption = f"Glossary Definitions ({len(rows)})"
+        opts = dict(columns=self.COLUMNS, caption=caption)
+        return self.Reporter.Table(rows, **opts)
 
-    @property
+    @cached_property
+    def glossary_terms(self):
+        """Table for glossary terms whose concepts link to media documents."""
+
+        c_path = "/GlossaryTermName/GlossaryTermConcept/@cdr:ref"
+        query = self.Query("query_term_pub n", "n.doc_id", "n.value").unique()
+        query.where("n.path = '/GlossaryTermName/TermName/TermNameString'")
+        query.join("query_term_pub c", "c.doc_id = n.doc_id")
+        query.where(f"c.path = '{c_path}'")
+        query.join("query_term_pub m", "m.doc_id = c.int_val")
+        query.where("m.path LIKE '/GlossaryTermConcept/%MediaID/@cdr:ref'")
+        rows = query.order("n.value").execute(self.cursor).fetchall()
+        caption = f"Glossary Terms ({len(rows)})"
+        opts = dict(columns=self.COLUMNS, caption=caption)
+        return self.Reporter.Table(rows, **opts)
+
+    @cached_property
     def summaries(self):
         """Table for summaries which link to media documents."""
 
-        if not hasattr(self, "_summaries"):
-            fields = "t.doc_id", "t.value"
-            query = self.Query("query_term_pub t", *fields).order("t.value")
-            query.join("query_term_pub m", "m.doc_id = t.doc_id")
-            query.where("t.path = '/Summary/SummaryTitle'")
-            query.where("m.path LIKE '/Summary/%MediaID/@cdr:ref'")
-            rows = query.unique().execute(self.cursor).fetchall()
-            caption = f"Summaries ({len(rows)})"
-            opts = dict(columns=self.COLUMNS, caption=caption)
-            self._summaries = self.Reporter.Table(rows, **opts)
-        return self._summaries
+        fields = "t.doc_id", "t.value"
+        query = self.Query("query_term_pub t", *fields).order("t.value")
+        query.join("query_term_pub m", "m.doc_id = t.doc_id")
+        query.where("t.path = '/Summary/SummaryTitle'")
+        query.where("m.path LIKE '/Summary/%MediaID/@cdr:ref'")
+        rows = query.unique().execute(self.cursor).fetchall()
+        caption = f"Summaries ({len(rows)})"
+        opts = dict(columns=self.COLUMNS, caption=caption)
+        return self.Reporter.Table(rows, **opts)
 
-    @property
+    @cached_property
     def types(self):
         """Document type(s) selected for the report."""
         return self.fields.getlist("type")

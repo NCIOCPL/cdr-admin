@@ -3,11 +3,10 @@
 # ----------------------------------------------------------------------
 # Sends back Excel workbook report to client.
 # ----------------------------------------------------------------------
-import cgi
 import cdrcgi
 import sys
 
-fields = cgi.FieldStorage()
+fields = cdrcgi.FieldStorage()
 name = fields and fields.getvalue('name') or cdrcgi.bail('Missing name')
 try:
     with open('d:/cdr/Reports/%s' % name, 'rb') as fp:

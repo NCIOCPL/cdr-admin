@@ -5,7 +5,6 @@
 # BZIssue::5001
 # ----------------------------------------------------------------------
 import sys
-import cgi
 import cdr
 import cdrcgi
 from io import BytesIO
@@ -13,7 +12,7 @@ from PIL import Image, ImageEnhance
 from cdrapi import db
 
 message = "GetCdrImage: No doc ID found"
-fields = cgi.FieldStorage()
+fields = cdrcgi.FieldStorage()
 width = fields.getvalue("width")
 res = fields.getvalue("res")
 fname = fields.getvalue("fname")

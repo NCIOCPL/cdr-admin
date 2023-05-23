@@ -49,8 +49,15 @@ class Control(Controller):
         for display, script in (
             ("Board Meeting Dates", "BoardMeetingDates.py"),
             ("PCIB Statistics Report", "RunPCIBStatReport.py"),
+            ("PDQ Content Counts (HTML)", "PDQContentCounts.py"),
         ):
             ol.append(page.B.LI(page.menu_link(script, display)))
+        link = page.menu_link(
+            "PDQContentCounts.py",
+            "PDQ Content Counts (Excel)",
+            format="excel"
+        )
+        ol.append(page.B.LI(link))
 
         # Section 3: other reports.
         page.body.set("class", "admin-menu")

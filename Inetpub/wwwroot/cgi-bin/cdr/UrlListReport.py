@@ -15,7 +15,8 @@ class Control(Controller):
     SUBTITLE = "URL List Report"
     LOGNAME = "URLListReport"
     COLUMNS = "Doc ID", "Doc Title", "URL", "Display Text", "Source Title"
-    QUERIES = dict(Summary="cis_query", DrugInformationSummary="dis_query")
+    QUERIES = dict(Summary="cis_query", DrugInformationSummary="dis_query",
+                   GlossaryTermConcept="gtc_query")
     DEFAULT_QUERY = "default_query"
 
     def populate_form(self, page):
@@ -72,6 +73,8 @@ class Control(Controller):
         query.join("query_term e", "e.doc_id = d.id")
         query.join("query_term x", "x.doc_id = e.doc_id",
                    "x.node_loc = e.node_loc")
+        # Not sure we want to join on x.doc_id instead of s.doc_id
+        # I'm leaving it as originally coded
         query.outer("query_term s", "x.doc_id = e.doc_id",
                     "s.node_loc = e.node_loc",
                     "s.path LIKE '%/ExternalRef/@SourceTitle'")
@@ -90,6 +93,25 @@ class Control(Controller):
         query.where("t.path = '/DrugInformationSummary/Title'")
         query.where("x.path LIKE '/Drug%/DrugReferenceLink/@cdr:xref'")
         query.where("x.value IS NOT NULL")
+        return query
+
+    @property
+    def gtc_query(self):
+        """Query for GlossaryTermConcept.
+           Users need to find URLs for ExternalRef and RelatedExternalRef."""
+
+        fields = "d.id", "d.title", "x.value", "e.value", "s.value"
+        query = self.Query("document d", *fields).order("d.id")
+        query.join("doc_type t", "t.id = d.doc_type")
+        query.join("query_term e", "e.doc_id = d.id")
+        query.join("query_term x", "x.doc_id = e.doc_id",
+                   "x.node_loc = e.node_loc")
+        query.outer("query_term s", "s.doc_id = e.doc_id",
+                    "s.node_loc = e.node_loc",
+                    "s.path LIKE '%/%ExternalRef/@SourceTitle'")
+        query.where(query.Condition("t.name", self.doctype))
+        query.where("e.path LIKE '%/%ExternalRef'")
+        query.where("x.path LIKE '%/%ExternalRef/@cdr:xref'")
         return query
 
     @property

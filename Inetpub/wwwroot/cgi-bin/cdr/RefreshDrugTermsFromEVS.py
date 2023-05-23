@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 """Show drug terms which differ from their EVS counterparts.
 
@@ -6,6 +6,7 @@ Provides a form with checkboxes to select drug terms to be refreshed from
 the EVS.
 """
 
+from collections import defaultdict
 from datetime import datetime
 from functools import cached_property
 from cdrapi.docs import Doc
@@ -19,6 +20,10 @@ class Control(Controller):
     SUBTITLE = "Drug Term Refresh"
     LOGNAME = "updates-from-evs"
     CSS = "../../stylesheets/RefreshDrugTermsFromEVS.css"
+    SORT_BY_NAME = "Sort By Name"
+    SORT_BY_ID = "Sort By CDR ID"
+    SUPPRESSED = "unrefreshable_drug_term"
+    SUPPRESS = f"INSERT INTO {SUPPRESSED} (id) VALUES (?)"
 
     def populate_form(self, page):
         """Show terms differing from the EVS.
@@ -30,13 +35,29 @@ class Control(Controller):
             page - HTMLPage object where we communicate with the user
         """
 
+        # Suppress any drug terms we've been asked to remove from the page.
+        suppress = self.fields.getlist("suppress")
+        if suppress:
+            for doc_id in suppress:
+                self.logger.info("%s: %r", self.SUPPRESS, doc_id)
+                try:
+                    self.cursor.execute(self.SUPPRESS, (doc_id,))
+                except Exception:
+                    self.logger.exception("suppressing CDR%d", doc_id)
+            self.logger.info("committing suppressions")
+            self.conn.commit()
+            self.logger.info("committed suppressions")
+
         # Perform and report any requested updates from the EVS.
         actions = self.fields.getlist("actions")
         if actions:
+            self.logger.info("actions: %r", actions)
             EVS.show_updates(self, page, actions)
+            self.logger.info("actions applied")
 
-        # Remember where we cached the concepts retrieved from the EVS.
+        # Remember settings which should be carried forward.
         page.form.append(page.hidden_field("concepts", self.concepts_path))
+        page.form.append(page.hidden_field("sort", self.sort))
 
         # Start building the form.
         start = datetime.now()
@@ -45,9 +66,21 @@ class Control(Controller):
 
         # Check each of the EVS concepts for deltas with the CDR documents.
         terms = 0
-        for concept in sorted(self.concepts.values()):
+        if self.sort == "name":
+            concepts = sorted(self.concepts.values())
+        else:
+            doc_ids = defaultdict(list)
+            for concept in self.concepts.values():
+                doc_id = self.codes.get(concept.code)
+                if doc_id:
+                    doc_ids[doc_id].append(concept)
+            concepts = []
+            for doc_id in sorted(doc_ids):
+                if len(doc_ids[doc_id]) == 1:
+                    concepts.append(doc_ids[doc_id][0])
+        for concept in concepts:
             doc = self.__doc_for_code(concept.code)
-            if not doc:
+            if not doc or doc.cdr_id in self.suppressed:
                 continue
             if not concept.differs_from(doc):
                 continue
@@ -57,10 +90,12 @@ class Control(Controller):
             label = f"Refresh CDR{doc.cdr_id} from {code} ({name})"
             value = f"{code}-{doc.cdr_id}"
             opts = dict(value=value, label=label)
-            checkbox = page.checkbox("actions", **opts)
+            refresh = page.checkbox("actions", **opts)
+            opts = dict(value=doc.cdr_id, label=f"Suppress CDR{doc.cdr_id}")
+            suppress = page.checkbox("suppress", **opts)
             body.append(
                 page.B.TR(
-                    page.B.TH(checkbox, colspan="3"),
+                    page.B.TH(suppress, refresh, colspan="3"),
                     page.B.CLASS("cb-row")
                 )
             )
@@ -134,9 +169,29 @@ class Control(Controller):
         body.append(row)
         page.form.append(table)
 
+    def run(self):
+        """Allow the user to change the sort order."""
+        if self.request == self.SORT_BY_ID:
+            self.redirect(self.script, sort="id", concepts=self.concepts_path)
+        elif self.request == self.SORT_BY_NAME:
+            self.redirect(self.script, sort="name", concepts=self.concepts_path)
+        else:
+            Controller.run(self)
+
     def show_report(self):
         """Everything is shown on the form page."""
         self.show_form()
+
+    @cached_property
+    def buttons(self):
+        """Custom list of action buttons."""
+
+        standard = [self.SUBMIT, self.SUBMENU, self.ADMINMENU, self.LOG_OUT]
+        if self.sort == "id":
+            buttons = [self.SORT_BY_NAME]
+        else:
+            buttons = [self.SORT_BY_ID]
+        return buttons + standard
 
     @cached_property
     def codes(self):
@@ -173,6 +228,31 @@ class Control(Controller):
     def evs(self):
         """Access to common EVS utilities."""
         return EVS()
+
+    @cached_property
+    def sort(self):
+        """How will the terms be sorted?"""
+        return "id" if self.fields.getvalue("sort") == "id" else "name"
+
+    @cached_property
+    def suppressed(self):
+        """Drug terms which the users don't want to see.
+
+        Handle the case in which the table hasn't been created yet.
+        """
+
+        query = self.Query(self.SUPPRESSED, "id")
+        try:
+            return {row.id for row in query.execute(self.cursor).fetchall()}
+        except Exception:
+            self.cursor.execute(f"CREATE TABLE {self.SUPPRESSED} "
+                                "(id INTEGER PRIMARY KEY)")
+            self.cursor.execute(f"ALTER TABLE {self.SUPPRESSED} "
+                                "ADD FOREIGN KEY(id) REFERENCES all_docs")
+            self.cursor.execute(f"GRANT SELECT ON {self.SUPPRESSED} "
+                                "TO CdrGuest")
+            self.conn.commit()
+            return set()
 
     def __doc_for_code(self, code):
         """Fetch the CDR document matching the caller's EVS concept code.

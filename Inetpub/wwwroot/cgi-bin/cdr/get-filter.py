@@ -6,13 +6,13 @@ Fetch XML for CDR filter
 Used for comparing filters across tiers
 """
 
-import cgi
 from sys import stdout
 import cdr
 from cdrapi import db
+from cdrcgi import FieldStorage
 
 logger = cdr.Logging.get_logger("filters")
-fields = cgi.FieldStorage()
+fields = FieldStorage()
 title = fields.getvalue("title")
 if not title:
     print("Status: 400 Missing title\n")

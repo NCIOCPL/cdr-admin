@@ -4,9 +4,9 @@
 # Return json-encoded dump of the client DLL trace logs, used to
 # track down what might be causing XMetaL to lock up or crash.
 # ----------------------------------------------------------------------
-from cgi import FieldStorage
 from json import dumps
 from cdrapi import db
+from cdrcgi import FieldStorage
 
 FIELDS = "log_id", "log_saved", "cdr_user", "session_id", "log_data"
 

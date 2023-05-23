@@ -49,7 +49,7 @@
 # JIRA::OCECDR-4190 - Let user pick version for DIS QC report
 #
 #----------------------------------------------------------------------
-import cgi
+
 import cdr
 import cdrcgi
 import os
@@ -98,7 +98,7 @@ filters = cdr.FILTERS
 # Get the parameters from the request.
 #----------------------------------------------------------------------
 repTitle = "CDR QC Report"
-fields   = cgi.FieldStorage() or cdrcgi.bail("No Request Found", repTitle)
+fields   = cdrcgi.FieldStorage() or cdrcgi.bail("No Request Found", repTitle)
 debug    = fields.getvalue("debug") and True or False
 if debug:
     os.environ["CDR_LOGGING_LEVEL"] = "DEBUG"
@@ -411,6 +411,7 @@ kpbox    = fields.getvalue("Keypoints")  or None
 learnmore= fields.getvalue("LearnMore")  or None
 modMarkup= fields.getvalue("ModuleMarkup")     or None
 qcOnly   = fields.getvalue("QCOnlyMod")  or None
+sumRefs  = fields.getvalue("SummaryRefs") or None
 
 standardWording      = fields.getvalue("StandardWording") or None
 audInternComments    = fields.getvalue("AudInternalComments")  or None
@@ -856,7 +857,9 @@ if letUserPickVersion:
                        'QCOnlyMod':
                             'Display QC-only Modules (Board Members QC Report)',
                        'SMD':
-                            'Display Section Meta Data'
+                            'Display Section Meta Data',
+                       'SummaryRefs':
+                            'Display Summary Ref and Fragment Ref Links'
                  }
 
     radioBtnLabels = { 'PubImages':{'pubYes':'... use publishable version',
@@ -893,6 +896,8 @@ if letUserPickVersion:
                                 inputID='displayQCOnlyMod', checked=0)
             form += addCheckbox(checkboxLabels, 'SMD',
                                 inputID='displaySectMetaData', checked=0)
+            form += addCheckbox(checkboxLabels, 'SummaryRefs',
+                                inputID='displaySummaryRefs', checked=0)
 
         # End - Misc Print Options block
         # ------------------------------
@@ -1129,6 +1134,8 @@ if letUserPickVersion:
                                 inputID='displayQCOnlyMod', checked=0)
             form += addCheckbox(checkboxLabels, 'SMD',
                                 inputID='displaySectMetaData', checked=0)
+            form += addCheckbox(checkboxLabels, 'SummaryRefs',
+                                inputID='displaySummaryRefs', checked=0)
 
         # End - Misc Print Options block
         # ------------------------------
@@ -1728,6 +1735,8 @@ filterParm.append(['DisplayGlossaryTermList',
                        glossary and "Y" or "N"])
 filterParm.append(['DisplayImages',
                        images and "Y" or "N"])
+filterParm.append(['DisplaySummaryRefList',
+                       sumRefs and "Y" or "N"])
 if images:
     filterParm.append(['DisplayPubImages', pubImages ])
 filterParm.append(['DisplayCitations',

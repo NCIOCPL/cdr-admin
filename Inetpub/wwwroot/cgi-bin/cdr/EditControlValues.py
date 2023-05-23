@@ -13,6 +13,7 @@ class Control(Controller):
 
     SAVE = "Save"
     DELETE = "Delete"
+    JSON = "JSON"
     SHOW = "Show All Values"
     SUBTITLE = "Manage Control Values"
     LOGNAME = "EditControlValues"
@@ -32,6 +33,8 @@ class Control(Controller):
             self.save()
         elif self.request == self.DELETE:
             self.inactivate()
+        elif self.request == self.JSON:
+            self.json()
         else:
             Controller.run(self)
 
@@ -143,10 +146,9 @@ fieldset { width: 800px; }
             self.session.tier.set_control_value(*args, **opts)
         except Exception as e:
             self.bail(str(e))
-        if self.new_group or self.new_name:
-            self._groups = Groups()
-            self._group = self.groups[group.lower()]
-            self._name = name.lower()
+        self._groups = Groups()
+        self._group = self.groups[group.lower()]
+        self._name = name.lower()
         self.subtitle = "Value successfully saved"
         self.show_form()
 
@@ -170,6 +172,10 @@ fieldset { width: 800px; }
         self.subtitle = "Value successfully deleted"
         self.show_form()
 
+    def json(self):
+        """Send the serialized active values to the client."""
+        self.send_page(self.groups.json, "json")
+
     @property
     def buttons(self):
         """Supply a customized set of action buttons."""
@@ -177,6 +183,7 @@ fieldset { width: 800px; }
         return (
             self.SAVE,
             self.DELETE,
+            self.JSON,
             self.SHOW,
             self.DEVMENU,
             self.ADMINMENU,
