@@ -50,6 +50,7 @@ class Control(Controller):
                 page.B.THEAD(
                     page.B.TR(
                         page.B.TH("Update?"),
+                        page.B.TH("Locked?"),
                         page.B.TH("CDR ID"),
                         page.B.TH("Title"),
                         page.B.TH("Language"),
@@ -160,10 +161,13 @@ class Control(Controller):
                 id - CDR ID for the Summary document
             """
 
+            self.id = id
+            self.control = control
             opts = dict(value=id, label="", checked=True)
             center = page.B.CLASS("center")
             self.row = page.B.TR(
                 page.B.TD(page.checkbox("selected", **opts), center),
+                page.B.TD("Yes" if self.locked else "No", center),
                 page.B.TD(str(id)),
                 page.B.TD(self.lookup(control, id, self.TITLE)),
                 page.B.TD(self.lookup(control, id, self.LANGUAGE)),
@@ -188,6 +192,15 @@ class Control(Controller):
             row = query.execute(control.cursor).fetchone()
             return row.value if row else "???"
 
+        @cached_property
+        def locked(self):
+            """True iff the summary document is currently checked out."""
+
+            query = self.control.Query("checkout", "dt_out")
+            query.where(query.Condition("id", self.id))
+            query.where("dt_in IS NULL")
+            rows = query.execute(self.control.cursor).fetchall()
+            return len(rows) > 0
 
 class Updater(Job):
     """Global change job used to update SummaryRef titles."""
