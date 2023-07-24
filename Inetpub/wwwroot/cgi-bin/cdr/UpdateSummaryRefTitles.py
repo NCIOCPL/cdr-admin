@@ -50,7 +50,7 @@ class Control(Controller):
                 page.B.THEAD(
                     page.B.TR(
                         page.B.TH("Update?"),
-                        page.B.TH("Locked?"),
+                        page.B.TH("Locked By"),
                         page.B.TH("CDR ID"),
                         page.B.TH("Title"),
                         page.B.TH("Language"),
@@ -167,7 +167,7 @@ class Control(Controller):
             center = page.B.CLASS("center")
             self.row = page.B.TR(
                 page.B.TD(page.checkbox("selected", **opts), center),
-                page.B.TD("Yes" if self.locked else "No", center),
+                page.B.TD(self.locked_by or ""),
                 page.B.TD(str(id)),
                 page.B.TD(self.lookup(control, id, self.TITLE)),
                 page.B.TD(self.lookup(control, id, self.LANGUAGE)),
@@ -193,14 +193,15 @@ class Control(Controller):
             return row.value if row else "???"
 
         @cached_property
-        def locked(self):
-            """True iff the summary document is currently checked out."""
+        def locked_by(self):
+            """None or name of user who has the document checked out."""
 
-            query = self.control.Query("checkout", "dt_out")
-            query.where(query.Condition("id", self.id))
-            query.where("dt_in IS NULL")
+            query = self.control.Query("usr u", "u.fullname")
+            query.join("checkout c", "c.usr = u.id")
+            query.where(query.Condition("c.id", self.id))
+            query.where("c.dt_in IS NULL")
             rows = query.execute(self.control.cursor).fetchall()
-            return len(rows) > 0
+            return rows[0][0] if rows else None
 
 class Updater(Job):
     """Global change job used to update SummaryRef titles."""
