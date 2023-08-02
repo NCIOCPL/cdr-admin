@@ -167,7 +167,7 @@ class Control(Controller):
         @property
         def url(self):
             """Address of the web page for the trial at NLM."""
-            return f"https://clinicaltrials.gov/ct2/study/{self.nctid}"
+            return f"https://clinicaltrials.gov/study/{self.nctid}"
 
 
 if __name__ == "__main__":
