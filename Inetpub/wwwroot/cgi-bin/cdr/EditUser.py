@@ -147,6 +147,8 @@ fieldset.text-fields-box textarea {
             office=self.office,
             phone=self.phone,
         )
+        if self.user.id:
+            opts["id"] = self.user.id
         if self.authmode == "local":
             if self.password != self.confirm:
                 self.bail("Password confirmation mismatch")
