@@ -54,7 +54,8 @@ function filter_doc(extra) {
         jQuery.each([
             "editorial", "advisory", "glosspatient", "glosshp", "publish",
             /* "internal", "external", */
-            "isqc", "ispp", "approved", "proposed", "glossary", "stdword", "loeref"
+            "isqc", "ispp", "approved", "proposed", "images", "glossary",
+            "stdword", "loeref"
         ], function(i, name) {
             if (jQuery("#" + name + ":checked").length)
                 url += "&" + name + "=true";
@@ -214,7 +215,12 @@ function filter_doc(extra) {
       </fieldset>
 -->
       <fieldset>
-        <legend>Miscellaneous Print Options</legend>
+        <legend>Miscellaneous Display Options</legend>
+        <div>
+          <input type="checkbox" name="images" value="true" id="images"
+                 checked>
+          <label for="images" class="clickable">Images</label>
+        </div>
         <div>
           <input type="checkbox" name="glossary" value="true" id="glossary"
                  onclick="glossary_clicked()">
