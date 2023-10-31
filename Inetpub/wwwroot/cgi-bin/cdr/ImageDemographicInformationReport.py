@@ -116,6 +116,8 @@ class Control(Controller):
                 caption.append(f"from {self.start}")
         elif self.end:
             caption.append(f"through {self.end}")
+        if self.report_type == "images":
+            caption.append(f"Number of rows: {len(self.rows)}")
         return caption
 
     @cached_property
@@ -218,8 +220,9 @@ class Control(Controller):
         """
 
         # Get the query started using the chosen selection method.
-        query = self.Query("query_term i", "i.doc_id").unique()
+        query = self.Query("query_term_pub i", "i.doc_id").unique()
         query.where("i.path = '/Media/PhysicalMedia/ImageData/ImageType'")
+        query.join("active_doc a", "a.id = i.doc_id")
         match self.selection_method:
             case "id":
                 if not self.image_id:
@@ -229,7 +232,7 @@ class Control(Controller):
                 if not self.image_title:
                     self.bail("No image title specified.")
                 title = self.image_title
-                query.join("query_term t", "t.doc_id = i.doc_id")
+                query.join("query_term_pub t", "t.doc_id = i.doc_id")
                 query.where ("t.path = '/Media/MediaTitle'")
                 query.where(query.Condition("t.value", title, "LIKE"))
             case "category":
@@ -237,7 +240,7 @@ class Control(Controller):
                 if not self.image_category:
                     self.bail("No image categories selected.")
                 categories = self.image_category
-                query.join("query_term c", "c.doc_id = i.doc_id")
+                query.join("query_term_pub c", "c.doc_id = i.doc_id")
                 query.where(f"c.path = '{path}'")
                 query.where(query.Condition("c.value", categories, "IN"))
             case _:
@@ -249,18 +252,18 @@ class Control(Controller):
                 "translation_of.doc_id = i.doc_id",
                 "translation_of.path = '/Media/TranslationOf/@cdr:ref'"
             )
-            query.outer("query_term translation_of", *join_conditions)
+            query.outer("query_term_pub translation_of", *join_conditions)
             query.where("translation_of.int_val IS NULL")
         elif self.language == "spanish":
             join_condition = "translation_of.doc_id = i.doc_id"
-            query.join("query_term translation_of", join_condition)
+            query.join("query_term_pub translation_of", join_condition)
             query.where("translation_of.path = '/Media/TranslationOf/@cdr:ref'")
 
         # Filter on audience as requested.
         audiences = dict(hp="Health_professionals", patient="Patients")
         audience = audiences.get(self.audience)
         if audience:
-            query.join("query_term audience", "audience.doc_id = i.doc_id")
+            query.join("query_term_pub audience", "audience.doc_id = i.doc_id")
             query.where("audience.path LIKE '/Media%/@audience'")
             query.where(query.Condition("audience.value", audience))
 
@@ -362,8 +365,9 @@ class Control(Controller):
         fields = "s.doc_id AS summary_id", "i.doc_id as image_id"
         query = self.Query("query_term s", *fields).unique()
         query.where("s.path LIKE '/Summary/%MediaID/@cdr:ref'")
-        query.join("query_term i", "i.doc_id = s.int_val")
+        query.join("query_term_pub i", "i.doc_id = s.int_val")
         query.where("i.path = '/Media/PhysicalMedia/ImageData/ImageType'")
+        query.join("active_doc", "active_doc.id = i.doc_id")
         match self.selection_method:
             case "id":
                 if not self.summary_id:
@@ -686,7 +690,7 @@ jQuery(function() {
 
     def __apply_common_filtering(self, query):
         """Narrow the report further, if requested.
-        
+
         Required positional argument:
             query - the Query object to be altered, as appropriate
         """
@@ -721,52 +725,9 @@ jQuery(function() {
             if self.end:
                 end = f"{self.end} 23:59:59"
                 query.where(query.Condition("document.first_pub", end, "<="))
-        
+
         # Log tbe assembled query.
         query.log(label="Image Demographic Report Query")
-
-    @property
-    def xxxsummaries(self):
-        """PDQ summaries (`Summary` objects) to be displayed on the report."""
-
-        if not hasattr(self, "_summaries"):
-            fields = "q.doc_id", "q.value AS title"
-            if self.id:
-                query = db.Query("query_term q", *fields).unique()
-                query.where(query.Condition("doc_id", self.id))
-            else:
-                audience = f"{self.AUDIENCES.get(self.audience)}s"
-                language = self.language.title()
-                b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
-                t_path = "/Summary/TranslationOf/@cdr:ref"
-                a_path = "/Summary/SummaryMetaData/SummaryAudience"
-                l_path = "/Summary/SummaryMetaData/SummaryLanguage"
-                query = db.Query("query_term q", *fields).unique()
-                query.join("active_doc d", "d.id = q.doc_id")
-                query.join("doc_version v", "v.id = d.id")
-                query.where("v.publishable = 'Y'")
-                query.join("query_term a", "a.doc_id = d.id")
-                query.where(query.Condition("a.path", a_path))
-                query.where(query.Condition("a.value", audience))
-                query.join("query_term l", "l.doc_id = d.id")
-                query.where(query.Condition("l.path", l_path))
-                query.where(query.Condition("l.value", language))
-                if "all" not in self.board:
-                    if language == "English":
-                        query.join("query_term_pub b", "b.doc_id = d.id")
-                    else:
-                        query.join("query_term_pub t", "t.doc_id = d.id")
-                        query.where(query.Condition("t.path", t_path))
-                        query.join("query_term b", "b.doc_id = t.int_val")
-                    query.where(query.Condition("b.path", b_path))
-                    query.where(query.Condition("b.int_val", self.board, "IN"))
-            query.where("q.path = '/Summary/SummaryTitle'")
-            self.logger.debug("query=\n%s", query)
-            self.logger.debug("self.board = %s", self.board)
-            query.log()
-            rows = query.execute(self.cursor).fetchall()
-            self._summaries = [Summary(self, row) for row in rows]
-        return self._summaries
 
 
     class Image:
@@ -830,6 +791,19 @@ jQuery(function() {
                     if value:
                         age.append(value)
             return age
+
+        @cached_property
+        def categories(self):
+            """Category strings assigned to this media document."""
+
+            categories = []
+            if self.root is not None:
+                path = "MediaContent/Categories/Category"
+                for node in self.root.findall(path):
+                    category = Doc.get_text(node, "").strip()
+                    if category:
+                        categories.append(category)
+            return categories
 
         @cached_property
         def doc(self):
@@ -1058,108 +1032,6 @@ jQuery(function() {
         def title(self):
             suffix = " [Module Only]" if self.module else ""
             return Doc.get_text(self.root.find("SummaryTitle")) + suffix
-
-class XXXSummary:
-    """Table of content (and auxilliary) information for one PDQ summary."""
-
-    from lxml import html as H
-    FILTERS = (
-        "name:Denormalization Filter: Summary Module",
-        "name:Wrap nodes with Insertion or Deletion",
-        "name:Clean up Insertion and Deletion",
-        "name:Summaries TOC Report",
-    )
-
-    def __init__(self, control, row):
-        """Remember the caller's information. Let properties do the real work.
-        """
-
-        self.__control = control
-        self.__row = row
-
-    @property
-    def board(self):
-        """String for the summary's PDQ Editorial board.
-
-        A summary typically has multiple board links. Only one will
-        match the controller's list of editorial boards shown on the
-        picklist. For a Spanish summary, we have to find the English
-        summary of which it is a translation, as that is the document
-        which will have the link to the editorial board we need.
-        """
-
-        if not hasattr(self, "_board"):
-            self._board = "Board not found"
-            b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
-            t_path = "/Summary/TranslationOf/@cdr:ref"
-            query = db.Query("query_term_pub b", "b.int_val").unique()
-            if self.control.language == "english":
-                query.where(query.Condition("b.path", b_path))
-                query.where(query.Condition("b.doc_id", self.id))
-            else:
-                query.join("query_term_pub t", "t.int_val = b.doc_id")
-                query.where(query.Condition("t.path", t_path))
-                query.where(query.Condition("t.doc_id", self.id))
-            for row in query.execute(self.control.cursor).fetchall():
-                board = self.control.boards.get(row.int_val)
-                if board:
-                    self._board = str(board)
-        return self._board
-
-    @property
-    def control(self):
-        """Access to report parameters and database connectivity."""
-        return self.__control
-
-    @property
-    def id(self):
-        """Unique CDR ID for the summary."""
-        return self.__row.doc_id
-
-    @property
-    def nodes(self):
-        """Sequence of HTML elements to be added to the report.
-
-        We use XSL/T filtering to generate the HTML fragments
-        for the report for this summary, which we then parse
-        so they can be added to the page object.
-        """
-
-        if not hasattr(self, "_nodes"):
-            opts = dict(id=self.id, version=self.version)
-            doc = Doc(self.control.session, **opts)
-            result = doc.filter(*self.FILTERS, parms=self.parms)
-            html = str(result.result_tree).strip()
-            self._nodes = self.H.fragments_fromstring(html)
-        return self._nodes
-
-    @property
-    def parms(self):
-        """Parameters for XSL/T filtering."""
-        level = str(self.control.level) or "999"
-        flag = "Y" if self.control.include_id else "N"
-        return dict(showLevel=level, showId=flag)
-
-    @property
-    def title(self):
-        """Title for the PDQ Summary document."""
-        return self.__row.title
-
-    @property
-    def version(self):
-        """Which version of the document do we want to filter?"""
-        if self.control.selection_method == "board":
-            return None
-        if not self.control.version or self.control.version < 1:
-            return None
-        return self.control.version
-
-    def __lt__(self, other):
-        """Support sorting a sequence of `Summary` objects."""
-
-        title = self.title.lower()
-        other_title = other.title.lower()
-        return (self.board, title) < (other.board, other_title)
 
 
 if __name__ == "__main__":

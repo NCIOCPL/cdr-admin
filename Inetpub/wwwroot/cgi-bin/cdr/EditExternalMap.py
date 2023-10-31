@@ -96,7 +96,7 @@ function view_doc(id) {{
         errors = {}
         actions = {}
         for mapping_id in delete_requests:
-            if mapping_id in doc_ids:
+            if doc_ids.get(mapping_id):
                 errors[mapping_id] = [self.DELETION_BLOCKED]
                 continue
             mapping = mappings[mapping_id]
@@ -178,17 +178,17 @@ function view_doc(id) {{
                     errors[mapping_id] = [f"{action} not permitted"]
                     continue
                 values = [
-                    new_id,
+                    new_id or None,
                     "Y" if mapping.id in bogus else "N",
                     "Y" if mapping.id in mappable else "N",
                     self.session.user_id,
                     mapping.id,
                 ]
                 try:
+                    args = mapping.id, values
+                    self.logger.info("Updating mapping %d with %s", *args)
                     self.cursor.execute(self.UPDATE, values)
                     self.conn.commit()
-                    args = mapping.id, values
-                    self.logger.info("Updated mapping %d with %s", *args)
                     changes[mapping.id] = [page.B.LI(diff) for diff in diffs]
                 except Exception as e:
                     self.logger.exception("Updating mapping %d", mapping.id)

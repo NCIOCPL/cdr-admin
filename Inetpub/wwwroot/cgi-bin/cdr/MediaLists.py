@@ -87,6 +87,7 @@ class Control(Controller):
                 "Report Filtering",
                 f"Diagnosis: {self.diagnosis_names}",
                 f"Condition: {self.category_names}",
+                f"Media Type: {self.type}",
             ]
             if "active" in self.options:
                 self._caption.append("Excluding blocked documents")

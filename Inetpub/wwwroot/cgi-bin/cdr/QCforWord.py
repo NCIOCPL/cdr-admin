@@ -67,6 +67,10 @@ class Control(Controller):
         """Filtering parameters."""
 
         id = self.fields.getvalue("parmid") or self.bail("Missing parameters")
+
+        # Testing if 'parmid' includes a fragment ID
+        if '#' in id: id = id.split('#')[0]
+
         query = self.Query("url_parm_set", "longURL")
         query.where(query.Condition("id", id))
         rows = query.execute(self.cursor).fetchall()
