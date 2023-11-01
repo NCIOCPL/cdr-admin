@@ -204,8 +204,15 @@ class Control(Controller):
     def users(self):
         """List of users (for the picklist)."""
 
-        query = self.Query("usr", "name").order("name")
-        return [row.name for row in query.execute(self.cursor)]
+        query = self.Query("usr", "name", "expired").order("name")
+        active = []
+        inactive = []
+        for name, expired in query.execute(self.cursor):
+            if expired:
+                inactive.append([name, f"{name} (inactive)"])
+            else:
+                active.append([name, f"{name} (active)"])
+        return active + inactive
 
 
 class Document:

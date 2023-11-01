@@ -7,11 +7,12 @@ The report is partitioned into three sections:
   * New CDR drug terms.
   * Drug terms requiring review.
 
-Users enter a date range from which to select terms into an HTML form
+Users enter a date range from which to select terms into a CGI form
 and the software then produces the Excel format report.
 """
 
 from datetime import date, datetime, timedelta
+from functools import cached_property
 from io import BytesIO
 from sys import stdout
 from xlsxwriter import Workbook
@@ -27,8 +28,8 @@ class Control(Controller):
     INSTRUCTIONS = (
         "To prepare an Excel format report of Drug/Agent terms, "
         "enter a start date and an optional end date for the "
-        "creation or import of Drug/Agent terms.  Terms of semantic "
-        "type \"Drug/Agent\" that were created or imported in the "
+        "creation of Drug/Agent terms.  Terms of semantic "
+        "type \"Drug/Agent\" that were created in the "
         "specified date range will be included in the report."
     )
 
@@ -46,7 +47,7 @@ class Control(Controller):
     TERM_TYPE = "TType"
     SOURCE_ID = "SourceID"
     DEFS = "Definition"
-    LAST_MOD = "Last Modified"
+    CREATED = "Created"
 
     def populate_form(self, page):
         """Explain how to run the report and show the date fields.
@@ -90,65 +91,49 @@ Content-length: {len(book_bytes):d}
 """.encode("utf-8"))
         stdout.buffer.write(book_bytes)
 
-    @property
+    @cached_property
     def book(self):
         """Excel workbook for the report."""
+        return Workbook(self.output, dict(in_memory=True))
 
-        if not hasattr(self, "_book"):
-            opts = dict(in_memory=True)
-            self._book = Workbook(self.output, opts)
-        return self._book
-
-    @property
+    @cached_property
     def end(self):
         """User's selection for the end of the report's date range."""
+        return self.parse_date(self.fields.getvalue("end"))
 
-        if not hasattr(self, "_end"):
-            self._end = self.parse_date(self.fields.getvalue("end"))
-        return self._end
-
-    @property
+    @cached_property
     def output(self):
         """Memory stream to capture the Excel workbook's bytes."""
+        return BytesIO()
 
-        if not hasattr(self, "_output"):
-            self._output = BytesIO()
-        return self._output
-
-    @property
+    @cached_property
     def start(self):
         """User's selection for the beginning of the report's date range."""
+        return self.parse_date(self.fields.getvalue("start"))
 
-        if not hasattr(self, "_start"):
-            self._start = self.parse_date(self.fields.getvalue("start"))
-        return self._start
-
-    @property
+    @cached_property
     def styles(self):
         """Formats for the reports."""
 
-        if not hasattr(self, "_styles"):
-            styles = dict(
-                comment=dict(italic=True, font_color="green"),
-                data=dict(align="left", valign="top", text_wrap=True),
-                divider=dict(fg_color="#C0C0C0"),
-                header=dict(
-                    align="center",
-                    bold=True,
-                    fg_color="blue",
-                    font_color="white",
-                ),
-                merge=dict(align="center", bold=True),
-            )
+        styles = dict(
+            comment=dict(italic=True, font_color="green"),
+            data=dict(align="left", valign="top", text_wrap=True),
+            divider=dict(fg_color="#C0C0C0"),
+            header=dict(
+                align="center",
+                bold=True,
+                fg_color="blue",
+                font_color="white",
+            ),
+            merge=dict(align="center", bold=True),
+        )
+        class Styles:
+            def __init__(self, book, styles):
+                for name in styles:
+                    setattr(self, name, book.add_format(styles[name]))
+        return Styles(self.book, styles)
 
-            class Styles:
-                def __init__(self, book, styles):
-                    for name in styles:
-                        setattr(self, name, book.add_format(styles[name]))
-            self._styles = Styles(self.book, styles)
-        return self._styles
-
-    @property
+    @cached_property
     def testing(self):
         """Boolean flag for suppressing writing the HTML headers."""
         return True if self.fields.getvalue("test") else False
@@ -177,8 +162,8 @@ Content-length: {len(book_bytes):d}
     def __collect_terms(self):
         """Identify the terms needed for the report.
 
-        Find all of the drug term documents last modified in the date
-        range specified by the user. Populates three sequences of terms
+        Find all of the drug term documents created in the date range
+        specified by the user. Populates three sequences of terms
         document references, one for each of the tables in the report:
           * terms imported from the NCI thesaurus
           * terms created in the CDR
@@ -199,12 +184,12 @@ Content-length: {len(book_bytes):d}
         query.where("t.path = '/Term/SemanticType/@cdr:ref'")
         query.where(query.Condition("t.int_val", subquery))
         if self.start or self.end:
-            query.join("query_term m", "m.doc_id = t.doc_id")
-            query.where("m.path = '/Term/DateLastModified'")
+            query.join("audit_trail a", "a.document = t.doc_id")
+            query.where("a.action = 1")
             if self.start:
-                query.where(f"m.value >= '{self.start}'")
+                query.where(f"a.dt >= '{self.start}'")
             if self.end:
-                query.where(f"m.value <= '{self.end} 23:59:59'")
+                query.where(f"a.dt <= '{self.end} 23:59:59'")
         doc_ids = [row[0] for row in query.execute(self.cursor).fetchall()]
         for doc_id in (sorted(doc_ids)):
             term = Drug(self, doc_id)
@@ -240,7 +225,7 @@ Content-length: {len(book_bytes):d}
             cols.append(Column(self.TERM_TYPE, 15))
             cols.append(Column(self.SOURCE_ID, 10))
             cols.append(Column(self.DEFS, 100))
-        cols.append(Column(self.LAST_MOD, 12))
+        cols.append(Column(self.CREATED, 12))
         return cols
 
 
@@ -249,18 +234,17 @@ class Comments:
 
     PUBLIC = "External"
 
-    @property
+    @cached_property
     def comments(self):
         """Collect the Comment children of the node for this object."""
 
-        if not hasattr(self, "_comments"):
-            self._comments = []
-            for child in self.node.findall("Comment"):
-                if child.get("audience") == self.PUBLIC:
-                    text = Doc.get_text(child, "").strip()
-                    if text:
-                        self._comments.append(text)
-        return self._comments
+        comments = []
+        for child in self.node.findall("Comment"):
+            if child.get("audience") == self.PUBLIC:
+                text = Doc.get_text(child, "").strip()
+                if text:
+                    comments.append(text)
+        return comments
 
 
 class Status:
@@ -273,13 +257,10 @@ class Status:
         """True if this definition needs review."""
         return self.status == self.PROBLEMATIC
 
-    @property
+    @cached_property
     def status(self):
         """The review status for the definition."""
-
-        if not hasattr(self, "_status"):
-            self._status = Doc.get_text(self.node.find("ReviewStatus"))
-        return self._status
+        return Doc.get_text(self.node.find("ReviewStatus"))
 
 
 class Drug(Comments, Status):
@@ -288,11 +269,7 @@ class Drug(Comments, Status):
     THESAURUS = "NCI Thesaurus"
 
     def __init__(self, control, doc_id):
-        """Fetch and parse the Term document.
-
-        Perform the wrapping of values with comments at object
-        construction time so we don't have to do it multiple times for
-        terms which appear in more than one table.
+        """Capture the caller's arguments.
 
         Pass:
             control - access to the database and workbook styles
@@ -341,7 +318,7 @@ class Drug(Comments, Status):
             other_name.write_cells(self, sheet, row + i, cols)
         if Control.DEFS in cols:
             self.write_cell(*common, cols[Control.DEFS], definitions)
-        self.write_cell(*common, cols[Control.LAST_MOD], self.last_modified)
+        self.write_cell(*common, cols[Control.CREATED], self.created)
         return last + 1
 
     def write_cell(self, sheet, first, last, col, values):
@@ -355,17 +332,6 @@ class Drug(Comments, Status):
           * rich text sequence stored in a single cell
           * single string value stored in a set of merged cells
           * rich text sequence stored in a set of merged cells
-
-        Note that the xlwt package does not have a method for
-        storing rich text in a multi-cell range. What you have to
-        do instead is perform the operation in two steps:
-
-          * write a styled placeholder to the range
-          * store the rich text sequence in the first cell of the range
-
-        In order to make this work, you have to suppress the block
-        which prevents overwriting the contents of a cell you've already
-        written to (see http://stackoverflow.com/questions/41770461).
 
         Note that there is a bug in Microsoft Excel, which prevents the
         auto-height feature from working properly. So the user may need to
@@ -394,8 +360,8 @@ class Drug(Comments, Status):
             if first < last:
                 sheet.merge_range(first, col, last, col, "", cell_format)
             sheet.write_rich_string(first, col, *values, cell_format)
-            self.control.logger.debug("write_cell(%d, %d, %d, %s)",
-                                      first, last, col, values)
+            args = first, last, col, values
+            self.control.logger.debug("write_cell(%d, %d, %d, %s)", *args)
         elif first == last:
             sheet.write(first, col, values, cell_format)
         else:
@@ -406,45 +372,45 @@ class Drug(Comments, Status):
         """Access to the database and workbook styles."""
         return self.__control
 
-    @property
+    @cached_property
+    def created(self):
+        """When the document was first created."""
+
+        query = self.control.Query("audit_trail", "dt")
+        query.where(query.Condition("document", self.__doc_id))
+        query.where("action = 1")
+        rows = query.execute(self.control.cursor).fetchall()
+        return rows[0][0].strftime("%Y-%m-%d") if rows else ""
+
+    @cached_property
     def definitions(self):
         """Alternate names for the drug term."""
 
-        if not hasattr(self, "_definitions"):
-            self._definitions = []
-            for node in self.doc.root.findall("Definition"):
-                self._definitions.append(self.Definition(node))
-        return self._definitions
+        definitions = []
+        for node in self.doc.root.findall("Definition"):
+            definitions.append(self.Definition(node))
+        return definitions
 
-    @property
+    @cached_property
     def doc(self):
         """`Doc` object for the CDR Term document."""
+        return Doc(self.control.session, id=self.__doc_id)
 
-        if not hasattr(self, "_doc"):
-            self._doc = Doc(self.control.session, id=self.__doc_id)
-        return self._doc
-
-    @property
+    @cached_property
     def from_nci_thesaurus(self):
-        """
-        Determine whether the source for drug term was the NCI thesaurus.
-        """
+        """`True` iff the source for this drug term was the NCI thesaurus."""
 
         for other_name in self.other_names:
             if other_name.source and other_name.source.code == self.THESAURUS:
                 return True
         return False
 
-    @property
+    @cached_property
     def last_modified(self):
         """When was this drug term document last modified?"""
+        return Doc.get_text(self.doc.root.find("DateLastModified"))
 
-        if not hasattr(self, "_last_modified"):
-            node = self.doc.root.find("DateLastModified")
-            self._last_modified = Doc.get_text(node)
-        return self._last_modified
-
-    @property
+    @cached_property
     def name(self):
         """String for the drug's preferred name.
 
@@ -452,15 +418,13 @@ class Drug(Comments, Status):
         strings, one for the name itself and the other for the comments.
         """
 
-        if not hasattr(self, "_name"):
-            node = self.doc.root.find("PreferredName")
-            self._name = Doc.get_text(node, "").strip()
-            if self.comments:
-                comments = [f"\n[{comment}]" for comment in self.comments]
-                self._name = self._name, "".join(comments)
-        return self._name
+        name = Doc.get_text(self.doc.root.find("PreferredName"), "").strip()
+        if not self.comments:
+            return name
+        comments = [f"\n[{comment}]" for comment in self.comments]
+        return name, "".join(comments)
 
-    @property
+    @cached_property
     def node(self):
         """Top-level node for the Term document.
 
@@ -468,17 +432,16 @@ class Drug(Comments, Status):
         """
         return self.doc.root
 
-    @property
+    @cached_property
     def other_names(self):
         """Alternate names for the drug term."""
 
-        if not hasattr(self, "_other_names"):
-            self._other_names = []
-            for node in self.doc.root.findall("OtherName"):
-                self._other_names.append(self.OtherName(node))
-        return self._other_names
+        names = []
+        for node in self.doc.root.findall("OtherName"):
+            names.append(self.OtherName(node))
+        return names
 
-    @property
+    @cached_property
     def problematic(self):
         """True if the drug should a appear on the list of terms to review."""
 
@@ -493,8 +456,7 @@ class Drug(Comments, Status):
         return False
 
     def __wrap_definitions(self, definitions):
-        """
-        Assemble the cell contents for the drug term's definitions.
+        """Assemble the cell contents for the drug term's definitions.
 
         Pass:
             definitions  - sequence of Definition objects for the drug term
@@ -543,7 +505,7 @@ class Drug(Comments, Status):
             """Portion of the Term document for this definition."""
             return self.__node
 
-        @property
+        @cached_property
         def text(self):
             """The text of the definition, stripped of markup.
 
@@ -552,12 +514,11 @@ class Drug(Comments, Status):
             comments, each comment on its own line.
             """
 
-            if not hasattr(self, "_text"):
-                self._text = Doc.get_text(self.node.find("DefinitionText"))
-                if self.comments:
-                    comments = [f"\n[{comment}]" for comment in self.comments]
-                    self._text = self._text, "".join(comments)
-            return self._text
+            text = Doc.get_text(self.node.find("DefinitionText"))
+            if self.comments:
+                comments = [f"\n[{comment}]" for comment in self.comments]
+                text = text, "".join(comments)
+            return text
 
     class OtherName(Comments, Status):
         """An alternate name for the drug term."""
@@ -586,7 +547,7 @@ class Drug(Comments, Status):
                 if col:
                     term.write_cell(sheet, row, row, col, value)
 
-        @property
+        @cached_property
         def name(self):
             """String for this alternate name.
 
@@ -598,37 +559,28 @@ class Drug(Comments, Status):
             format styling in the report.
             """
 
-            if not hasattr(self, "_name"):
-                node = self.node.find("OtherTermName")
-                self._name = Doc.get_text(node, "").strip()
-                if self.comments:
-                    comments = [f"\n[{comment}]" for comment in self.comments]
-                    self._name = self._name, "".join(comments)
-            return self._name
+            name = Doc.get_text(self.node.find("OtherTermName"), "").strip()
+            if self.comments:
+                comments = [f"\n[{comment}]" for comment in self.comments]
+                name = name, "".join(comments)
+            return name
 
         @property
         def node(self):
             """Portion of the Term document for this alternate name."""
             return self.__node
 
-        @property
+        @cached_property
         def source(self):
             """Source information for this alternate name."""
 
-            if not hasattr(self, "_source"):
-                node = self.node.find("SourceInformation/VocabularySource")
-                self._source = None
-                if node is not None:
-                    self._source = self.Source(node)
-            return self._source
+            node = self.node.find("SourceInformation/VocabularySource")
+            return None if node is None else self.Source(node)
 
-        @property
+        @cached_property
         def type(self):
             """String for the type of this other name."""
-
-            if not hasattr(self, "_type"):
-                self._type = Doc.get_text(self.node.find("OtherNameType"))
-            return self._type
+            return Doc.get_text(self.node.find("OtherNameType"))
 
         class Source:
             """Identification of the origin of the term's alternate name."""

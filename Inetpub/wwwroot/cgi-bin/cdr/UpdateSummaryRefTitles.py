@@ -1,7 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 """Update normalized links to selected summary.
 """
+
 from cdrcgi import Controller
 from cdrapi.docs import Doc
 from datetime import datetime
@@ -42,10 +43,14 @@ class Control(Controller):
                 page.B.CAPTION(
                     "Summary Documents to be Updated",
                     page.B.BR(),
+                    "Unckeck the documents which should not be updated",
+                    page.B.BR(),
                     "Press 'Confirm' button to proceed with updates",
                 ),
                 page.B.THEAD(
                     page.B.TR(
+                        page.B.TH("Update?"),
+                        page.B.TH("Locked By"),
                         page.B.TH("CDR ID"),
                         page.B.TH("Title"),
                         page.B.TH("Language"),
@@ -56,7 +61,6 @@ class Control(Controller):
             )
             page.form.append(table)
             page.form.append(page.hidden_field("id", self.id))
-            page.form.append(page.hidden_field("confirmed", "true"))
             page.add_css(self.CSS)
 
     def build_tables(self):
@@ -66,14 +70,14 @@ class Control(Controller):
             `Reporter.Table` object
         """
 
-        if not self.confirmed:
+        if not self.selected:
             self.show_form()
         self.logger.info("processing links to %s", self.cdr_id)
         job = Updater(self)
         job.run()
-        self.logger.info("assembling table for %d docs", len(self.ids))
+        self.logger.info("assembling table for %d docs", len(self.selected))
         rows = []
-        for id in self.ids:
+        for id in self.selected:
             if id in job.successes:
                 outcome = "Processed"
             elif id in job.unavailable:
@@ -91,60 +95,55 @@ class Control(Controller):
         self.logger.info("returning table with %d rows", len(rows))
         return self.Reporter.Table(rows, cols=self.COLS, caption=self.CAPTION)
 
-    @property
+    @cached_property
     def cdr_id(self):
         """Normalized CDR ID of the linked summary."""
-
-        if not hasattr(self, "_cdr_id"):
-            self._cdr_id = Doc.normalize_id(self.id) if self.id else None
-        return self._cdr_id
+        return Doc.normalize_id(self.id) if self.id else None
 
     @cached_property
-    def confirmed(self):
-        """The user has reviewed the list of linking docs and is ready."""
-        return True if self.fields.getvalue("confirmed") else False
-
-    @property
     def id(self):
         """CDR ID of the linked summary."""
 
-        if not hasattr(self, "_id"):
-            self._id = self.fields.getvalue("id", "").strip()
-            if self._id:
-                try:
-                    self._id = Doc.extract_id(self._id)
-                except Exception:
-                    self._id = None
-        return self._id
+        id = self.fields.getvalue("id", "").strip()
+        if not id:
+            return None
+        try:
+            return Doc.extract_id(id)
+        except Exception:
+            return None
 
-    @property
+    @cached_property
     def ids(self):
         """CDR IDs of the linking summaries."""
 
-        if not hasattr(self, "_ids"):
-            self._ids = None
-            if self.id:
-                query = self.Query("query_term", "doc_id").unique()
-                query.where("path LIKE '/Summary%/SummaryRef/@cdr:href'")
-                query.where(query.Condition('int_val', self.id))
-                rows = query.execute(self.cursor).fetchall()
-                self._ids = sorted([row.doc_id for row in rows])
-        return self._ids
+        if not self.id:
+            return None
+        query = self.Query("query_term", "doc_id").unique()
+        query.where("path LIKE '/Summary%/SummaryRef/@cdr:href'")
+        query.where(query.Condition('int_val', self.id))
+        rows = query.execute(self.cursor).fetchall()
+        return sorted([row.doc_id for row in rows])
 
-    @property
+    @cached_property
     def linked_title(self):
         """SummaryTitle for the linked CDR document."""
 
-        if not hasattr(self, "_linked_title"):
-            self._linked_title = None
-            if self.id:
-                query = self.Query("query_term", "value")
-                query.where(query.Condition("doc_id", self.id))
-                query.where("path = '/Summary/SummaryTitle'")
-                rows = query.execute(self.cursor).fetchall()
-                title = rows[0].value if rows else ""
-                self._linked_title = title.strip()
-        return self._linked_title
+        if not self.id:
+            return None
+        query = self.Query("query_term", "value")
+        query.where(query.Condition("doc_id", self.id))
+        query.where("path = '/Summary/SummaryTitle'")
+        rows = query.execute(self.cursor).fetchall()
+        return (rows[0].value if rows else "").strip()
+
+    @cached_property
+    def selected(self):
+        """IDs of the documents the user wants to update."""
+
+        try:
+            return [int(id) for id in self.fields.getlist("selected")]
+        except Exception:
+            self.bail()
 
 
     class Summary:
@@ -162,7 +161,13 @@ class Control(Controller):
                 id - CDR ID for the Summary document
             """
 
+            self.id = id
+            self.control = control
+            opts = dict(value=id, label="", checked=True)
+            center = page.B.CLASS("center")
             self.row = page.B.TR(
+                page.B.TD(page.checkbox("selected", **opts), center),
+                page.B.TD(self.locked_by or ""),
                 page.B.TD(str(id)),
                 page.B.TD(self.lookup(control, id, self.TITLE)),
                 page.B.TD(self.lookup(control, id, self.LANGUAGE)),
@@ -187,6 +192,16 @@ class Control(Controller):
             row = query.execute(control.cursor).fetchone()
             return row.value if row else "???"
 
+        @cached_property
+        def locked_by(self):
+            """None or name of user who has the document checked out."""
+
+            query = self.control.Query("usr u", "u.fullname")
+            query.join("checkout c", "c.usr = u.id")
+            query.where(query.Condition("c.id", self.id))
+            query.where("c.dt_in IS NULL")
+            rows = query.execute(self.control.cursor).fetchall()
+            return rows[0][0] if rows else None
 
 class Updater(Job):
     """Global change job used to update SummaryRef titles."""
@@ -207,7 +222,7 @@ class Updater(Job):
 
     def select(self):
         """Return sequence of CDR ID integers for documents to transform."""
-        return self.__control.ids
+        return sorted(self.__control.selected)
 
     def transform(self, doc):
         """Refresh the SummaryRef elements linked to the target summary.
@@ -230,14 +245,12 @@ class Updater(Job):
         # Return the results.
         return etree.tostring(root)
 
-    @property
+    @cached_property
     def comment(self):
         """Custom comment embedding CDR ID of linked summary document."""
 
-        if not hasattr(self, "_comment"):
-            self._comment = ("Updating SummaryRef titles (OCECDR-5068) "
-                             f"for {self.__control.cdr_id} {datetime.now()}")
-        return self._comment
+        return ("Updating SummaryRef titles (OCECDR-5068) "
+                f"for {self.__control.cdr_id} {datetime.now()}")
 
 
 if __name__ == "__main__":

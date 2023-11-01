@@ -36,6 +36,8 @@ class Control(Controller):
         "Comment",
         "ComprehensiveReview",
         "DateLastModified",
+        "DatedAction",
+        "PatientVersionOf",
         "PMID",
         "PdqKey",
         "RelatedDocuments",
@@ -43,6 +45,7 @@ class Control(Controller):
         "ResponseToComment",
         "StandardWording",
         "TypeOfSummaryChange",
+        "WillReplace",
     )
     RAW = (
         "ContentType: text/xml;charset=utf-8\n"
@@ -55,6 +58,7 @@ class Control(Controller):
         "body { background: white; }",
         "pre { font-size: 13px; }",
     )
+    URL = "https://www.cancer.gov/espanol/tipos"
 
     def populate_form(self, page):
         """Show the fields and the instruction.
@@ -223,6 +227,20 @@ class Control(Controller):
             xml = etree.tostring(self.doc.resolved, encoding="utf-8")
             parser = etree.XMLParser(remove_blank_text=True)
             root = etree.fromstring(xml, parser)
+            hp = None
+            node = root.find("PatientVersionOf")
+            if node is not None:
+                english_hp = node.get(f"{{{Doc.NS}}}ref")
+                if english_hp:
+                    query = self.Query("query_term", "doc_id")
+                    query.where(query.Condition("value", english_hp))
+                    query.where("path = '/Summary/TranslationOf/@cdr:ref'")
+                    rows = query.execute(self.cursor).fetchall()
+                    if rows:
+                        try:
+                            hp = Doc(self.session, id=rows[0].doc_id)
+                        except Exception as e:
+                            self.bail(f"oops! {e}")
             first = True
             for node in root.findall("SummaryMetaData/MainTopics"):
                 if first:
@@ -239,8 +257,21 @@ class Control(Controller):
                     elif child.tag in ("Title", "SectMetaData"):
                         continue
                     node.remove(child)
+            node = root.find("SummaryMetaData/SummaryLanguage")
+            if node is not None:
+                node.text = "Spanish"
+            node = root.find("SummaryMetaData/SummaryURL")
+            if node is not None:
+                node.set(f"{{{Doc.NS}}}xref", self.URL)
             etree.strip_elements(root, with_tail=False, *self.STRIP)
             etree.strip_attributes(root, "PdqKey")
+            node = etree.SubElement(root, "TranslationOf")
+            node.text = self.doc.title
+            node.set(f"{{{Doc.NS}}}ref", self.doc.cdr_id)
+            if hp is not None:
+                node = etree.SubElement(root, "PatientVersionOf")
+                node.text = hp.title
+                node.set(f"{{{Doc.NS}}}ref", hp.cdr_id)
             opts = dict(pretty_print=True, encoding="unicode")
             return etree.tostring(root, **opts)
         except Exception:

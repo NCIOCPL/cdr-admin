@@ -213,6 +213,7 @@ class Summary:
     SCRIPT = "PublishPreview.py"
     IMAGE_PATH = "/pdq/media/images"
     IMAGE_PATTERN = "pdq/media/images/([0-9-]+)\\.jpg"
+    NCI_LOGO = "files/ncids_header/logos/Logo_NCI\\.svg"
     CANCER_GOV = "https://www.cancer.gov"
     URL_PATHS = (
         "/Summary/SummaryMetaData/SummaryURL/@cdr:xref",
@@ -313,6 +314,18 @@ class Summary:
                     href = f"proxy.py?url={url}"
                     link.set("href", href)
             replacement = f"{self.CANCER_GOV}{self.IMAGE_PATH}"
+
+            # The NCI Logo sits within a picture element.  It's display
+            # needs to be handled differently from the img elements.
+            for source in page.iter("source"):
+                self.__control.show_progress("fixing NCI Logo link...")
+                srcset = source.get("srcset", "")
+                match = search(self.NCI_LOGO, srcset)
+                if match:
+                    source.set("srcset", f"{self.CANCER_GOV}{srcset}")
+                else:
+                    continue
+
             for img in page.iter("img"):
                 src = img.get("src", "")
                 img.set("osrc", src)

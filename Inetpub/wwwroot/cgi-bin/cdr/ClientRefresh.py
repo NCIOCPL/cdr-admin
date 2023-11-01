@@ -222,7 +222,7 @@ def make_delta(client_manifest):
             Control.logger.debug("client file %s to be deleted", name)
             to_be_deleted.append(name)
     updates = etree.Element("Updates")
-    if to_be_installed:
+    if to_be_installed or to_be_deleted and manifest_name:
         if manifest_name and manifest_name not in to_be_installed:
             to_be_installed.append(manifest_name)
         Control.logger.debug("sending %d files to be installed",

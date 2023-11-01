@@ -229,7 +229,7 @@ class Control(Controller):
 
     @property
     def glossary(self):
-        """True if glossary term print options are requested."""
+        """True if glossary term display options are requested."""
         return self.fields.getvalue("glossary") == "true"
 
     @property
@@ -244,7 +244,7 @@ class Control(Controller):
 
     @property
     def loeref(self):
-        """True if level-of-evidence print options are requested."""
+        """True if level-of-evidence display options are requested."""
         return self.fields.getvalue("loeref") == "true"
 
     @cached_property
@@ -266,6 +266,7 @@ class Control(Controller):
             delRevLevels="N" if self.redline_strikeout else "Y",
             DisplayComments=self.comments,
             DisplayGlossaryTermList="Y" if self.glossary else "N",
+            DisplayImages="Y" if self.display_images else "N",
             ShowStandardWording="Y" if self.standard_wording else "N",
             displayBoard="_".join(self.boards),
             displayAudience="_".join(self.audiences),
@@ -301,8 +302,13 @@ class Control(Controller):
         return resolved_sets
 
     @property
+    def display_images(self):
+        """True if images display option is requested."""
+        return self.fields.getvalue("images") == "true"
+
+    @property
     def standard_wording(self):
-        """True if standard wording print options are requested."""
+        """True if standard wording display options are requested."""
         return self.fields.getvalue("stdword") == "true"
 
     @property
