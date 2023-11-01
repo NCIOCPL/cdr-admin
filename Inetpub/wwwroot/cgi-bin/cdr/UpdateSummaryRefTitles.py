@@ -19,6 +19,7 @@ class Control(Controller):
     COLS = "Linking ID", "Outcome"
     CAPTION = "Results"
     CSS = "th, td { background-color: #e8e8e8; border-color: #bbb; }"
+    CONFIRM = "Confirm"
 
     def populate_form(self, page):
         """Ask for CDR ID of linked summary.
@@ -94,6 +95,27 @@ class Control(Controller):
             self.logger.info("recording outcome %s for CDR%d", outcome, id)
         self.logger.info("returning table with %d rows", len(rows))
         return self.Reporter.Table(rows, cols=self.COLS, caption=self.CAPTION)
+
+    def run(self):
+        """Override to handle custom buttons."""
+
+        try:
+            if self.request and self.request == self.CONFIRM:
+                self.show_report()
+        except Exception as e:
+            self.logger.exception("Control.run() failure")
+            bail(e)
+        Controller.run(self)
+
+    @cached_property
+    def buttons(self):
+        """Override buttons for the confirmation page."""
+
+        if self.selected:
+            return self.SUBMENU, self.ADMINMENU, self.LOG_OUT
+        elif self.id:
+            return self.CONFIRM, self.SUBMENU, self.ADMINMENU, self.LOG_OUT
+        return self.SUBMIT, self.SUBMENU, self.ADMINMENU, self.LOGOUT
 
     @cached_property
     def cdr_id(self):
