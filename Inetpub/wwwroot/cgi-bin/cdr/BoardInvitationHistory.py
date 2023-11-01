@@ -57,7 +57,7 @@ class Control(Controller):
             if self.including_board_specific_columns:
                 for board in member.boards:
                     row = [
-                        self.Reporter.Cell(member.id, center=True),
+                        self.Reporter.Cell(member.id),
                         self.Reporter.Cell(member.name),
                     ]
                     for name in self.OPTIONAL_COLUMNS:
@@ -71,7 +71,7 @@ class Control(Controller):
                     rows.append(row)
             else:
                 row = [
-                    self.Reporter.Cell(member.id, center=True),
+                    self.Reporter.Cell(member.id),
                     self.Reporter.Cell(member.name),
                 ]
                 rows.append(row)

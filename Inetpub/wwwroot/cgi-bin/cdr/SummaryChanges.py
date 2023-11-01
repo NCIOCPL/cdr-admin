@@ -6,6 +6,7 @@
 from cdrcgi import Controller
 from cdrapi.docs import Doc
 from datetime import date
+from functools import cached_property
 import lxml.html
 
 
@@ -38,6 +39,7 @@ class Control(Controller):
         """
 
         if self.summaries:
+            page.form.attrib.pop("target", None)
             page.form.append(page.hidden_field("start", self.start))
             page.form.append(page.hidden_field("end", self.end))
             page.form.append(page.hidden_field("scope", self.scope))
@@ -48,7 +50,7 @@ class Control(Controller):
                 opts = dict(label=label, value=id, checked=checked)
                 fieldset.append(page.radio_button("DocId", **opts))
                 checked = False
-            page.add_css("fieldset { width: 1024px; }")
+            # page.add_css("fieldset { width: 1024px; }")
         else:
             if self.fragment:
                 fieldset = page.fieldset("Error")
@@ -123,6 +125,8 @@ class Control(Controller):
 
         if not hasattr(self, "_doc"):
             self._doc = Doc(self.session, id=self.id)
+            if not self._doc.title:
+                self.bail(f"CDR{self.id} not found")
         return self._doc
 
     @property
@@ -194,6 +198,16 @@ class Control(Controller):
         if not hasattr(self, "_start"):
             self._start = self.parse_date(self.fields.getvalue("start"))
         return self._start
+
+    @property
+    def same_window(self):
+        """Decide when to avoid opening a new browser tab."""
+        return [self.SUBMIT] if self.fragment or self.id else []
+
+    @cached_property
+    def suppress_sidenav(self):
+        """Don't show the left navigation column on followup pages."""
+        return True if self.id or self.fragment else False
 
     @property
     def summaries(self):

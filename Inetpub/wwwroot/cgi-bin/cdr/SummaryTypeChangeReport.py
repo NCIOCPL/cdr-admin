@@ -79,7 +79,7 @@ class Control(Controller):
         opts["id-tip"] = "separate multiple IDs with spaces"
         self.add_summary_selection_fields(page, **opts)
         fieldset = page.fieldset("Include")
-        fieldset.set("class", "by-board-block")
+        fieldset.set("class", "by-board-block usa-fieldset")
         for value, label in self.MODULES:
             checked = value == self.modules
             opts = dict(value=value, label=label, checked=checked)
@@ -108,7 +108,7 @@ class Control(Controller):
             fieldset.append(page.radio_button("type", **opts))
         page.form.append(fieldset)
         fieldset = page.fieldset("Date Range for Changes History")
-        fieldset.set("class", "history")
+        fieldset.set("class", "history usa-fieldset")
         opts = dict(value=self.start, label="Start Date")
         fieldset.append(page.date_field("start", **opts))
         opts = dict(value=self.end, label="End Date")

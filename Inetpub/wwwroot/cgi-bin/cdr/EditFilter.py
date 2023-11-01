@@ -23,11 +23,11 @@ class Control(Controller):
         "of one of the documents has been seriously mangled.",
     )
     CSS = (
-        "pre {"
-        "    border: solid #936 2px; font-size: 12px; padding: 12px; ",
-        "    width: 700px; margin: 25px auto; ",
-        "}",
-        "fieldset { width: 700px; }",
+        #"pre {"
+        #"    border: solid #936 2px; font-size: 12px; padding: 12px; ",
+        #"    width: 700px; margin: 25px auto; ",
+        #"}",
+        #"fieldset { width: 700px; }",
         ".del { background-color: #fafad2; } /* light goldenrod yellow */",
         ".add { background-color: #f0e68c; } /* khaki */",
         ".pnt { background-color: #87cefa; } /* light sky blue */",
@@ -73,25 +73,26 @@ class Control(Controller):
         fieldset.append(page.checkbox("options", **opts))
         page.form.append(fieldset)
         if self.diff is not None:
-            page.form.append(self.diff)
+            fieldset = page.fieldset("Filter Comparison")
+            fieldset.append(self.diff)
         else:
-            page.form.append(page.B.PRE(self.doc.xml.strip()))
+            fieldset = page.fieldset("Filter Document")
+            fieldset.append(page.B.PRE(self.doc.xml.strip()))
+        page.form.append(fieldset)
         page.add_css("\n".join(self.CSS))
+
+    @property
+    def same_window(self):
+        """We're already in a separate tab; don't open any more."""
+        return self.COMPARE, self.FILTERS, self.VIEW
 
     @property
     def buttons(self):
         """Customize the command buttons."""
 
-        buttons = [
-            self.COMPARE,
-            self.FILTERS,
-            self.DEVMENU,
-            self.ADMINMENU,
-            self.LOG_OUT,
-        ]
         if self.request and self.request != self.VIEW:
-            buttons.insert(0, self.VIEW)
-        return buttons
+            return self.VIEW, self.COMPARE, self.FILTERS
+        return self.COMPARE, self.FILTERS
 
     @property
     def default_tier(self):

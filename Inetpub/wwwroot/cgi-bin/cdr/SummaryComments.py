@@ -68,7 +68,7 @@ class Control(Controller):
                 fieldset.append(page.radio_button("selection_method", **opts))
             page.form.append(fieldset)
             fieldset = page.fieldset("Board")
-            fieldset.set("class", "by-board-block")
+            fieldset.set("class", "by-board-block usa-fieldset")
             for id, name in self.boards.items():
                 opts = dict(value=id, label=name)
                 fieldset.append(page.radio_button("board", **opts))
@@ -76,11 +76,11 @@ class Control(Controller):
             self.add_audience_fieldset(page)
             self.add_language_fieldset(page)
             fieldset = page.fieldset("Summary Document ID")
-            fieldset.set("class", "by-id-block")
+            fieldset.set("class", "by-id-block usa-fieldset")
             fieldset.append(page.text_field("id", label="CDR ID"))
             page.form.append(fieldset)
             fieldset = page.fieldset("Summary Title")
-            fieldset.set("class", "by-title-block")
+            fieldset.set("class", "by-title-block usa-fieldset")
             tooltip = "Use wildcard (%) as appropriate."
             fieldset.append(page.text_field("title", tooltip=tooltip))
             page.form.append(fieldset)

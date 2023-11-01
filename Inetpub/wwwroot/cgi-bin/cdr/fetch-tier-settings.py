@@ -55,6 +55,8 @@ class Settings:
         for key in node.keys():
             children[key] = [node.get(key)]
         for child in node:
+            if not isinstance(child.tag, str):
+                continue
             if child.tag not in children:
                 children[child.tag] = []
             children[child.tag].append(self.extract_node(child))
@@ -152,9 +154,16 @@ class Settings:
         return settings
 
     def serialize(self):
-        return json.dumps({
-            "windows": self.windows,
-        }, indent=2)
+        def dump(me):
+            if isinstance(me, dict):
+                print(f"dict keys: {me.keys()}")
+                for value in me.values():
+                    dump(value)
+            elif isinstance(me, (list, tuple)):
+                for item in me:
+                    dump(item)
+        # dump(self.windows)
+        return json.dumps(dict(windows=self.windows), indent=2, default=str)
 
     def run(self):
         print(f"Content-type: application/json\n\n{self.serialize()}")
@@ -166,4 +175,29 @@ if __name__ == "__main__":
     if not session or not cdr.canDo(session, "GET SYS CONFIG"):
         print("Status: 403\n\nUser not authorized for viewing system settings")
         sys.exit(0)
-    Settings(session).run()
+    if not fields.getvalue("prompt"):
+        Settings(session).run()
+        sys.exit(0)
+    class Control(cdrcgi.Controller):
+        TITLE = SUBTITLE = "Tier Settings"
+        def populate_form(self, page):
+            fieldset = page.fieldset("Instructions")
+            fieldset.append(page.B.P(
+                "Click Submit to generate a JSON representation of the "
+                f"settings for this tier ({self.session.tier}). "
+                "This information includes:"
+            ))
+            fieldset.append(
+                page.B.UL(
+                    page.B.LI("Operating system version identification"),
+                    page.B.LI("Environment variable values"),
+                    page.B.LI("Executable search path locations"),
+                    page.B.LI("Database settings"),
+                    page.B.LI("Python interpreter and module versions"),
+                    page.B.LI("Web server configuration settings"),
+                    page.B.LI("Checksums for relevant file system content"),
+                    page.B.LI("CDR document types and valid value enumerations")
+                )
+            )
+            page.form.append(fieldset)
+    Control().run()

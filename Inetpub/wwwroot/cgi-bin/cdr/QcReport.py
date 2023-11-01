@@ -57,6 +57,7 @@ import re
 from cdrapi import db
 from cdrapi.users import Session
 from html import escape as html_escape
+from lxml.html import tostring
 
 #----------------------------------------------------------------------
 # Dynamically create the title of the menu section (request #809).
@@ -115,8 +116,10 @@ section  = "QC Report"
 SUBMENU  = "Reports Menu"
 buttons  = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
 header   = cdrcgi.header(title, title, getSectionTitle(repType),
-                         "QcReport.py", buttons, method = 'GET',
-                         stylesheet = """
+                         script="QcReport.py", buttons=buttons, method='GET',
+                         session=session, fields=fields,
+                         logger=cdr.LOGGER,
+                         stylesheet="""
   <style type = 'text/css'>
     fieldset            { margin-bottom: 10px; }
     /* fieldset.docversion { width: 860px; */
@@ -135,10 +138,17 @@ header   = cdrcgi.header(title, title, getSectionTitle(repType),
     *.gg              { border: 1px solid green;
                         background: #99FF66;
                         color: #006600; }
-    *.comgroup          { background: #C9C9C9;
-                          margin-bottom: 8px; }
+    *.comgroup          { background: #EEE; /*#C9C9C9;*/
+                          margin-bottom: 8px;
+                          margin-left: -.5rem;
+                          padding: .5rem .5rem .5rem .5rem; }
+    .comgroup:first-of-type { margin-top: .75rem; }
+    .comgroup div { background: #EEE; }
+    .comgroup div:first-child .usa-checkbox__label { margin-top: .1rem; }
+    .comments-extra .subheading { font-weight: bold; }
+    .comments-extra p { font-style: italic; }
     *.radio-button    { margin-left: 40px; }
-    label:hover       { background-color: lightyellow; }
+    /* label:hover       { background-color: lightyellow; } */
   </style>
 
   <script language = 'JavaScript'>
@@ -548,25 +558,33 @@ if not docId and not docTitle and not glossaryDefinition:
         extra += "\n   "
         extra += "<INPUT TYPE='hidden' NAME='ReportType' VALUE='%s'>" % repType
     form = """\
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-   %s
-   <TABLE>
-    <TR>
-     <TD ALIGN='right'><B>%s:&nbsp;</B><BR/>(use %% as wildcard)</TD>
-     <TD><INPUT SIZE='60' NAME='%s'></TD>
-    </TR>
-    <TR>
-     <TD> </TD>
-     <TD>... or ...</TD>
-    </TR>
-    <TR>
-     <TD ALIGN='right'><B>%s:&nbsp;</B></TD>
-     <TD><INPUT SIZE='60' NAME='DocId'></TD>
-    </TR>
-   </TABLE>
-""" % (cdrcgi.SESSION, session, extra, label[0], fieldName, label[1])
-    cdrcgi.sendPage(header + form + """\
-  </FORM>
+     %s
+     <fieldset class="usa-fieldset">
+      <legend class="usa-legend">Title or Document ID</legend>
+      <div class="labeled-field" title="Use %% as wildcard.">
+       <label for="title-fld" class="usa-label">%s</label>
+       <input name="%s" id="title-fld" class="usa-input usa-input--xl">
+      </div>
+      <div class="labeled-field">
+       <label for="id-fld" class="usa-label">%s</label>
+       <input name="DocId" id="id-fld" class="usa-input usa-input--xl">
+      </div>
+     </fieldset>
+""" % (extra, label[0], fieldName, label[1])
+    footer = cdrcgi.HTMLPage.make_footer()
+    footer.set("style", "margin-top: 2rem")
+    footer = tostring(footer, encoding="Unicode")
+    cdrcgi.sendPage(header + form + f"""\
+     <INPUT value="Submit" type="submit" name="Request"
+            class="button usa-button">
+    </FORM>
+   </DIV>
+  </DIV>
+  </MAIN>
+  {footer}
+  <SCRIPT
+    src="https://cdnjs.cloudflare.com/ajax/libs/uswds/3.6.0/js/uswds.min.js"
+   ></SCRIPT>
  </BODY>
 </HTML>
 """)
@@ -584,29 +602,48 @@ except Exception as e:
 # More than one matching title; let the user choose one.
 #----------------------------------------------------------------------
 def showTitleChoices(choices):
-    form = """\
-   <H3>More than one matching document found; please choose one.</H3>
+    trimmed_header = header.split("<main ")[0]
+    form = f"""\
+  <MAIN class="usa-section">
+   <DIV class="grid-container">
+    <H1>{getSectionTitle(repType)}</H1>
+    <H3>More than one matching document found; please choose one.</H3>
+    <FORM class="usa-form" id="primary-form">
 """
     for choice in choices:
         form += """\
-   <INPUT TYPE="radio" id="%d" NAME="DocId" VALUE="CDR%010d">
-   <label for="%d">[CDR%06d] %s</label><BR>
-""" % (choice[0], choice[0], choice[0], choice[0], 
-       html_escape(choice[1]))
-    cdrcgi.sendPage(header + form + """\
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-   <INPUT TYPE='hidden' NAME='DocType' VALUE='%s'>
-   <INPUT TYPE='hidden' NAME='ReportType' VALUE='%s'>
-  </FORM>
+    <DIV class="usa-radio">
+     <INPUT TYPE="radio" id="%d" NAME="DocId" VALUE="CDR%010d"
+        CLASS="usa-radio__input">
+     <label for="%d" class="usa-radio__label">[CDR%06d] %s</label>
+    </DIV>
+""" % (choice[0], choice[0], choice[0], choice[0], html_escape(choice[1]))
+    footer = cdrcgi.HTMLPage.make_footer()
+    footer.set("style", "margin-top: 2rem")
+    footer = tostring(footer, encoding="Unicode")
+    cdrcgi.sendPage(trimmed_header + form + """\
+     <INPUT TYPE='hidden' NAME='DocType' VALUE='%s'>
+     <INPUT TYPE='hidden' NAME='ReportType' VALUE='%s'>
+     <INPUT TYPE="hidden" NAME="%s" VALUE="%s">
+     <BR>
+     <INPUT value="Submit" type="submit" name="Request"
+            class="button usa-button">
+    </FORM>
+   </DIV>
+  </MAIN>
+  %s
+  <SCRIPT
+    src="https://cdnjs.cloudflare.com/ajax/libs/uswds/3.6.0/js/uswds.min.js"
+   ></SCRIPT>
  </BODY>
 </HTML>
-""" % (cdrcgi.SESSION, session, docType or '', repType or ''))
+""" % (docType or '', repType or '', cdrcgi.SESSION, session, footer))
 
 # ---------------------------------------------------------------------
 # Adding a line to add on/off checkbox options
 # ---------------------------------------------------------------------
 def addCheckbox(inputLabels, inputName, inputID='', checked=0):
-    isChecked = checked and "checked='1'" or ""
+    isChecked = checked and 'checked="1"' or ""
     showImages = ''
 
     # Adding on-click trigger when 'Images' are selected so that the
@@ -614,13 +651,14 @@ def addCheckbox(inputLabels, inputName, inputID='', checked=0):
     # non-publishable versions.
     # ---------------------------------------------------------------
     if inputName == 'Images':
-       showImages = 'onclick="selectImageVersion(\'displayImages\')"'
+        showImages = '''onclick="selectImageVersion('displayImages');"'''
 
     cbHtml = """\
-      <input name='%s' type='checkbox' id='%s' %s
-             %s>&nbsp;
-      <label for='%s'>%s</label>
-      <br>
+          <div class="usa-checkbox">
+           <input name="%s" type="checkbox" id="%s" %s
+                  class="usa-checkbox__input" %s>
+           <label class="usa-checkbox__label" for="%s">%s</label>
+          </div>
 """ % (inputName, inputID, showImages, isChecked, inputID,
        inputLabels[inputName])
     return cbHtml
@@ -631,22 +669,24 @@ def addCheckbox(inputLabels, inputName, inputID='', checked=0):
 # of an image or the last version (if exists).
 # The default is to display the last publishable version of the image.
 # ---------------------------------------------------------------------
-def addImageRadioBtn(inputLabels, inputName, inputID=''):
-    id1 = 'pubYes'
-    id2 = 'pubNo'
+def addImageRadioBtn(inputLabels, inputName, inputID=""):
+    id1 = "pubYes"
+    id2 = "pubNo"
     cbHtml = """\
-      <div id="pub-image" class="radio-button" style="display:none;">
-       <input type='radio' name='%s' id='%s'
-              value="Y" checked>&nbsp;
-       <label for='%s'>%s</label>
-       <br>
-       <input type='radio' name='%s' id='%s'
-              value="N" >&nbsp;
-       <label for='%s'>%s</label>
-       <br>
-      </div>
-""" % (inputName, id1, id1, inputLabels['PubImages'][id1],
-       inputName, id2, id2, inputLabels['PubImages'][id2])
+          <div id="pub-image" class="radio-button" style="display:none;">
+           <div class="usa-radio">
+            <input type="radio" name="%s" id="%s" class="usa-radio__input"
+                   value="Y" checked>
+            <label for="%s" class="usa-radio__label">%s</label>
+           </div>
+           <div class="usa-radio">
+            <input type="radio" name="%s" id="%s" class="usa-radio__input"
+              value="N" >
+            <label for="%s" class="usa-radio__label">%s</label>
+           </div>
+          </div>
+""" % (inputName, id1, id1, inputLabels["PubImages"][id1],
+       inputName, id2, id2, inputLabels["PubImages"][id2])
     return cbHtml
 
 #----------------------------------------------------------------------
@@ -737,11 +777,16 @@ if letUserPickVersion:
         rows = cursor.fetchall()
     except Exception as e:
         cdrcgi.bail(f"Failure retrieving document versions: {e}")
-    form = """\
-  <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-  <INPUT TYPE='hidden' NAME='DocType' VALUE='%s'>
-  <INPUT TYPE='hidden' NAME='DocId' VALUE='CDR%010d'>
-""" % (cdrcgi.SESSION, session, docType, intId)
+    trimmed_header = header.split("<main ")[0]
+    form = f"""\
+  <MAIN class="usa-section">
+   <DIV class="grid-container">
+    <H1>{getSectionTitle(repType)}</H1>
+    <FORM class="usa-form" id="primary-form">
+     <INPUT TYPE="hidden" NAME="{cdrcgi.SESSION}" VALUE="{session}">
+     <INPUT TYPE="hidden" NAME="DocType" VALUE="{docType}">
+     <INPUT TYPE="hidden" NAME="DocId" VALUE="CDR{intId:010d}">
+"""
 
     if debug:
         form += '  <input type="hidden" name="debug" value="yes, please">\n'
@@ -749,36 +794,34 @@ if letUserPickVersion:
     # Include the ReportType so the "DocumentVersion" screen can differentiate
     # the specific report type to run.
     form += """\
-  <INPUT TYPE='hidden' NAME='ReportType' VALUE='%s'>
+     <INPUT TYPE='hidden' NAME='ReportType' VALUE='%s'>
 """ % (repType or "")
 
     form += """\
-  <fieldset class='docversion'>
-   <legend>&nbsp;Select document version&nbsp;</legend>
-  <div style="width: 100%; text-align: center;">
-  <div style="margin: 0 auto;">
-  <SELECT NAME='DocVersion'>
-   <OPTION VALUE='0' SELECTED='1'>Current Working Version</OPTION>
+     <fieldset class="usa-fieldset">
+      <legend class="usa-legend">&nbsp;Select document version&nbsp;</legend>
+      <!-- div style="width: 100%; text-align: center;">
+      <div style="margin: 0 auto;" -->
+      <SELECT NAME='DocVersion' class="usa-select">
+       <OPTION VALUE='0' SELECTED='1'>Current Working Version</OPTION>
 """
 
     # Limit display of version comment to 120 chars (if exists)
     # ---------------------------------------------------------
     for row in rows:
         form += """\
-   <OPTION VALUE='%d'>[V%d %s] %s</OPTION>
+       <OPTION VALUE='%d'>[V%d %s] %s</OPTION>
 """ % (row[0], row[0], str(row[2])[:10],
        not row[1] and "[No comment]" or html_escape(row[1][:120]))
-        selected = ""
-    form += "</SELECT></div></div>"
+    form += "</SELECT><!--/div></div-->"
     form += """
-  </fieldset>
+     </fieldset>
 """
     if docType in ("Summary", "DrugInformationSummary", "GlossaryTermName"):
         form += """\
-  <BR>
-  <fieldset class="wrapper">
-   <legend>&nbsp;Select Insertion/Deletion markup to be displayed
-           (one or more)&nbsp;</legend>
+     <p>
+      <em>Select Insertion/Deletion markup to be displayed (one or more)</em>
+     </p>
 """
         # The Board Markup does not apply to the Patient Version Summaries
         # or the DrugInfoSummary or GlossaryTerm reports
@@ -786,14 +829,20 @@ if letUserPickVersion:
         if docType == 'Summary':
             if repType not in ("pat", "patbu", "patrs"):
                 form += """\
-     <fieldset>
-      <legend>&nbsp;Board Markup&nbsp;</legend>
-      <input name='Editorial-board' type='checkbox' id='eBoard'
-                   checked='1'>
-      <label for='eBoard'>Editorial board markup</label>
-      <br>
-      <input name='Advisory-board' type='checkbox' id='aBoard'>
-      <label for='aBoard'>Advisory board markup</label>
+     <fieldset class="usa-fieldset">
+      <legend class="usa-legend">&nbsp;Board Markup&nbsp;</legend>
+      <div class="usa-checkbox">
+       <input name="Editorial-board" type="checkbox" id="eBoard"
+                   checked="1" class="usa-checkbox__input">
+       <label for="eBoard"
+              class="usa-checkbox__label">Editorial board markup</label>
+      </div>
+      <div class="usa-checkbox">
+       <input name="Advisory-board" type="checkbox" id="aBoard"
+              class="usa-checkbox__input">
+       <label for="aBoard"
+              class="usa-checkbox__label">Advisory board markup</label>
+      </div>
      </fieldset>
 """
         # Display the check boxed for the Revision-level Markup
@@ -801,19 +850,28 @@ if letUserPickVersion:
         # -----------------------------------------------------
     ### <td valign="top">
         form += """\
-     <fieldset>
-      <legend>&nbsp;Revision-level Markup&nbsp;</legend>
-      <input name='publish' type='checkbox' id='pup'>
-      <label for='pup'>With publish attribute</label>
-      <br>
-      <input name='approved' type='checkbox' id='app'
-                   checked='1'>
-      <label for='app'>With approved attribute</label>
-      <br>
-      <input name='proposed' type='checkbox' id='prop'>
-      <label for='prop'>With proposed attribute</label>
+     <fieldset class="usa-fieldset">
+      <legend class="usa-legend">&nbsp;Revision-level Markup&nbsp;</legend>
+      <div class="usa-checkbox">
+       <input name="publish" type="checkbox" id="pup"
+              class="usa-checkbox__input">
+       <label for="pup"
+              class="usa-checkbox__label">With publish attribute</label>
+      </div>
+      <div class="usa-checkbox">
+       <input name="approved" type="checkbox" id="app"
+              class="usa-checkbox__input" checked>
+       <label for="app" class="usa-checkbox__label">
+        With approved attribute
+       </label>
+      </div>
+      <div class="usa-checkbox">
+       <input name="proposed" type="checkbox" id="prop"
+              class="usa-checkbox__input">
+       <label for="prop"
+              class="usa-checkbox__label">With proposed attribute</label>
+      </div>
      </fieldset>
-  </fieldset>
 """
 
     # Display the check boxes for the HP or Patient version sections
@@ -868,13 +926,14 @@ if letUserPickVersion:
 
     # Display the Misc. Print Options check boxes for Patients
     # --------------------------------------------------------
+    patient = repType in ('pat', 'patbu', 'patrs')
     if docType == 'Summary':
-        if repType == 'pat' or repType == 'patbu' or repType == 'patrs':
+        if patient:
             form += """\
-         <p>
-         <fieldset>
-          <legend>&nbsp;Misc Print Options&nbsp;</legend>
-    """
+         <!--p-->
+         <fieldset class="usa-fieldset">
+          <legend class="usa-legend">&nbsp;Misc Print Options&nbsp;</legend>
+"""
 
             form += addCheckbox(checkboxLabels, 'Glossaries',
                                 inputID='displayGlossaries')
@@ -902,7 +961,7 @@ if letUserPickVersion:
         # End - Misc Print Options block
         # ------------------------------
             form += """\
-             </fieldset>
+         </fieldset>
         """
 
     # Display the Comment display checkbox
@@ -915,27 +974,35 @@ if letUserPickVersion:
     # -----------------------------------------------------------
     if docType == 'Summary':
         form += """\
-     <p>
-     <fieldset>
-      <legend>&nbsp;Select Comment Types to be displayed&nbsp;</legend>
-      <div class='comgroup'>
-      <input name='internal' type='checkbox' id='int'
+         <!--p-->
+         <fieldset class="usa-fieldset">
+          <legend class="usa-legend">
+           Select Comment Types to be displayed
+          </legend>
+          <div class="comgroup">
+           <div class="usa-checkbox">
+            <input name="internal" type="checkbox" id="int"
 """
-        if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
-            form += """\
-"""
-        else:
+        if patient:
             form += """\
                    CHECKED="1"
 """
         form += """\
-                   onclick='javascript:dispInternal()'>
-      <label for='int'>Internal Comments (excluding permanent comments)</label>
-      <br>
-      <input name='permanent' type='checkbox' id='perm'
-                   onclick='javascript:dispPermanent()'>
-      <label for='perm'>Permanent Comments (internal & external)</label>
-      </div>
+                   class="usa-checkbox__input"
+                   onclick="javascript:dispInternal()">
+            <label for="int" class="usa-checkbox__label">
+             Internal Comments (excluding permanent comments)
+            </label>
+           </div>
+           <div class="usa-checkbox">
+            <input name="permanent" type="checkbox" id="perm"
+                   class="usa-checkbox__input"
+                   onclick="javascript:dispPermanent();">
+            <label for="perm" class="usa-checkbox__label">
+             Permanent Comments (internal & external)
+            </label>
+           </div>
+          </div>
 """
         # The users don't want the option for advisory-board comments
         # displayed for the patient summaries because these summaries
@@ -945,177 +1012,138 @@ if letUserPickVersion:
         # being checked by the JavaScript functions.
         # -----------------------------------------------------------
         # XXX
-        if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
+        if not patient:
             form += """\
-      <div class='comgroup'>
-      <input name='external' type='checkbox' id='ext'
+          <div class="comgroup">
+           <div class="usa-checkbox">
+            <input name="external" type="checkbox" id="ext"
                    CHECKED="1"
-                   onclick='javascript:dispExternal()'>
-      <label for='ext'>External Comments (excluding advisory comments)</label>
-      <br>
-      <input name='advisory' type='checkbox' id='adv'
-                   onclick='javascript:dispAdvisory()'>
-      <label for='adv'>Advisory Board Comments (internal & external)</label>
-      </div>
+                   class="usa-checkbox__input"
+                   onclick="javascript:dispExternal()">
+            <label for="ext" class="usa-checkbox__label">
+             External Comments (excluding advisory comments)
+            </label>
+           </div>
+           <div class="usa-checkbox">
+            <input name="advisory" type="checkbox" id="adv"
+                   class="usa-checkbox__input"
+                   onclick="javascript:dispAdvisory()">
+            <label class="usa-checkbox__label" for="adv">
+             Advisory Board Comments (internal & external)
+            </label>
+           </div>
+          </div>
 """
         else:
             form += """\
-      <div class='comgroup'>
-      <input name='external' type='checkbox' id='ext'
-                   onclick='javascript:dispExternal()'>
-      <label for='ext'>External Comments</label>
+          <div class="comgroup">
+           <div class="usa-checkbox">
+            <input name="external" type="checkbox" id="ext"
+                   class="usa-checkbox__input"
+                   onclick="javascript:dispExternal()">
+            <label for="ext" class="usa-checkbox__label">
+             External Comments
+            </label>
+           </div>
        <!-- I need the element as a hidden field so that I can use the same
             javascript functions for HP and Patient version -->
-       <input name='advisory' type='hidden' id='adv'
-                   onclick='javascript:dispAdvisory()'>
-       </div>
-      </div>
+       <!-- Yes, but how in the world does "onclick" work for a hidden
+            field? -->
+           <input name="advisory" type="hidden" id="adv"
+                  onclick="javascript:dispAdvisory()">
+          </div>
 """
 
         form += """\
-      <div class='comgroup'>
-      <input name='all' type='checkbox' id='allcomment'
-                   onclick='javascript:dispAll()'>
-      <label for='allcomment'>All Comments</label>
-      <br>
-      <input name='no' type='checkbox' id='nocomment'
-                   onclick='javascript:dispNone()'>
-      <label for='nocomment'>No Comments</label>
-     </div>
-     Click <a onclick="showOptions('hide');" title='More options'
-              style="color: blue; text-decoration: underline;">here</a>
-     for individual options ...
-     </fieldset>
-     <fieldset id='hide' style="display: none;">
-     <table>
-      <tr>
-       <td class="colheading"
-           colspan="3">Display Comments and Responses
-                       (mark comment type to be displayed)</td>
-      </tr>
-      <tr>
-       <td>
-        <table>
-      <tr>
-       <td class="subheading">Audience (txt color)</td>
-      </tr>
-      <tr>
-       <td>
-        <INPUT TYPE    = "checkbox"
-               NAME    = "AudInternalComments"
+          <div class="comgroup">
+           <div class="usa-checkbox">
+            <input name="all" type="checkbox" id="allcomment"
+                   class="usa-checkbox__input"
+                   onclick="javascript:dispAll()">
+            <label class="usa-checkbox__label" for="allcomment">
+             All Comments
+            </label>
+           </div>
+           <div class="usa-checkbox">
+            <input name="no" type="checkbox" id="nocomment"
+                   class="usa-checkbox__input"
+                   onclick="javascript:dispNone()">
+            <label for="nocomment" class="usa-checkbox__label">
+             No Comments
+            </label>
+           </div>
+          </div>
+          <div>
+           Click <a onclick="showOptions('hide');" title="More options"
+                    style="color: blue; text-decoration: underline;">here</a>
+           for individual options ...
+          </div>
+         </fieldset>
 """
 
-        if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
-            form += """\
-"""
-        else:
-            form += """\
-               CHECKED = "1"
-"""
+        # Nested table layout replaced with cleaner approach.
+        print_options = (
+            dict(
+                group="Audience (txt color)",
+                buttons=(
+                    ("AudInternalComments", "Internal", "ai", patient),
+                    ("AudExternalComments", "External", "ae", not patient),
+                ),
+            ),
+            dict(
+                group="Source (txt spacing)",
+                buttons=(
+                    ("SrcEditorComments", "Not Advisory", "se", True),
+                    ("SrcAdvisoryComments", "Advisory", "sa", patient),
+                ),
+            ),
+            dict(
+                group="Duration (background)",
+                buttons=(
+                    ("DurPermanentComments", "Permanent", "dp", not patient),
+                    ("DurRegularyComments", "Non-permanent", "dr", True),
+                ),
+            ),
+        )
 
+        form += f"""\
+         <fieldset id='hide' style="display: none;"
+                   class="usa-fieldset comments-extra">
+          <legend class="usa-legend">Display Comments and Responses</legend>
+          <p>Mark comment types to be displayed.</p>
+          <div class="grid-row grid-gap">
+"""
+        for block in print_options:
+            group = block["group"]
+            form += f"""\
+           <div class="class="tablet:grid-col-4">
+            <div class="subheading">{group}</div>
+"""
+            for name, label, id, checked in block["buttons"]:
+                checked = "checked" if checked else ""
+                form += f"""\
+            <div class="usa-checkbox">
+             <input type="checkbox" name="{name}" {checked}
+                    class="usa-checkbox__input" id="{id}">
+             <label for="{id}" class="usa-checkbox__label">{label}</label>
+            </div>
+"""
+            form += """\
+           </div>
+"""
         form += """\
-               ID      = "ai">&nbsp; Internal
-       </td>
-      </tr>
-      <tr>
-       <td>
-        <INPUT TYPE    = "checkbox"
-               NAME    = "AudExternalComments"
-"""
-
-        if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
-            form += """\
-               CHECKED = "1"
-"""
-        else:
-            form += """\
-"""
-
-        form += """\
-               ID      = "ae">&nbsp; External
-       </td>
-       </tr>
-       </table>
-       </td>
-       <td>
-        <table>
-      <tr>
-       <td class="subheading">Source (txt spacing)</td>
-      </tr>
-         <tr>
-       <td>
-        <INPUT TYPE    = "checkbox"
-               NAME    = "SrcEditorComments"
-               CHECKED = "1"
-               ID      = "se">&nbsp; Not Advisory
-       </td>
-      </tr>
-      <tr>
-       <td>
-        <INPUT TYPE    = "checkbox"
-               NAME    = "SrcAdvisoryComments"
-"""
-
-        if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
-            form += """\
-"""
-        else:
-            form += """\
-               CHECKED = "1"
-"""
-
-        form += """\
-               ID      = "sa">&nbsp; Advisory
-       </td>
-       </tr>
-       </table>
-       </td>
-       <td>
-        <table>
-      <tr>
-       <td class="subheading">Duration (background)</td>
-      </tr>
-         <tr>
-       <td>
-        <INPUT TYPE    = "checkbox"
-               NAME    = "DurPermanentComments"
-"""
-
-        if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
-            form += """\
-               CHECKED = "1"
-"""
-        else:
-            form += """\
-"""
-
-        form += """\
-               ID      = "dp">&nbsp; Permanent
-       </td>
-      </tr>
-      <tr>
-       <td>
-        <INPUT TYPE    = "checkbox"
-               NAME    = "DurRegularComments"
-               CHECKED = "1"
-               ID      = "dr">&nbsp; Non-permanent
-       </td>
-       </tr>
-       </table>
-       </td>
-      </tr>
-     </table>
-     </fieldset>
+          </div>
+         </fieldset>
 """
 
     # Display the Misc. Print Options check boxes for HP
     # --------------------------------------------------
     if docType == 'Summary':
-        if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
+        if not patient:
             form += """\
-         <p>
-         <fieldset>
-          <legend>&nbsp;Misc Print Options&nbsp;</legend>
+         <!--p-->
+         <fieldset class="usa-fieldset">
+          <legend class="usa-legend">Miscellaneous Print Options</legend>
     """
 
             form += addCheckbox(checkboxLabels, 'Glossaries',
@@ -1140,24 +1168,40 @@ if letUserPickVersion:
         # End - Misc Print Options block
         # ------------------------------
             form += """\
-             </fieldset>
-        """
+         </fieldset>
+"""
 
     # Display the Quick&Dirty option checkbox
     # ---------------------------------------
     if docType == 'Summary':
         form += """\
-  <p>
-     <fieldset>
-      <legend>&nbsp;911 Options&nbsp;</legend>
-      &nbsp;<input name='QD' type='checkbox' id='dispQD'>&nbsp;
-      <label for='dispQD'>Run Quick &amp; Dirty report</label>
-      <br>
-     </fieldset>"""
-#    form += """
-#     </table>"""
+  <!--p-->
+     <fieldset class="usa-fieldset">
+      <legend class="usa-legend">&nbsp;911 Options&nbsp;</legend>
+      <div class="usa-checkbox">
+       <input name="QD" type="checkbox" id="dispQD" class="usa-checkbox__input">
+       <label for="dispQD" class="usa-checkbox__label">
+        Run Quick &amp; Dirty report
+       </label>
+      </div>
+     </fieldset>
+"""
+    form += """\
+     <INPUT value="Submit" type="submit" name="Request"
+            class="button usa-button">
+"""
 
-    cdrcgi.sendPage(header + form + """
+    footer = cdrcgi.HTMLPage.make_footer()
+    footer.set("style", "margin-top: 2rem")
+    footer = tostring(footer, encoding="Unicode")
+    cdrcgi.sendPage(trimmed_header + form + """\
+    </FORM>
+   </DIV>
+  </MAIN>
+""" + footer + """
+  <SCRIPT
+    src="https://cdnjs.cloudflare.com/ajax/libs/uswds/3.6.0/js/uswds.min.js"
+   ></SCRIPT>
  </BODY>
 </HTML>
 """)
@@ -1202,7 +1246,7 @@ if not docType:
   <xsl:value-of        select = "."/>
   <xsl:text> </xsl:text>
  </xsl:template>
-</xsl:transform>""", inline = 1, docId = docId, docVer = version or None)
+</xsl:transform>""", inline=1, docId=docId, docVer=version or None)
 
         if "Patients" in inspectSummary[0]:
             repType = 'pat'
@@ -1648,8 +1692,7 @@ if docType not in filters:
     user_name = Session(session).user_name
     message = "QcReport - Filter for document type '%s' does not exist (%s)."
     cdr.LOGGER.info(message, docType, user_name)
-    doc = cdr.getDoc(session, docId, version = version or "Current",
-                     getObject = 1)
+    doc = cdr.getDoc(session, docId, version=version or "Current", getObject=1)
     if isinstance(doc, (str, bytes)):
         cdrcgi.bail(doc)
     html = """\

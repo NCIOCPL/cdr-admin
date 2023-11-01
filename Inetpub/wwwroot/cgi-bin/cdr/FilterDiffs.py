@@ -5,6 +5,7 @@
 
 from sys import stdout
 from difflib import unified_diff
+from functools import cached_property
 from lxml import etree
 import json
 import requests
@@ -57,6 +58,10 @@ class Control:
     def only_on(self, filter_name, tier_name):
         """Create a message to show a filter missing from one or the other."""
         return self.filter_banner(filter_name) + [f"Only on {tier_name}", ""]
+
+    @cached_property
+    def logger(self):
+        return cdr.Logging.get_logger("FilterDiffs")
 
     @property
     def filter_names(self):
@@ -123,15 +128,10 @@ class Control:
                 pass
         return self._prod_filters
 
-    @property
+    @cached_property
     def refresh_cache(self):
         """Flag indicating whether we need to get fresh filters from PROD."""
-
-        if not hasattr(self, "_refresh_cache"):
-            self._refresh_cache = False
-            if self.fields.getvalue("refresh-cache"):
-                self._refresh_cache = True
-        return self._refresh_cache
+        return True if self.fields.getvalue("refresh-cache") else False
 
     @staticmethod
     def normalize(xml):

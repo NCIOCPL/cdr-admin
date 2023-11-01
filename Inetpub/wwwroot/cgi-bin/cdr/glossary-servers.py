@@ -58,7 +58,7 @@ class Control(Controller):
         counter = 1
         for alias in sorted(servers):
             fieldset = page.fieldset("Server")
-            fieldset.set("class", "server-block")
+            fieldset.set("class", "server-block usa-fieldset")
             fieldset.set("id", f"server-block-{counter}")
             opts = dict(label="Alias", classes="alias", value=alias)
             fieldset.append(page.text_field(f"alias-{counter:d}", **opts))
@@ -115,15 +115,23 @@ class Control(Controller):
             if alias not in new:
                 opts["name"] = alias
                 updateCtl(self.session.name, "Inactivate", **opts)
-        self.subtitle = f"Glossary Servers Saved: {len(new):d}"
+        self._alert = f"Glossary Servers Saved: {len(new):d}"
         s = "" if len(new) == 1 else "s"
         self.logger.info("%d server%s saved by %s", len(new), s, self.user)
         self.show_form()
 
     @property
-    def buttons(self):
-        """Customize the action buttons to add DEVMENU."""
-        return self.SUBMIT, self.DEVMENU, self.ADMINMENU, self.LOG_OUT
+    def alerts(self):
+        """Information to display at the top of the form."""
+
+        if hasattr(self, "_alert"):
+            return [dict(message=self._alert, type="success")]
+        return []
+
+    @property
+    def same_window(self):
+        """Keep everything on the same tab."""
+        return [self.SUBMIT]
 
     @property
     def servers(self):

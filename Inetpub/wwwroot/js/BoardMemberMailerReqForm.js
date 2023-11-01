@@ -24,12 +24,15 @@ function check_board(whatever) {
             var key = letter[1];
             // let [name, key] = letter; poor IE can't cope
             let button = jQuery('<input type="radio", name="letter">');
+            button.attr("class", "usa-radio__input");
             button.attr("value", key);
             button.attr("id", key);
             let label = jQuery("<label>");
+            label.attr("class", "usa-radio__label");
             label.attr("for", key);
             label.text(name);
             let div = jQuery("<div>");
+            div.attr("class", "usa-radio");
             div.append(button);
             div.append(label);
             jQuery("#letters").append(div);
@@ -46,12 +49,15 @@ function check_board(whatever) {
             // let [id, name] = member; aargh!
             let key = "member-" + id;
             let checkbox = jQuery('<input type="checkbox", name="member">');
+            checkbox.attr("class", "usa-checkbox__input");
             checkbox.attr("value", id);
             checkbox.attr("id", key);
             let label = jQuery("<label>");
+            label.attr("class", "usa-checkbox__label");
             label.attr("for", key);
             label.text(name);
             let div = jQuery("<div>");
+            div.attr("class", "usa-checkbox");
             div.append(checkbox);
             div.append(label);
             jQuery("#members").append(div);

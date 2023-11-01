@@ -27,7 +27,8 @@ class Control(Controller):
 
         fieldset = page.fieldset("Enter a term or pronunciation word stem")
         fieldset.append(page.text_field("term_stem"))
-        fieldset.append(page.text_field("pron_stem"))
+        opts = dict(label="Pronunciation Stem")
+        fieldset.append(page.text_field("pron_stem", **opts))
         page.form.append(fieldset)
 
     def build_tables(self):

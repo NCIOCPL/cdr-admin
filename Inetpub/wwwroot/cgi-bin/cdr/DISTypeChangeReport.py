@@ -33,10 +33,11 @@ class Control(Controller):
         "'By CDR ID' and enter multiple CDR IDs separated by a comma. "
         "To run the report for all "
         "drug information summaries, refer to the ad-hoc query "
-        "'DIS CDR IDs for Type of Change Report' on the following page: ",
+        "'DIS CDR IDs for Type of Change Report' on the ",
         "CDR Stored Database Queries",
         "/cgi-bin/cdr/CdrQueries.py",
-        "Copy and paste the complete set of CDR IDs into the CDR ID field."
+        " page. Copy and paste the complete set of CDR IDs into the "
+        "CDR ID field."
     )
 
     def build_tables(self):
@@ -107,10 +108,9 @@ class Control(Controller):
 
         fieldset = page.fieldset("Instructions")
         fieldset.append(page.B.P(self.INSTRUCTIONS[0],
-                        page.B.BR(),
-                        page.B.A(self.INSTRUCTIONS[1],
+                        page.B.A(self.INSTRUCTIONS[1], target="_blank",
                                  href=self.INSTRUCTIONS[2]),
-                        page.B.BR(), self.INSTRUCTIONS[3]))
+                        self.INSTRUCTIONS[3]))
         page.form.append(fieldset)
 
         page.form.append(page.hidden_field("debug", self.debug or ""))
@@ -144,7 +144,7 @@ class Control(Controller):
         page.form.append(fieldset)
 
         fieldset = page.fieldset("Date Range for Changes History")
-        fieldset.set("class", "history")
+        fieldset.set("class", "history usa-fieldset")
         opts = dict(value=self.start, label="Start Date")
         fieldset.append(page.date_field("start", **opts))
         opts = dict(value=self.end, label="End Date")
@@ -225,14 +225,14 @@ $(function() {
             page.form.append(fieldset)
 
             fieldset = page.fieldset("Drug Info Summary ID")
-            fieldset.set("class", "by-id-block")
+            fieldset.set("class", "by-id-block usa-fieldset")
             label = kwopts.get("id-label", "CDR ID")
             opts = dict(label=label, tooltip=kwopts.get("id-tip"))
             fieldset.append(page.text_field("cdr-id", **opts))
             page.form.append(fieldset)
 
             fieldset = page.fieldset("Drug Info Summary Title")
-            fieldset.set("class", "by-title-block")
+            fieldset.set("class", "by-title-block usa-fieldset")
             tooltip = "Use wildcard (%) as appropriate."
             fieldset.append(page.text_field("title", tooltip=tooltip))
             page.form.append(fieldset)

@@ -364,7 +364,7 @@ class Board:
             if reviews:
                 review = reviews[0]
                 row.extend([
-                    review.date,
+                    Reporter.Cell(review.date, classes="text-no-wrap"),
                     Reporter.Cell(review.state, classes="center"),
                     review.comment or ""
                 ])
@@ -377,7 +377,7 @@ class Board:
                     row.append(Reporter.Cell(doc.doc_id))
                 row.append(Reporter.Cell(doc.title))
                 row.extend([
-                    review.date,
+                    Reporter.Cell(review.date, classes="text-no-wrap"),
                     Reporter.Cell(review.state, classes="center"),
                     review.comment or ""
                 ])

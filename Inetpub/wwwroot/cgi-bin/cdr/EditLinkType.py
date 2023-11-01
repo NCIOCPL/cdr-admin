@@ -140,14 +140,17 @@ class Control(Controller):
         js = f"var templates = {{'e': `{e_template}`, 'r': `{r_template}`}};"
         page.add_script(js)
         page.head.append(page.B.SCRIPT(src=self.JS))
-        page.head.append(page.B.LINK(href=self.CSS, rel="stylesheet"))
+        # page.head.append(page.B.LINK(href=self.CSS, rel="stylesheet"))
+        page.add_css("""\
+.labeled-field img { margin-right: .5rem; }
+""")
 
     def make_error_block(self):
         """Create a box showing the errors preventing the save request."""
 
         B = self.HTMLPage.B
         fieldset = self.HTMLPage.fieldset("Errors")
-        fieldset.set("class", "errors")
+        fieldset.set("class", "errors usa-fieldset")
         ul = B.UL()
         for error in self.errors:
             ul.append(B.LI(error, B.CLASS("errors")))
@@ -187,7 +190,7 @@ class Control(Controller):
 
         fieldset = self.HTMLPage.fieldset("Custom Rule")
         fieldset.set("id", f"block-{counter}")
-        fieldset.set("class", "r-block numbered-block")
+        fieldset.set("class", "r-block numbered-block usa-fieldset")
         fieldset.append(self.make_ruletype_field(counter, ruletype))
         fieldset.append(self.make_ruletext_field(counter, text))
         fieldset.append(self.make_rulecomment_field(counter, comment))
@@ -227,13 +230,14 @@ class Control(Controller):
         name = f"ruletext-{counter}"
         help_text = 'E.g. /Term/TermType/TermTypeName == "Index term"'
         opts = dict(id=name, name=name, title=help_text)
+        textarea_class = self.HTMLPage.B.CLASS("usa-textarea")
         return self.HTMLPage.B.DIV(
             self.HTMLPage.B.LABEL(
                 self.HTMLPage.B.FOR(name),
                 "Rule Text",
-                self.HTMLPage.B.CLASS("clickable")
+                self.HTMLPage.B.CLASS("clickable usa-label")
             ),
-            self.HTMLPage.B.TEXTAREA(value or "", **opts),
+            self.HTMLPage.B.TEXTAREA(value or "", textarea_class, **opts),
             self.HTMLPage.B.CLASS("labeled-field")
         )
 
@@ -254,6 +258,7 @@ class Control(Controller):
 
         name = f"ruletype-{counter}"
         select = self.HTMLPage.B.SELECT(name=name, id=name)
+        select.set("class", "usa-select")
         option = self.HTMLPage.B.OPTION("Select Rule Type", value="")
         if not ruletype:
             option.set("selected")
@@ -292,7 +297,7 @@ class Control(Controller):
 
         fieldset = self.HTMLPage.fieldset("Allowed Link Source")
         fieldset.set("id", f"block-{counter}")
-        fieldset.set("class", "e-block numbered-block")
+        fieldset.set("class", "e-block numbered-block usa-fieldset")
         doctypes = list(self.doctypes)
         if doctype and doctype not in doctypes:
             doctypes.append(doctype)
@@ -353,15 +358,9 @@ class Control(Controller):
     def buttons(self):
         """Customize the action buttons at the top of the form."""
 
-        buttons = [
-            self.SAVE,
-            self.CANCEL,
-            self.DEVMENU,
-            self.ADMINMENU,
-            self.LOG_OUT,
-        ]
+        buttons = [self.SAVE]
         if self.linktype or self.request == self.SAVE and not self.errors:
-            buttons.insert(2, self.DELETE)
+            buttons.append(self.DELETE)
         return buttons
 
     @property

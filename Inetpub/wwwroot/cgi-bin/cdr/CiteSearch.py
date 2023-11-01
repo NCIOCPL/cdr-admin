@@ -115,9 +115,10 @@ $(function() { chk_cdrid(); chk_pmid(); });
 
         pubmed = f"window.open('{self.PUBMED}', 'pm');"
         buttons = page.body.xpath("//*[@id='header-buttons']")
-        buttons[0].append(self.button("Search PubMed", onclick=pubmed))
-        if self.session.can_do("ADD DOCUMENT", "Citation"):
-            self.add_import_form(page)
+        if buttons:
+            buttons[0].append(self.button("Search PubMed", onclick=pubmed))
+            if self.session.can_do("ADD DOCUMENT", "Citation"):
+                self.add_import_form(page)
 
     def add_import_form(self, page):
         """Add another fieldset with fields for importing a PubMed document."""

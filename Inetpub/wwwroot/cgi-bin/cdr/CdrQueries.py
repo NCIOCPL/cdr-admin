@@ -6,7 +6,9 @@
 from datetime import datetime
 from json import dumps
 import sys
-from cdrcgi import Controller, Reporter, bail
+from lxml.html import tostring
+import lxml.html.builder as B
+from cdrcgi import Controller, Reporter, bail, REQUEST
 from cdrapi import db
 
 
@@ -18,6 +20,10 @@ class Control(Controller):
 
     LOGNAME = "CdrQueries"
     SUBTITLE = "CDR Stored Database Queries"
+    TABLE_STYLE = (
+        "tbody tr:nth-child(odd) { background-color: #eee; }",
+        "p { font-style: italic; color: green; }",
+    )
 
     def create_sheet(self):
         """Create and send an Excel report for the current SQL query."""
@@ -67,7 +73,6 @@ class Control(Controller):
         self.logger.info("populate_form(): self.query=%s", self.query)
         opts = dict(
             options=self.query_names,
-            size=5,
             onchange="show_query();",
             default=self.query,
         )
@@ -90,17 +95,20 @@ class Control(Controller):
 
         # Customize the appearance of this tool's web page.
         page.add_css("""\
-table { margin-top: 25px; }
+/* (table { margin-top: 25px; }
 body { background: #fcfcfc; }
 p { font-size: .8em; text-align: center; color: green; text-style: italic }
+*/
 .labeled-field textarea#sql {
-    width: 800px;
+    /* width: 800px; */
     font-family: Courier;
-    min-height: 26px;
+    min-height: 2rem;
 }
+/*
 .labeled-field input { width: 800px; }
 .labeled-field select { width: 805px; }
-fieldset { width: 950px; }""")
+fieldset { width: 950px; } */
+.usa-textarea { height: auto; }""")
 
         # Add some client-side scripting to support scrolling through
         # the stored queries.
@@ -112,9 +120,12 @@ function show_query() {{
     adjust_height();
 }}
 function adjust_height() {{
+    console.log("adjusting height");
     let box = jQuery("#sql");
     let sql = box.val() + "x";
     let rows = sql.split(/\\r\\n|\\r|\\n/).length;
+    let old_rows = box.attr("rows");
+    console.log("rows=" + rows + " old rows=" + old_rows);
     if (box.attr("rows") != rows)
         box.attr("rows", rows);
 }}
@@ -135,12 +146,23 @@ jQuery(function() {{
 
         self.logger.debug("run_query(): self.sql=%s", self.sql)
         if self.sql:
-            self.populate_form(self.form_page)
             start = datetime.now()
-            self.form_page.body.append(self.table.node)
+            table = self.table.node
+            if self.query:
+                table.insert(0, B.CAPTION(self.query or "Ad-hoc query"))
             elapsed = datetime.now() - start
             elapsed = f"Retrieved {len(self.rows):d} rows in {elapsed}"
-            self.form_page.body.append(self.form_page.B.P(elapsed))
+            style = "\n".join(self.TABLE_STYLE)
+            page = B.HTML(
+                B.HEAD(B.TITLE("Ad-hoc query results"), B.STYLE(style)),
+                B.BODY(table, B.P(elapsed))
+            )
+            opts = dict(
+                pretty_print=True,
+                doctype="<!DOCTYPE html>",
+                encoding="unicode",
+            )
+            self.send_page(tostring(page, **opts))
         self.form_page.send()
 
     def save_query(self):
@@ -151,13 +173,26 @@ jQuery(function() {{
             self.cursor.execute(insert, (self.name, self.sql or ""))
             self.conn.commit()
             self._query = self.name
-            self.subtitle = "New query successfully stored"
+            #self.subtitle = "New query successfully stored"
         elif self.query:
             update = "UPDATE query SET value = ? WHERE name = ?"
             self.cursor.execute(update, (self.sql, self.query))
             self.conn.commit()
-            self.subtitle = "Query successfully deleted"
+            #self.subtitle = "Query successfully deleted"
         self.show_form()
+
+    @property
+    def alerts(self):
+        """Show any notifications which are appropriate."""
+        if self.request == "Save" and (self.name or self.query):
+            query = "New query" if self.name else "Query"
+            alert = {"type": "success"}
+            alert["message"] = f"{query} successfuly stored."
+            return [alert]
+        elif self.request == "Delete":
+            message = "Query successfully deleted."
+            return [dict(type="success", message=message)]
+        return []
 
     def send_json(self):
         """Return JSON-encoded results from the current query to the user."""
@@ -172,6 +207,31 @@ jQuery(function() {{
             sys.exit(0)
         else:
             self.show_form()
+
+    def show_form(self):
+        """Populate an HTML page with a form and fields and send it."""
+
+        self.populate_form(self.form_page)
+        B = self.form_page.B
+        button_classes = B.CLASS("button usa-button")
+        delete_classes = B.CLASS("button usa-button usa-button--secondary")
+        opts = dict(type="submit", name=REQUEST)
+        for value in list(self.buttons):
+            classes = delete_classes if value == "Delete" else button_classes
+            button = B.INPUT(classes, value=value, **opts)
+            if value in self.same_window:
+                button.set("onclick", self.SAME_WINDOW)
+            self.form_page.form.append(button)
+        for alert in self.alerts:
+            message = alert["message"]
+            del alert["message"]
+            self.form_page.add_alert(message, **alert)
+        self.form_page.send()
+
+    @property
+    def same_window(self):
+        """Don't open a new tab for these commands."""
+        return "Excel", "Save", "Delete"
 
     @property
     def buttons(self):

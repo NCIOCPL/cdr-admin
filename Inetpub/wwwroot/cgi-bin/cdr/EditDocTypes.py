@@ -26,7 +26,8 @@ class Control(Controller):
 
         page.body.set("class", "admin-menu")
         fieldset = page.fieldset("Existing Document Types (click to edit)")
-        fieldset.set("class", "flexlinks")
+        fieldset.set("id", "doc-type-list")
+        # fieldset.set("class", "flexlinks")
         ul = page.B.UL()
         script = self.EDIT_DOCTYPE
         for doctype in Doctype.list_doc_types(self.session):
@@ -34,7 +35,11 @@ class Control(Controller):
             ul.append(page.B.LI(link))
         fieldset.append(ul)
         page.form.append(fieldset)
-        page.add_css(".flexlinks ul { height: 125px }")
+        page.add_css("""
+#doc-type-list ul { list-style-type: none; column-width: 15rem; }
+#doc-type-list a { text-decoration: none; }
+""")
+        #page.add_css(".flexlinks ul { height: 125px }")
 
     @property
     def subtitle(self):

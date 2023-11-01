@@ -3,7 +3,7 @@
 """Menu for editing CDR linking tables.
 """
 
-from cdrcgi import Controller, navigateTo
+from cdrcgi import Controller, navigateTo, REQUEST
 
 
 class Control(Controller):
@@ -20,14 +20,17 @@ class Control(Controller):
 
         page.body.set("class", "admin-menu")
         fieldset = page.fieldset("Existing Link Types (click to edit)")
-        fieldset.set("class", "flexlinks")
+        fieldset.set("id", "link-type-list")
         ul = page.B.UL()
         script = self.EDIT_LINK_TYPE
         for id, name in self.link_types:
             ul.append(page.B.LI(page.menu_link(script, name, id=id)))
         fieldset.append(ul)
         page.form.append(fieldset)
-        page.add_css(".flexlinks ul { height: 400px; }")
+        page.add_css("""
+#link-type-list ul { list-style-type: none; column-width: 15rem; }
+#link-type-list a { text-decoration: none; }
+""")
 
     def run(self):
         """Override base class to add action for new button."""
@@ -40,6 +43,18 @@ class Control(Controller):
         else:
             Controller.run(self)
 
+    def show_form(self):
+        """Populate an HTML page with a form and fields and send it."""
+
+        self.populate_form(self.form_page)
+        B = self.form_page.B
+        classes = B.CLASS("button usa-button")
+        opts = dict(type="submit", name=REQUEST)
+        for button in self.buttons:
+            button = B.INPUT(classes, value=button, **opts)
+            self.form_page.form.append(button)
+        self.form_page.send()
+
     @property
     def buttons(self):
         """Override to specify custom buttons for this page."""
@@ -47,9 +62,6 @@ class Control(Controller):
         return (
             self.ADD_NEW_LINK_TYPE,
             self.SHOW_ALL,
-            self.DEVMENU,
-            self.ADMINMENU,
-            self.LOG_OUT
         )
 
     @property

@@ -26,11 +26,14 @@ class Control(Controller):
 
         page.body.set("class", "admin-menu")
         fieldset = page.fieldset("Filter Sets (click to edit)")
-        fieldset.set("class", "flexlinks")
+        fieldset.set("class", "flexlinks usa-fieldset")
         script = self.EDIT_FILTER_SET
         ul = page.B.UL()
+        ul.set("class", "usa-list usa-list--unstyled margin-top-2")
         for id, name in FilterSet.get_filter_sets(self.session):
-            ul.append(page.B.LI(page.menu_link(script, name, id=id)))
+            link = page.menu_link(script, name, id=id)
+            link.set("target", "_blank")
+            ul.append(page.B.LI(link))
         fieldset.append(ul)
         page.form.append(fieldset)
 
@@ -54,9 +57,6 @@ class Control(Controller):
             self.DEEP,
             self.REPORT,
             self.ADD,
-            self.DEVMENU,
-            self.ADMINMENU,
-            self.LOG_OUT
         )
 
     @property

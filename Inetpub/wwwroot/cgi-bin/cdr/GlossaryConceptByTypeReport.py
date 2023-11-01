@@ -72,7 +72,6 @@ class Control(Controller):
         opts = dict(label="Include Spanish", value="Y")
         fieldset.append(page.radio_button("spanish", **opts))
         page.form.append(fieldset)
-        page.add_css(".labeled-field label { width: 120px; }")
 
     @property
     def audience(self):

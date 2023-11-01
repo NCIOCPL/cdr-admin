@@ -35,7 +35,7 @@ class Control(Controller):
         fieldset.append(page.date_range("date_range", **opts))
         page.form.append(fieldset)
         fieldset = page.fieldset("Maximum Number Of Logs")
-        fieldset.set("class", "radio-buttons")
+        #fieldset.set("class", "radio-buttons")
         checked = True
         for value in self.MAX_LOGS:
             opts = dict(value=value, checked=checked)
@@ -43,18 +43,18 @@ class Control(Controller):
             fieldset.append(page.radio_button("max-logs", **opts))
         page.form.append(fieldset)
         fieldset = page.fieldset("Sort Order")
-        fieldset.set("class", "radio-buttons")
+        #fieldset.set("class", "radio-buttons")
         opts = dict(value=self.LATEST_FIRST, checked=True)
         fieldset.append(page.radio_button("sort-order", **opts))
         opts = dict(value=self.OLDEST_FIRST, checked=False)
         fieldset.append(page.radio_button("sort-order", **opts))
         page.form.append(fieldset)
         page.add_css("""\
-.radio-buttons > div {
+/* .radio-buttons > div {
     display: inline-block;
     padding-right: 1rem;
 }
-.date-range span.date-range-sep { padding: 0 27px }
+.date-range span.date-range-sep { padding: 0 27px } */
 """)
 
     def build_tables(self):
@@ -122,7 +122,7 @@ Content-Length: {len(zip_bytes)}
         if elapsed is not None:
             elapsed.text = str(self.elapsed)
         self.report.page.add_css("""\
-p { border: solid maroon 2px; padding: .5rem; }
+p { border: solid maroon 1px; padding: .5rem; }
 """)
         self.report.send(self.format)
 

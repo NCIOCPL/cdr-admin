@@ -42,12 +42,13 @@ function red_button(i) {
 // Add a server block, possibly with existing values.
 function add_server_block(i, alias, url) {
     var id = i ? i : jQuery(".alias").length + 1;
-    var attrs = {class: "server-block", id: "server-block-" + id};
+    var attrs = {class: "server-block usa-fieldset", id: "server-block-" + id};
     var fieldset = jQuery("<fieldset>", attrs);
-    fieldset.append(jQuery("<legend>Server</legend>"));
+    fieldset.append(jQuery("<legend>Server</legend>", {class: "usa-legend"}));
     fieldset.append(make_field("alias", id, "Alias", alias));
     fieldset.append(make_field("url", id, "URL", url));
-    jQuery("form").append(fieldset);
+    // jQuery("form").append(fieldset);
+    jQuery("#submit-button-submit").before(fieldset)
     jQuery("input[name='num-servers']").val(id);
     if (!i) {
         add_buttons();
@@ -70,9 +71,9 @@ function remove_server(id) {
 function make_field(name, id, label, value) {
     var id = name + "-" + id;
     var field = jQuery("<div>", {class: "labeled-field"});
-    field.append(jQuery("<label>", {for: id, text: label}));
+    field.append(jQuery("<label>", {class: "usa-label", for: id, text: label}));
     field.append(jQuery("<input>", {
-        class: name,
+        class: name + " usa-input usa-input--xl",
         name: id,
         id: id,
         value: value

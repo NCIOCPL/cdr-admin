@@ -201,7 +201,7 @@ class Control(Controller):
         # Add Report Filtering options
         # ----------------------------
         fieldset = page.fieldset("Report Filtering")
-        fieldset.set("class", "by-search-block")
+        fieldset.set("class", "by-search-block usa-fieldset")
         opts = dict(options=["all"]+self.diagnoses, multiple=True)
         fieldset.append(page.select("diagnosis", **opts))
         opts["options"] = ["all"] + self.categories
@@ -211,7 +211,7 @@ class Control(Controller):
         # Fieldset for date range
         # -----------------------
         fieldset = page.fieldset("Date Range")
-        fieldset.set("class", "by-search-block")
+        fieldset.set("class", "by-search-block usa-fieldset")
         fieldset.append(page.date_field("start_date", value=self.start))
         fieldset.append(page.date_field("end_date", value=self.end))
         page.form.append(fieldset)
@@ -224,7 +224,7 @@ class Control(Controller):
             ("all", "Display English and Spanish"),
         )
         fieldset = page.fieldset("Language")
-        fieldset.set("class", "by-search-block")
+        fieldset.set("class", "by-search-block usa-fieldset")
         for value, label in LANGUAGE:
             opts = dict(value=value, label=label, onclick=None)
             opts["checked"] = value == self.languages
@@ -323,14 +323,14 @@ class Control(Controller):
             page.form.append(fieldset)
 
             fieldset = page.fieldset("Media ID")
-            fieldset.set("class", "by-id-block")
+            fieldset.set("class", "by-id-block usa-fieldset")
             label = kwopts.get("id-label", "CDR ID")
             opts = dict(label=label, tooltip=kwopts.get("id-tip"))
             fieldset.append(page.text_field("cdr-id", **opts))
             page.form.append(fieldset)
 
             fieldset = page.fieldset("Media Title")
-            fieldset.set("class", "by-title-block")
+            fieldset.set("class", "by-title-block usa-fieldset")
             tooltip = "Use wildcard (%) as appropriate."
             fieldset.append(page.text_field("title", tooltip=tooltip))
             page.form.append(fieldset)

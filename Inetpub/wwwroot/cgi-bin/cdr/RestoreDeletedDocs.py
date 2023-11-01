@@ -14,7 +14,7 @@ class Control(Controller):
 
     SUBTITLE = "CDR Document Restoration"
     LOGNAME = "DocumentRestoration"
-    LEGEND = "Select Documents To Restore (with optional comment)"
+    LEGEND = "Select Documents To Restore"
     REASON = "Restored using the CDR Admin interface"
     INSTRUCTIONS = "Enter document IDs separated by spaces and/or line breaks."
 
@@ -30,7 +30,7 @@ class Control(Controller):
         page.form.append(fieldset)
         fieldset = page.fieldset(self.LEGEND)
         fieldset.append(page.textarea("ids", label="CDR IDs", rows=3))
-        fieldset.append(page.textarea("reason", label="Comment"))
+        fieldset.append(page.textarea("reason", label="Comment (optional)"))
         page.form.append(fieldset)
         fieldset = page.fieldset("New Status")
         opts = dict(value="I", label="Inactive", checked=True)

@@ -67,8 +67,9 @@ function green_button() {
 function add_term_field() {
   var id = "term-" + (jQuery(".term").length + 1);
   var field = jQuery("<div>", {class: "labeled-field"});
-  field.append(jQuery("<label>", {for: id, text: "Term"}));
-  field.append(jQuery("<input>", {class: "term", name: "term", id: id}));
+  var term_classes = "term usa-input usa-input--xl";
+  field.append(jQuery("<label>", {for: id, text: "Term", class: "usa-label"}));
+  field.append(jQuery("<input>", {class: term_classes, name: "term", id: id}));
   jQuery("#search-terms").append(field);
 }
 jQuery(document).ready(function() {

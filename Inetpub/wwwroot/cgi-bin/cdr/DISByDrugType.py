@@ -10,7 +10,7 @@ from cdrapi.docs import Doctype
 class Control(Controller):
     """Access to the database and report-generation tools."""
 
-    SUBTITLE = "Drug Information Summary report by drug type."
+    SUBTITLE = "Drug Report By Drug Type"
     LOGNAME = "DISByDrugType"
     DRUG_TYPE_PATH = "/DrugInformationSummary/DrugInfoMetaData/DrugType"
     TITLE_PATH = "/DrugInformationSummary/Title"

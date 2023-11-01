@@ -57,7 +57,7 @@ class Control(Controller):
             opts["checked"] = False
         page.form.append(fieldset)
         fieldset = page.fieldset("Select Report Grouping")
-        fieldset.set("class", "hideable")
+        fieldset.set("class", "hideable usa-fieldset")
         opts["checked"] = True
         for value, label in self.GROUPINGS:
             opts["value"] = value
@@ -66,7 +66,7 @@ class Control(Controller):
             opts = dict(checked=False)
         page.form.append(fieldset)
         fieldset = page.fieldset("Select Approved Indication(s)")
-        fieldset.set("class", "hideable")
+        fieldset.set("class", "hideable usa-fieldset")
         options = [("all", "All indications")] + self.all_indications
         opts = dict(
             default="all",

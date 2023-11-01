@@ -11,7 +11,7 @@ from cdrcgi import Controller, WEBSERVER, BASE
 class Control(Controller):
     """Access to report-building tools."""
 
-    SUBTITLE = "Drug Information Summary Date Last Modified"
+    SUBTITLE = "DIS Date Last Modified"
     REPORT_TYPES = "user", "system"
 
     def build_tables(self):

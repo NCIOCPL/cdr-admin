@@ -149,7 +149,7 @@ class Control(Controller):
 
         for name in self.INSTRUCTIONS:
             fieldset = page.fieldset(name)
-            fieldset.set("class", "instructions")
+            fieldset.set("class", "instructions usa-fieldset")
             for segment in getattr(self, name.upper()):
                 if isinstance(segment, str):
                     fieldset.append(page.B.P(segment))
@@ -163,7 +163,7 @@ class Control(Controller):
         fieldset.append(page.text_field("old", label="Old Document ID"))
         fieldset.append(page.text_field("new", label="New Document ID"))
         page.form.append(fieldset)
-        page.head.append(page.B.LINK(href=self.CSS, rel="stylesheet"))
+        # page.head.append(page.B.LINK(href=self.CSS, rel="stylesheet"))
 
     def confirm(self):
         """Show the user what will happen and request confirmation."""

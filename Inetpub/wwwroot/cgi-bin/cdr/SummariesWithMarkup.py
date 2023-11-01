@@ -10,6 +10,7 @@ from cdrapi.docs import Doc
 class Control(Controller):
     """Access to the database and report-creation tools."""
 
+    SUBTITLE = "Summaries With Markup"
     LEVELS = "Publish", "Approved", "Proposed", "Rejected"
     INCLUDE_AB_MARKUP = "Include Advisory Board markup"
     INCLUDE_WITHOUT_MARKUP = "Include summaries without markup"

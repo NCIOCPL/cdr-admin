@@ -46,7 +46,7 @@ class Control(Controller):
         """
 
         fieldset = page.fieldset("Audience")
-        fieldset.set("class", "board-fieldset")
+        fieldset.set("class", "board-fieldset usa-fieldset")
         checked = True
         for audience in self.AUDIENCES:
             opts = dict(value=audience, checked=checked)
@@ -62,7 +62,7 @@ class Control(Controller):
         """
 
         fieldset = page.fieldset("Board(s)")
-        fieldset.set("class", "board-fieldset")
+        fieldset.set("class", "board-fieldset usa-fieldset")
         opts = dict(value="all", label="All Boards", checked=True)
         fieldset.append(page.checkbox("board", **opts))
         for board in sorted(self.boards.values()):
@@ -78,7 +78,7 @@ class Control(Controller):
         """
 
         fieldset = page.fieldset("Summary Document ID")
-        fieldset.set("id", "cdrid-fieldset")
+        fieldset.set("id", "cdrid-fieldset usa-fieldset")
         fieldset.append(page.text_field("id", label="CDR ID"))
         page.form.append(fieldset)
 
@@ -90,7 +90,7 @@ class Control(Controller):
         """
 
         fieldset = page.fieldset("Language")
-        fieldset.set("class", "board-fieldset")
+        fieldset.set("class", "board-fieldset usa-fieldset")
         checked = True
         for language in self.LANGUAGES:
             opts = dict(value=language, checked=checked)
@@ -233,7 +233,7 @@ jQuery(function() {
         if self.include_id:
             page.form.append(page.hidden_field("include_id", "Y"))
         fieldset = page.fieldset("Choose Summary")
-        fieldset.set("style", "width: 600px")
+        # fieldset.set("style", "width: 600px")
         for summary in self.fragment_matches:
             opts = dict(value=summary.id, label=summary.display)
             if summary.tooltip:
@@ -252,7 +252,7 @@ jQuery(function() {
         if self.include_id:
             page.form.append(page.hidden_field("include_id", "Y"))
         fieldset = page.fieldset("Select Document Version")
-        fieldset.set("style", "width: 600px")
+        # fieldset.set("style", "width: 600px")
         options = [(v.id, v.description) for v in self.versions]
         fieldset.append(page.select("version", options=options))
         page.form.append(fieldset)

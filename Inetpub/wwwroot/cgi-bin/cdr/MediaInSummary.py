@@ -237,14 +237,14 @@ class Control(Controller):
             page.form.append(fieldset)
 
             fieldset = page.fieldset("Summary ID")
-            fieldset.set("class", "by-id-block")
+            fieldset.set("class", "by-id-block usa-fieldset")
             label = kwopts.get("id-label", "CDR ID")
             opts = dict(label=label, tooltip=kwopts.get("id-tip"))
             fieldset.append(page.text_field("cdr-id", **opts))
             page.form.append(fieldset)
 
             fieldset = page.fieldset("Summary Title")
-            fieldset.set("class", "by-title-block")
+            fieldset.set("class", "by-title-block usa-fieldset")
             tooltip = "Use wildcard (%) as appropriate."
             fieldset.append(page.text_field("title", tooltip=tooltip))
             page.form.append(fieldset)

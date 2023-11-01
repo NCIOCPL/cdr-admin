@@ -118,7 +118,7 @@ class Control(Controller):
         fieldset.append(page.select("board", **opts))
         page.form.append(fieldset)
         fieldset = page.fieldset("Selection Method", id="method-block")
-        fieldset.set("class", "hidden")
+        fieldset.set("class", "hidden usa-fieldset")
         all = "Send All Summaries to all Board Members"
         opts = dict(label=all, value="all", checked=True)
         fieldset.append(page.radio_button("selection_method", **opts))
@@ -128,7 +128,7 @@ class Control(Controller):
         fieldset.append(page.radio_button("selection_method", **opts))
         page.form.append(fieldset)
         fieldset = page.fieldset("Choose Member(s)", id="members-block")
-        fieldset.set("class", "hidden")
+        fieldset.set("class", "hidden usa-fieldset")
         opts = dict(tooltip="Hold down the control (Ctrl) key while "
                     "left-clicking to select multiple board members",
                     multiple=True, classes="taller", onchange="memchg()")
@@ -136,7 +136,7 @@ class Control(Controller):
         page.form.append(fieldset)
         fieldset = page.fieldset("Choose One Or More Summaries(s)")
         fieldset.set("id", "summaries-block")
-        fieldset.set("class", "hidden")
+        fieldset.set("class", "hidden usa-fieldset")
         opts = dict(tooltip="Hold down the control (Ctrl) key while "
                     "left-clicking to select multiple summaries",
                     multiple=True, classes="taller", onchange="sumchg()")
@@ -144,7 +144,7 @@ class Control(Controller):
         page.form.append(fieldset)
         self.add_script(page)
         page.add_css("select.taller { height: 150px; }")
-        page.send()
+        # page.send()
 
     def show_candidates(self):
         """Put up a cascading second form.
@@ -862,4 +862,8 @@ class Tracker:
 
 
 if __name__ == "__main__":
-    Control().run()
+    control = Control()
+    try:
+        control.run()
+    except Exception:
+        control.logger.exception("failure:")

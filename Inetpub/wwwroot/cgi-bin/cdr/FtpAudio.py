@@ -72,7 +72,7 @@ class Control(Controller):
         opts = dict(value="overwrite", label=label)
         fieldset.append(page.checkbox("options", **opts))
         page.form.append(fieldset)
-        page.add_css("fieldset {width:600px} #paths input {width:400px}")
+        # page.add_css("fieldset {width:600px} #paths input {width:400px}")
 
     def build_tables(self):
         """Perform the retrievals and report the processing outcome."""

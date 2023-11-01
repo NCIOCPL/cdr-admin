@@ -12,10 +12,41 @@ class Control(Controller):
 
     SUBTITLE = "Unverified Citations Report"
     COLUMNS = "Doc ID", "Citation", "Comment"
+    INSTRUCTIONS = (
+        "Press Submit to generate an HTML table showing the CDR ",
+        "Citation",
+        " documents whose ",
+        "VerificationDetails/Verified",
+        " element has 'No' as its string content. The report table "
+        "has three columns. The first column contains the CDR document "
+        "ID. The second column shows the contents of the ",
+        "FormattedReference",
+        " element of the QC report resulting from filtering the "
+        "document. The third column cotains the text content of the ",
+        "Comment",
+        " element of that QC report. The report is ordered by CDR document "
+        "ID, oldest documents appearing first.",
+    )
 
-    def show_form(self):
-        """Bypass the form; this report doesn't use one."""
-        self.show_report()
+    def populate_form(self, page):
+        """Explain how the report works.
+
+        Required positional argument
+          page - instance of the cdrcgi.HTMLPage class
+        """
+
+        fieldset = page.fieldset("Instructions")
+        segments = []
+        code = False
+        for segment in self.INSTRUCTIONS:
+            if code:
+                segments.append(page.B.CODE(segment))
+            else:
+                segments.append(segment)
+            code = not code
+        fieldset.append(page.B.P(*segments))
+        page.form.append(fieldset)
+        page.add_css("fieldset p code { color: purple; }")
 
     def build_tables(self):
         """Build and show the table for the report."""

@@ -73,7 +73,7 @@ class Control(Controller):
         for paragraph, strong in self.INSTRUCTIONS:
             p = page.B.P(paragraph)
             if strong:
-                p.set("class", "strong warning")
+                p.set("class", "text-orange text-bold")
             fieldset.append(p)
         page.form.append(fieldset)
         fieldset = page.fieldset("Replacement Information")

@@ -7,6 +7,7 @@ BZIssue::1283 - add support for searching by user
 
 import datetime
 import cdr
+from functools import cached_property
 from cdrcgi import Controller
 from cdrapi import db
 
@@ -75,25 +76,28 @@ class ActivityReport(Controller):
         self.report.page.body.set("id", "activity-report")
         self.report.send(self.format)
 
-    @property
+    @cached_property
     def start_date(self):
-        if not hasattr(self, "_start_date"):
-            self._start_date = self.fields.getvalue("start_date")
-            if self._start_date:
-                if not cdr.strptime(self._start_date, "%Y-%m-%d"):
-                    msg = "Start Date must be valid date in YYYY-MM-DD format"
-                    self.bail(msg)
-        return self._start_date
+        """Make sure the start date is valid if present."""
+
+        start_date = self.fields.getvalue("start_date")
+        if not start_date:
+            return None
+        try:
+            return self.parse_date(start_date)
+        except Exception:
+            self.bail("Invalid start date")
 
     @property
     def end_date(self):
-        if not hasattr(self, "_end_date"):
-            self._end_date = self.fields.getvalue("end_date")
-            if self._end_date:
-                if not cdr.strptime(self._end_date, "%Y-%m-%d"):
-                    msg = "Start Date must be valid date in YYYY-MM-DD format"
-                    self.bail(msg)
-        return self._end_date
+        """Make sure the end date is valid if present."""
+        end_date = self.fields.getvalue("end_date")
+        if not end_date:
+            return None
+        try:
+            return self.parse_date(end_date)
+        except Exception:
+            self.bail("Invalid end date")
 
     @property
     def doctypes(self):

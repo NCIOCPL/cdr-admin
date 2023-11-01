@@ -64,9 +64,9 @@ class Control(Controller):
         """Override to add hidden fields and a couple of extra buttons."""
 
         page = self.report.page
-        buttons = page.form.find("header/h1/span")
-        buttons.insert(0, page.button(self.BACK))
-        buttons.insert(0, page.button(self.REFRESH))
+        #buttons = page.form.find("header/h1/span")
+        #buttons.insert(0, page.button(self.BACK))
+        #buttons.insert(0, page.button(self.REFRESH))
         page.form.append(page.hidden_field("jobId", self.id))
         page.form.append(page.hidden_field("jobName", self.name))
         page.form.append(page.hidden_field("jobAge", self.age))

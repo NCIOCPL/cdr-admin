@@ -27,6 +27,7 @@ class Control(Controller):
     def run(self):
         """Override so we can handle some custom commands."""
 
+        self.control_value_saved = False
         if not self.session.can_do("SET_SYS_VALUE"):
             self.bail("Not authorized to manage control values")
         if self.request == self.SAVE:
@@ -123,10 +124,12 @@ jQuery(function() {{
 
         # Customize the display widths, fonts.
         page.add_css("""\
+/*
 fieldset { width: 800px; }
 .labeled-field input,
 .labeled-field textarea,
 .labeled-field select { width: 650px; }
+*/
 #value { font-family: Courier; }""")
 
     def save(self):
@@ -149,8 +152,21 @@ fieldset { width: 800px; }
         self._groups = Groups()
         self._group = self.groups[group.lower()]
         self._name = name.lower()
-        self.subtitle = "Value successfully saved"
+        #self.subtitle = "Value successfully saved"
+        self.control_value_saved = True
         self.show_form()
+
+    @property
+    def same_window(self):
+        """Avoid opening a new tab for these commands."""
+        return "Save", "Delete"
+
+    @property
+    def alerts(self):
+        if not self.control_value_saved:
+            return []
+        message = "Control value successfully saved."
+        return [dict(message=message, type="success")]
 
     def inactivate(self):
         """Suppress a value which is no longer needed."""
@@ -180,15 +196,7 @@ fieldset { width: 800px; }
     def buttons(self):
         """Supply a customized set of action buttons."""
 
-        return (
-            self.SAVE,
-            self.DELETE,
-            self.JSON,
-            self.SHOW,
-            self.DEVMENU,
-            self.ADMINMENU,
-            self.LOG_OUT,
-        )
+        return self.SAVE, self.DELETE, self.JSON, self.SHOW
 
     @property
     def comment(self):
