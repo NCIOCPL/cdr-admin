@@ -14,6 +14,7 @@ function check_board(whatever) {
     if (board_id != current_board) {
 
         // Renew the radio button fields for the available letters.
+        current_board = board_id;
         jQuery("#letters div").remove();
         let board = boards[board_id];
         let type = board.type;
@@ -91,16 +92,16 @@ function check_submit_button() {
     let letter = jQuery("#letters input:checked").val();
     console.log("recipients: " + recipients + " letter: " + letter);
     if (!letter || recipients < 1)
-        jQuery("#submit-button").hide();
+        jQuery("#submit-button-submit").hide();
     else
-        jQuery("#submit-button").show();
+        jQuery("#submit-button-submit").show();
 }
 
 // Plug in the handler for changes to the board selection, and run it now.
 jQuery(function() {
-    jQuery("#board input").click(function() { check_board(); });
+    jQuery("#boards input").click(function() { check_board(); });
     check_board();
-    let submit = jQuery("#header-buttons input[value='Submit']");
-    submit.attr("id", "submit-button");
+    // let submit = jQuery("#header-buttons input[value='Submit']");
+    // submit.attr("id", "submit-button-submit");
     check_submit_button();
 });

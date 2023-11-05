@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 
-"""
-    Report on the types of changes recorded in selected Drug Info Summaries.
+"""Report on the types of changes recorded in selected Drug Info Summaries.
 
-    (adapted from SummaryTypeChangeReport.py written by BK)
+   (adapted from SummaryTypeChangeReport.py written by BK)
 """
 
+from functools import cached_property
 from datetime import date
 from cdrapi.docs import Doc
 from cdrcgi import Controller
@@ -13,9 +13,7 @@ from cdr import URDATE, getSchemaEnumVals
 
 
 class Control(Controller):
-    """
-    Logic manager for report.
-    """
+    """Logic manager for report."""
 
     SUBTITLE = "DIS Type of Change"
     LOGNAME = "DISTypeChangeReport"
@@ -35,12 +33,17 @@ class Control(Controller):
         "drug information summaries, refer to the ad-hoc query "
         "'DIS CDR IDs for Type of Change Report' on the ",
         "CDR Stored Database Queries",
-        "/cgi-bin/cdr/CdrQueries.py",
+        "/cgi-bin/cdr/CdrQueries.py?query=DIS CDR IDs for Type of Change Report",
         " page. Copy and paste the complete set of CDR IDs into the "
         "CDR ID field."
     )
 
     def build_tables(self):
+        """Pass on the tables property."""
+        return self.tables
+
+    @cached_property
+    def tables(self):
         """Assemble the table(s) for the report.
 
         If we're ready to display the report, we have three options:
@@ -77,23 +80,24 @@ class Control(Controller):
                 cells += row[1:]
                 table_rows.append(cells)
 
-            tables = [self.Reporter.Table(table_rows, **opts)]
-        self.subtitle = f"Report produced {self.today}"
+            tables = [self.Reporter.Table(rows, **opts)]
+        self.subtitle = f"DIS Type of Change Report ({self.today})"
         if self.type == self.HISTORICAL:
             self.subtitle += f" -- {self.date_range}"
         return tables
 
     def show_report(self):
-        """Overriding this method allows us to add CSS to the report
-
-           Overriding is not necessary if the standard report formatting
-           is working for the clients. In that case remove this method.
-        """
+        """Overridden to widen single report table with many columns."""
 
         elapsed = self.report.page.html.get_element_by_id("elapsed", None)
         if elapsed is not None:
             elapsed.text = str(self.elapsed)
-        self.report.page.add_css("th { background-color: lightgrey; }")
+        if len(self.tables) == 1 and len(self.columns) > 5:
+            table = self.report.page.form.find("table")
+            report_footer = self.report.page.main.find("p")
+            report_footer.addprevious(table)
+            css = ".report .usa-table { width: 90%; margin: 3rem auto 1.25rem; }"
+            self.report.page.add_css(css)
         self.report.send(self.format)
 
     def populate_form(self, page, titles=None):
@@ -456,6 +460,8 @@ $(function() {
                     self._dis_docs = [Summary(self, titles[0].id)]
                 else:
                     self.populate_form(self.form_page, titles)
+                    button = self.form_page.button("Submit")
+                    self.form_page.form.append(button)
                     self.form_page.send()
             elif self.selection_method == "id":
                 if not self.cdr_ids:
@@ -572,8 +578,9 @@ class Summary:
         nrows = len(changes)
         if nrows < 1:
             return []
+        opts = dict(href=f"QcReport.py?DocId={self.id}", rowspan=nrows)
         row = [
-            self.id,
+            self.control.Reporter.Cell(self.id, **opts),
             self.control.Reporter.Cell(self.display_title, rowspan=nrows),
             changes[0].date,
         ]
@@ -585,7 +592,7 @@ class Summary:
         for change in changes[1:]:
             # First element is the CDR-ID which is suppressed for all but the
             # first row.
-            row = ["", change.date]
+            row = [change.date]
             if not change_type:
                 row.append(change.type)
             if self.control.comments:

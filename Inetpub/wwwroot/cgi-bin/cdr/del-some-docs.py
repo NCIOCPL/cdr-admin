@@ -59,9 +59,9 @@ class Control(Controller):
         self.show_form()
 
     @property
-    def buttons(self):
-        """Customize the action buttons on the banner bar."""
-        return self.SUBMIT, self.DEVMENU, self.ADMINMENU, self.LOG_OUT
+    def same_window(self):
+        """No need to open new browser tabs for this tool."""
+        return [self.SUBMIT]
 
     @property
     def ids(self):

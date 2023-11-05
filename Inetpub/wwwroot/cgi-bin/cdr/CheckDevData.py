@@ -32,8 +32,6 @@ class Control(Controller):
     def show_report(self):
         """Override the base class version as this isn't a tabular report."""
 
-        buttons = self.report.page.form.find("header/h1/span")
-        buttons.insert(0, self.report.page.button(self.DEVMENU))
         self.compare_tables(self.report.page)
         self.compare_docs(self.report.page)
         self.report.page.add_css(self.RULES)

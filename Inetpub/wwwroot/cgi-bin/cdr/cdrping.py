@@ -4,7 +4,7 @@
 # CGI script invoked by the Big Brother system monitor to determine if
 # the CDR server is up and responding properly.
 #
-# If error, reports to default log file (debug.log) and to web client.
+# If error, reports to default log file (cdr-client.log) and to web client.
 ############
 
 import cdr

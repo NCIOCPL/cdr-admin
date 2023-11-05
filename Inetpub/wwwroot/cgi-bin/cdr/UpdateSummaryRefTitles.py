@@ -18,7 +18,7 @@ class Control(Controller):
     LOGNAME = "update-summaryref-titles"
     COLS = "Linking ID", "Outcome"
     CAPTION = "Results"
-    CSS = "th, td { background-color: #e8e8e8; border-color: #bbb; }"
+    CONFIRM = "Confirm"
 
     def populate_form(self, page):
         """Ask for CDR ID of linked summary.
@@ -58,10 +58,10 @@ class Control(Controller):
                     )
                 ),
                 page.B.TBODY(*rows),
+                page.B.CLASS("usa-table usa-table--borderless")
             )
             page.form.append(table)
             page.form.append(page.hidden_field("id", self.id))
-            page.add_css(self.CSS)
 
     def build_tables(self):
         """Show the linking documents we examined.
@@ -94,6 +94,27 @@ class Control(Controller):
             self.logger.info("recording outcome %s for CDR%d", outcome, id)
         self.logger.info("returning table with %d rows", len(rows))
         return self.Reporter.Table(rows, cols=self.COLS, caption=self.CAPTION)
+
+    def run(self):
+        """Override to handle custom buttons."""
+
+        try:
+            if self.request and self.request == self.CONFIRM:
+                self.show_report()
+        except Exception as e:
+            self.logger.exception("Control.run() failure")
+            bail(e)
+        Controller.run(self)
+
+    @cached_property
+    def buttons(self):
+        """Override buttons for the confirmation page."""
+
+        if self.selected:
+            return []
+        elif self.id:
+            return [self.CONFIRM]
+        return [self.SUBMIT]
 
     @cached_property
     def cdr_id(self):
@@ -137,6 +158,11 @@ class Control(Controller):
         return (rows[0].value if rows else "").strip()
 
     @cached_property
+    def same_window(self):
+        """Stay in the same browser tab."""
+        return [self.CONFIRM, self.SUBMIT]
+
+    @cached_property
     def selected(self):
         """IDs of the documents the user wants to update."""
 
@@ -163,10 +189,14 @@ class Control(Controller):
 
             self.id = id
             self.control = control
-            opts = dict(value=id, label="", checked=True)
-            center = page.B.CLASS("center")
+            opts = dict(value=id, label="\u00a0", checked=True)
+            center = page.B.CLASS("text-center")
+            checkbox = page.checkbox("selected", **opts)
+            label = checkbox.find("label")
+            classes = label.get("class") + " margin-top-0 margin-left-2"
+            label.set("class", classes)
             self.row = page.B.TR(
-                page.B.TD(page.checkbox("selected", **opts), center),
+                page.B.TD(checkbox, center),
                 page.B.TD(self.locked_by or ""),
                 page.B.TD(str(id)),
                 page.B.TD(self.lookup(control, id, self.TITLE)),

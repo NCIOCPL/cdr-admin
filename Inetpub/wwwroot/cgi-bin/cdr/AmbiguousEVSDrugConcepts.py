@@ -15,30 +15,44 @@ class Control(Controller):
 
     SUBTITLE = "EVS Drug Concepts Used By More Than One CDR Drug Term"
     LOGNAME = "ambiguous-evs-drug-concepts"
-    BUTTONS = (
-        HTMLPage.button(Controller.SUBMENU),
-        HTMLPage.button(Controller.ADMINMENU),
-        HTMLPage.button(Controller.LOG_OUT),
+    INSTRUCTIONS = (
+        "Press Submit to bring up a report of drug concepts in the NCI "
+        "Thesaurus, also known as the Enterprise Vocabulary System, or "
+        "EVS, which have been linked to two or more CDR Term documents. "
+        "Examine the CDR documents and determine how to resolve the "
+        "ambiguity so that the automate tools for refreshing the drug "
+        "terms from the EVS can be used. This might involve eliminating "
+        "duplicate documents, fixing typos in the NCIThesaurusConcept "
+        "elements, or some other resolution."
     )
 
-    def show_form(self):
-        return self.show_report()
+    def populate_form(self, page):
+        """Explain the form.
+
+        Require positional argument:
+          page - instance of the HTMLPage class
+        """
+
+        fieldset = page.fieldset("Instructions")
+        fieldset.append(page.B.P(self.INSTRUCTIONS))
+        page.form.append(fieldset)
 
     def show_report(self):
         opts = dict(
             banner=self.title,
             subtitle=self.subtitle,
             body_classes="report",
-            buttons=self.BUTTONS,
+            buttons=[],
             session=self.session,
             action=self.script,
+            control=self,
         )
         page = HTMLPage(self.title, **opts)
         opts = dict(Filter="set:QC Term Set")
         for concept in sorted(self.concepts.values()):
-            page.body.append(page.B.H3(f"{concept.name} ({concept.code})"))
+            page.form.append(page.B.H3(f"{concept.name} ({concept.code})"))
             if concept.definitions:
-                page.body.append(page.B.P(concept.definitions[0]))
+                page.form.append(page.B.P(concept.definitions[0]))
                 ul = page.B.UL()
                 ids = self.evs.linked_concepts[concept.code]
                 docs = [Doc(self.session, id=id) for id in ids]
@@ -47,12 +61,12 @@ class Control(Controller):
                     url = self.make_url("Filter.py", **opts)
                     link = page.B.A(doc.cdr_id, href=url, target="_blank")
                     ul.append(page.B.LI(f"{doc.title} (", link, ")"))
-                page.body.append(ul)
+                page.form.append(ul)
         elapsed = datetime.now() - self.started
         count = len(self.concepts)
         footnote = page.B.P(f"{count} concepts; elapsed: {elapsed}")
         footnote.set("class", "footnote")
-        page.body.append(footnote)
+        page.form.append(footnote)
         page.send()
 
     @cached_property

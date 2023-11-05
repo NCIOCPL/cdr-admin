@@ -3,6 +3,7 @@
 """Audit Trail report requested by Lakshmi.
 """
 
+from functools import cached_property
 from cdrapi import db
 from cdrapi.docs import Doc
 from cdrapi.users import Session
@@ -19,23 +20,22 @@ class Control(Controller):
             self.show_report()
         Controller.run(self)
 
-    @property
+    @cached_property
     def doc(self):
         """The subject of the report."""
-        if not hasattr(self, "_doc"):
-            doc_id = self.fields.getvalue("id")
-            if doc_id:
-                self._doc = Doc(Session("guest"), id=doc_id)
-            else:
-                self._doc = None
-        return self._doc
 
-    @property
+        doc_id = self.fields.getvalue("id")
+        if doc_id:
+            doc = Doc(Session("guest"), id=doc_id)
+            if doc.title is None:
+                self.bail(f"CDR{doc_id} not found")
+            return doc
+        return None
+
+    @cached_property
     def limit(self):
         """How many rows should be included in the report."""
-        if not hasattr(self, "_limit"):
-            self._limit = int(self.fields.getvalue("rows", "150"))
-        return self._limit
+        return int(self.fields.getvalue("rows", "150"))
 
     def build_tables(self):
         """Get the most recent activity for this document."""

@@ -46,11 +46,9 @@ class Control(Controller):
 
         ROLES = dict(
             APPC=443,
-            APPWEB=443,
             DBWIN=None,
             SFTP=22,
             CG=443,
-            GLOSSIFIERC=80,
             DRUPAL=443,
         )
 
@@ -134,8 +132,8 @@ class Control(Controller):
                 """Description of error encountered for this role."""
 
                 span = self.control.HTMLPage.B.SPAN(self.error)
-                span.set("class", "error")
-                return self.control.Reporter.Cell(span)
+                span.set("class", "error text-red text-bold")
+                return self.control.Reporter.Cell(span, center=True)
 
             @property
             def name(self):
@@ -152,7 +150,7 @@ class Control(Controller):
                         try:
                             self._id = gethostbyname(self.dns)
                         except Exception:
-                            self.logger.exception("%s not found", self.dns)
+                            self.control.logger.exception("%s not found", self.dns)
                 return self._id
 
             @property
@@ -246,7 +244,7 @@ class Control(Controller):
                         status = self.__control.ok_image
                     except Exception:
                         status = self.__control.HTMLPage.B.SPAN("LOGIN FAILED")
-                        status.set("class", "error")
+                        status.set("class", "error text-red test-bold")
                     status = self.__control.Reporter.Cell(status, center=True)
                     rows.append([database, account, status])
             return rows
@@ -261,4 +259,10 @@ class Control(Controller):
 
 if __name__ == "__main__":
     """Don't execute the script if loaded as a module."""
-    Control().run()
+
+    control = Control()
+    try:
+        control.run()
+    except Exception as e:
+        control.logger.exception("Tier settings check failure")
+        control.bail(e)

@@ -29,8 +29,6 @@ class Control(Controller):
     )
     SUMMARY = "Summary"
     MEDIA = "Media"
-    REPORTS_MENU = SUBMENU = "Reports"
-    ADMINMENU = "Admin"
     TYPES = (
         ("current", "Current Jobs", True),
         ("history", "Job History", False),
@@ -115,9 +113,6 @@ class Control(Controller):
             self.SUBMIT,
             self.SUMMARY,
             self.MEDIA,
-            self.REPORTS_MENU,
-            self.ADMINMENU,
-            self.LOG_OUT,
         )
 
     @property
@@ -191,6 +186,11 @@ class Control(Controller):
         if not hasattr(self, "_rows"):
             self._rows = [job.row for job in sorted(self.jobs)]
         return self._rows
+
+    @property
+    def same_window(self):
+        """Don't open a new browser tab for these buttons."""
+        return (self.SUMMARY, self.MEDIA)
 
     @property
     def sort(self):

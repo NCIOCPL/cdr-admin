@@ -3,6 +3,7 @@
 """Admin interface for managing CDR configuration in the /etc directory.
 """
 
+from functools import cached_property
 import os
 import cdr
 from cdrcgi import Controller, bail
@@ -32,14 +33,8 @@ class Control(Controller):
         textarea.set("spellcheck", "false")
         fieldset.append(textarea)
         page.form.append(fieldset)
-        page.add_css("""\
-xbody { background: #fcfcfc; }
-fieldset { width: 750px; }
-fieldset .labeled-field select, fieldset .labeled-field textarea {
-    width: 600px;
-}
-textarea { height: 600px; font-family: monospace; font-size: 12px; }""")
-
+        page.add_css(".usa-textarea { font-family: monospace; font-size: .9rem; }")
+        page.add_css(".usa-textarea { height: 32rem; }")
         page.add_script(f"""\
 function change_file() {{
     var url = "{self.script}?Session={self.session.name}&filename=";
@@ -66,28 +61,35 @@ function change_file() {{
         """Save the currently edited configuration file if changed."""
 
         classes = "info center"
-        if self.content.strip() and self.content != self.original:
+        stripped = self.content.strip().replace("\r", "")
+        original = self.original.strip().replace("\r", "")
+        self.logger.debug("stripped=%r", stripped)
+        self.logger.debug("original=%r", original)
+        if stripped and stripped != original:
             with open(self.filepath, "w", encoding="utf-8") as fp:
                 fp.write(self.content)
-            message = f"Saved new values for {self.filepath}"
             command = f"{self.FIX_PERMISSIONS} {self.filepath}"
             result = cdr.run_command(command, merge_output=True)
             if result.returncode:
                 message = result.stdout or "Failure fixing permissions"
-                classes = "failure center"
+                self.alerts.append(dict(message=message, type="warning"))
+            else:
+                message = f"Saved new values for {self.filepath}"
+                self.alerts.append(dict(message=message, type="success"))
         else:
             message = f"File {self.filepath} unchanged"
-        page = self.form_page
-        self.populate_form(page)
-        header = page.body.find("form/header")
-        if header is not None:
-            header.addnext(page.B.P(message, page.B.CLASS(classes)))
-        page.send()
+            self.alerts.append(dict(message=message, type="warning"))
+        self.show_form()
+
+    @cached_property
+    def alerts(self):
+        """Add to this list when we save successfully."""
+        return []
 
     @property
     def buttons(self):
-        """Provide a custom set of action buttons."""
-        return self.SAVE, self.DEVMENU, self.ADMINMENU, self.LOG_OUT
+        """This form uses a custom action button."""
+        return [self.SAVE]
 
     @property
     def content(self):
@@ -126,6 +128,11 @@ function change_file() {{
             with open(self.filepath, encoding="utf-8", newline="\n") as fp:
                 self._original = fp.read()
         return self._original
+
+    @property
+    def same_window(self):
+        """Stay on the same browser tab for this form."""
+        return self.buttons
 
 
 if __name__ == "__main__":

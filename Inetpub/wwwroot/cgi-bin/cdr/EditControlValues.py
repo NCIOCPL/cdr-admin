@@ -3,6 +3,7 @@
 """Manage the CDR control values.
 """
 
+from functools import cached_property
 from json import dumps
 from cdrcgi import Controller
 from cdrapi.db import Query
@@ -27,7 +28,6 @@ class Control(Controller):
     def run(self):
         """Override so we can handle some custom commands."""
 
-        self.control_value_saved = False
         if not self.session.can_do("SET_SYS_VALUE"):
             self.bail("Not authorized to manage control values")
         if self.request == self.SAVE:
@@ -118,7 +118,7 @@ function check_name() {{
 }}
 jQuery(function() {{
     jQuery("input[value='{self.SHOW}']").click(function() {{
-        window.open("{self.URL}", "ControlValues");
+        window.open("{self.URL}", "_blank");
     }});
 }});""")
 
@@ -152,8 +152,7 @@ fieldset { width: 800px; }
         self._groups = Groups()
         self._group = self.groups[group.lower()]
         self._name = name.lower()
-        #self.subtitle = "Value successfully saved"
-        self.control_value_saved = True
+        self.alerts.append(dict(message="Value successfully saved.", type="success"))
         self.show_form()
 
     @property
@@ -161,12 +160,10 @@ fieldset { width: 800px; }
         """Avoid opening a new tab for these commands."""
         return "Save", "Delete"
 
-    @property
+    @cached_property
     def alerts(self):
-        if not self.control_value_saved:
-            return []
-        message = "Control value successfully saved."
-        return [dict(message=message, type="success")]
+        """Append to this list as needed."""
+        return []
 
     def inactivate(self):
         """Suppress a value which is no longer needed."""
@@ -185,7 +182,7 @@ fieldset { width: 800px; }
         for name in names:
             if hasattr(self, name):
                 delattr(self, name)
-        self.subtitle = "Value successfully deleted"
+        self.alerts.append(dict(message="Value successfully dropped.", type="success"))
         self.show_form()
 
     def json(self):
@@ -256,19 +253,6 @@ fieldset { width: 800px; }
     def new_name(self):
         """Name for which to store a new row in the ctl table."""
         return self.fields.getvalue("new_name", "").strip()
-
-    @property
-    def subtitle(self):
-        """String to be displayed under the primary banner."""
-
-        if not hasattr(self, "_subtitle"):
-            self.subtitle = self.SUBTITLE
-        return self._subtitle
-
-    @subtitle.setter
-    def subtitle(self, value):
-        """Allow the subtitle to be updated dynamically."""
-        self._subtitle = value
 
     @property
     def value(self):

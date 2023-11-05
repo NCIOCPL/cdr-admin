@@ -19,9 +19,7 @@ class Control(Controller):
     SUBMENU = "Mailers"
     SUBSYSTEM = "PDQ Board Member Correspondence Mailer"
     LETTERS = "board-member-letters"
-
-    def build_tables(self):
-        """Create the publishing job and list the mailer recipients."""
+    STATUS_PAGE = "Status Page"
 
     def populate_form(self, page):
         """Add the parameters for mailer generation.
@@ -51,14 +49,6 @@ class Control(Controller):
         page.add_script(f"var boards = {self.boards.json};")
         page.add_script(f"var letters = {self.letters_json};")
         page.head.append(page.B.SCRIPT(src="/js/BoardMemberMailerReqForm.js"))
-
-    def run(self):
-        """Override to handle routing to Mailers menu."""
-
-        if self.request == self.SUBMENU:
-            navigateTo("Mailers.py", self.session.name)
-        else:
-            Controller.run(self)
 
     def show_report(self):
         """Overridden so we can create the mailers."""
@@ -97,6 +87,8 @@ class Control(Controller):
             ul.append(page.B.LI(recipient))
         fieldset.append(ul)
         page.form.append(fieldset)
+        button = self.HTMLPage.button(self.STATUS_PAGE, onclick="show_status();")
+        page.form.append(button)
         page.add_script(f"""\
 function show_status() {{
     window.open("PubStatus.py?id={job.id}", "status-{job.id}");

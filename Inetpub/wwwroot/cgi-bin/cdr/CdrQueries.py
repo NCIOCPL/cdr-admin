@@ -71,8 +71,9 @@ class Control(Controller):
         page.form.append(fieldset)
         fieldset = page.fieldset("Saved Queries")
         self.logger.info("populate_form(): self.query=%s", self.query)
+        prompt = "-- Select a query or create a new one --"
         opts = dict(
-            options=self.query_names,
+            options=[("", prompt)] + self.query_names,
             onchange="show_query();",
             default=self.query,
         )
@@ -95,19 +96,10 @@ class Control(Controller):
 
         # Customize the appearance of this tool's web page.
         page.add_css("""\
-/* (table { margin-top: 25px; }
-body { background: #fcfcfc; }
-p { font-size: .8em; text-align: center; color: green; text-style: italic }
-*/
 .labeled-field textarea#sql {
-    /* width: 800px; */
     font-family: Courier;
     min-height: 2rem;
 }
-/*
-.labeled-field input { width: 800px; }
-.labeled-field select { width: 805px; }
-fieldset { width: 950px; } */
 .usa-textarea { height: auto; }""")
 
         # Add some client-side scripting to support scrolling through

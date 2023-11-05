@@ -60,7 +60,7 @@ class ActivityReport(Controller):
         rows = []
         for user, name, action, when, dt, id, title, cmt in cursor.fetchall():
             who = f"{name} ({user})"
-            when = str(when)[:19]
+            when = str(when)[:19].replace("-", self.NONBREAKING_HYPHEN)
             cdrid = f"{id:010d}"
             url = f"QcReport.py?DocId={cdrid}&Session={self.session}"
             url += "&DocVersion=-1"
@@ -72,8 +72,14 @@ class ActivityReport(Controller):
         return self.Reporter.Table(rows, caption=caption, columns=self.COLS)
 
     def show_report(self):
-        """Override to provide a hook for some custom style rules."""
+        """Override so we can widen the report table."""
+
         self.report.page.body.set("id", "activity-report")
+        table = self.report.page.form.find("table")
+        report_footer = self.report.page.main.find("p")
+        report_footer.addprevious(table)
+        css = ".report .usa-table { width: 90%; margin: 3rem auto 1.25rem; }"
+        self.report.page.add_css(css)
         self.report.send(self.format)
 
     @cached_property

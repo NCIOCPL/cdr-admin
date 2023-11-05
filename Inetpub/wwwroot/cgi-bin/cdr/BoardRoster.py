@@ -102,7 +102,7 @@ class Control(Controller):
             fieldset.append(page.checkbox("option", value=option))
         page.form.append(fieldset)
         fieldset = page.fieldset("Columns to Include")
-        fieldset.set("class", "summary-fieldset hidden")
+        fieldset.set("class", "summary-fieldset hidden usa-fieldset")
         for name, header in self.COLUMNS:
             checked = name in self.DEFAULTS
             opts = dict(value=name, label=name, checked=checked)
@@ -112,12 +112,14 @@ class Control(Controller):
             fieldset.append(page.checkbox("column", **opts))
         page.form.append(fieldset)
         fieldset = page.fieldset("Miscellaneous Summary Report Options")
-        fieldset.set("class", "summary-fieldset hidden")
+        fieldset.set("class", "summary-fieldset hidden usa-fieldset")
         fieldset.append(page.B.P(self.EXTRA_HELP))
-        fieldset.append(page.text_field("extra", label="Extra Cols", value=0))
+        field = page.text_field("extra", label="Extra Cols", value=0)
+        field.find("input").set("type", "number")
+        fieldset.append(field)
         page.form.append(fieldset)
         fieldset = page.add_output_options(default="html")
-        fieldset.set("class", "summary-fieldset hidden")
+        fieldset.set("class", "summary-fieldset hidden usa-fieldset")
         page.add_script("\n".join(self.JS))
 
     def show_report(self):

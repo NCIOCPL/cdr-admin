@@ -191,6 +191,11 @@ class Control(Controller):
         return self._position
 
     @property
+    def same_window(self):
+        """Once we're on the second browser tab, don't open any more."""
+        return (self.ADD, self.DROP, self.SAVE, self.CANCEL)
+
+    @property
     def table(self):
         """Table selected by the user from the landing page form."""
 

@@ -99,10 +99,10 @@ jQuery(function() {
         """
 
         B = self.report.page.B
-        div = B.DIV(style="margin: 10px auto; width: 600px")
-        self.report.page.body.append(div)
+        div = B.DIV() #style="margin: 10px auto; width: 600px")
+        self.report.page.form.append(div)
         div.append(B.H3(self.caption))
-        dl = B.DL(style="margin: 5px auto; width: 1000px")
+        dl = B.DL() #style="margin: 5px auto; width: 1000px")
         div.append(dl)
         for indication in sorted(self.indications, key=str.lower):
             dl.append(B.DT(indication))
@@ -182,6 +182,11 @@ jQuery(function() {
                     if indication not in self.all_indications:
                         bail()
         return self._indication
+
+    @property
+    def no_results(self):
+        """One variation has no tables."""
+        return None
 
     @property
     def indication_table(self):

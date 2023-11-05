@@ -1209,6 +1209,8 @@ if letUserPickVersion:
 #----------------------------------------------------------------------
 # Determine the document type.
 #----------------------------------------------------------------------
+if version in (0, -1, "0", "-1"):
+    version = None
 if not docType:
     try:
         cursor.execute("""\

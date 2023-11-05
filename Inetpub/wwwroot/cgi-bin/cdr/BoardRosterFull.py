@@ -447,6 +447,8 @@ class Board:
                 for column in self.control.columns:
                     self.control.logger.debug("column %s", column)
                     value = "" if column == "blank" else getattr(self, column)
+                    if value and column == "start_date":
+                        value = value.replace("-", Control.NONBREAKING_HYPHEN)
                     self._row.append(value)
             return self._row
 

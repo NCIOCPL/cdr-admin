@@ -33,7 +33,9 @@ class Control(Controller):
             titles - sequence of documents to choose from
         """
 
-        if self.titles:
+        if self.doc_id:
+            self.show_report()
+        elif self.titles:
             titles = self.titles
             legend = "Choose Document"
             if len(titles) > 500:
@@ -59,6 +61,15 @@ class Control(Controller):
             fieldset.append(page.text_field(DOCID, label="Doc ID"))
             fieldset.append(page.text_field("DocTitle", label="Doc Title"))
             page.form.append(fieldset)
+
+    def show_report(self):
+        """Override to add some styling to the version table."""
+
+        elapsed = self.report.page.html.get_element_by_id("elapsed", None)
+        if elapsed is not None:
+            elapsed.text = str(self.elapsed)
+        self.report.page.add_css("#version-table td { vertical-align: top; }")
+        self.report.send(self.format)
 
     @cached_property
     def doc_id(self):
@@ -376,7 +387,7 @@ class Document:
 
         if not hasattr(self, "_version_table"):
             rows = [version.row for version in self.versions]
-            opts = dict(columns=self.columns)
+            opts = dict(columns=self.columns, id="version-table")
             self._version_table = self.control.Reporter.Table(rows, **opts)
         return self._version_table
 
@@ -517,12 +528,12 @@ class Document:
 
             Cell = self.__document.control.Reporter.Cell
             return [
-                Cell(self.num, classes="center"),
+                Cell(self.num, center=True),
                 self.__row.comment or "",
                 Cell(str(self.__row.dt)[:16], classes="nowrap"),
                 self.__row.fullname or self.__row.name,
-                Cell(self.__row.val_status, classes="center"),
-                Cell(self.__row.publishable, classes="center"),
+                Cell(self.__row.val_status, center=True),
+                Cell(self.__row.publishable, center=True),
                 Cell(self.publication_events, classes="nowrap"),
             ]
 

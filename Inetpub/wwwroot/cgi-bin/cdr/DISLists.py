@@ -3,6 +3,7 @@
 """Report on lists of drug information summaries.
 """
 
+from functools import cached_property
 import datetime
 from cdrcgi import Controller, Reporter
 from cdrapi import db
@@ -11,7 +12,7 @@ from cdrapi import db
 class Control(Controller):
     """Top-level logic for the report."""
 
-    SUBTITLE = f"Drug Info Summaries List -- {datetime.date.today()}"
+    SUBTITLE = "Drug Info Summaries List"
     SINGLE_AGENT = "single_agent"
     COMBINATION = "combination"
     AGENT_TYPES = {
@@ -253,6 +254,14 @@ function check_options(value) {
     def show_gridlines(self):
         """Boolean indicating whether we should have visible cell borders."""
         return True if "gridlines" in self.options else False
+
+    @cached_property
+    def subtitle(self):
+        """Customize the subtitle for the report."""
+
+        if self.request == self.SUBMIT:
+            return f"{self.SUBTITLE} -- {datetime.date.today()}"
+        return self.SUBTITLE
 
 
 if __name__ == "__main__":
