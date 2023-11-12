@@ -3,6 +3,7 @@
 """Menu of existing filter sets.
 """
 
+from functools import cached_property
 from cdrcgi import Controller, navigateTo
 from cdrapi.docs import FilterSet
 
@@ -36,6 +37,9 @@ class Control(Controller):
             ul.append(page.B.LI(link))
         fieldset.append(ul)
         page.form.append(fieldset)
+        if self.deleted:
+            message = f"Successfully deleted {self.deleted}."
+            self.alerts.append(dict(message=message, type="success"))
 
     def run(self):
         """Override base class to add action for new button."""
@@ -49,27 +53,20 @@ class Control(Controller):
         else:
             Controller.run(self)
 
+    @cached_property
+    def alerts(self):
+        """Append to this list as needed."""
+        return []
+
     @property
     def buttons(self):
         """Override to specify custom buttons for this page."""
+        return (self.DEEP, self.REPORT, self.ADD)
 
-        return (
-            self.DEEP,
-            self.REPORT,
-            self.ADD,
-        )
-
-    @property
-    def subtitle(self):
-        """Dynamically determine what to display under the main banner."""
-
-        if not hasattr(self, "_subtitle"):
-            set_name = self.fields.getvalue("deleted")
-            if set_name:
-                self._subtitle = f"Successfully deleted {set_name!r}"
-            else:
-                self._subtitle = self.SUBTITLE
-        return self._subtitle
+    @cached_property
+    def deleted(self):
+        """Name of set which has just been deleted."""
+        return self.fields.getvalue("deleted")
 
 
 if __name__ == "__main__":

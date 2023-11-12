@@ -3,6 +3,7 @@
 """Form for editing named CDR filter sets.
 """
 
+from functools import cached_property
 from json import loads
 from cdrcgi import Controller, bail, navigateTo
 from cdrapi.docs import FilterSet
@@ -111,9 +112,10 @@ class Control(Controller):
         try:
             filter_set.save()
             args = filter_set.id, filter_set.name, len(filter_set.members)
-            self.subtitle = "Saved set {} ({}) with {} members".format(*args)
+            message = "Saved set {} ({}) with {} members".format(*args)
             if self.set.id and self.set.name != filter_set.name:
-                self.subtitle += f" (name changed from {self.set.name})"
+                message += f" (name changed from {self.set.name})"
+            self.alerts.append(dict(message=message, type="success"))
         except Exception as e:
             self.logger.exception("failure saving %s", self.name)
             bail(str(e))
@@ -132,105 +134,92 @@ class Control(Controller):
             bail(str(e))
         navigateTo(self.EDIT_SETS, self.session.name, deleted=name)
 
-    @property
+    @cached_property
+    def alerts(self):
+        """Add to this list to queue alert notifications."""
+        return []
+
+    @cached_property
     def buttons(self):
         """Create custom action list (this isn't a report)."""
 
-        buttons = [
-            self.SAVE,
-            self.SETS,
-            self.DEVMENU,
-            self.ADMINMENU,
-            self.LOG_OUT,
-        ]
         if self.set.id:
-            buttons.insert(1, self.DELETE)
-        return buttons
+            return [self.SAVE, self.DELETE, self.SETS]
+        return [self.SAVE, self.SETS]
 
-    @property
+    @cached_property
     def description(self):
         """Short description string (from the editing form)."""
+        return self.fields.getvalue("description")
 
-        if not hasattr(self, "_description"):
-            self._description = self.fields.getvalue("description")
-        return self._description or None
-
-    @property
+    @cached_property
     def filter_list(self):
         """HTML ul object for the filter docs which can be made members."""
 
-        if not hasattr(self, "_filter_list"):
-            items = []
-            for doc in sorted(self.filters.values()):
-                items.append(self.B.LI(doc.title, self.B.CLASS("filter")))
-            self._filter_list = self.B.UL(*items)
-            self._filter_list.set("id", "filters")
-        return self._filter_list
+        items = []
+        for doc in sorted(self.filters.values()):
+            items.append(self.B.LI(doc.title, self.B.CLASS("filter")))
+        return self.B.UL(*items, id="filters")
 
-    @property
+    @cached_property
     def filters(self):
         """Dictionary of `Doc` objects, indexed by normalized titles."""
 
-        if not hasattr(self, "_filters"):
-            docs = FilterSet.get_filters(self.session)
-            self._filters = {}
-            for doc in docs:
-                key = doc.title.lower().strip()
-                self._filters[key] = doc
-        return self._filters
+        filters = {}
+        for doc in FilterSet.get_filters(self.session):
+            key = doc.title.lower().strip()
+            filters[key] = doc
+        return filters
 
-    @property
+    @cached_property
     def member_list(self):
         """HTML ul element for the filter set's members."""
 
-        if not hasattr(self, "_member_list"):
-            items = []
-            for member in self.set.members:
-                if isinstance(member, FilterSet):
-                    member_class = "set"
-                    label = member.name
-                else:
-                    member_class = "filter"
-                    label = member.title
-                li = self.B.LI(label, self.B.CLASS(member_class))
-                items.append(li)
-            self._member_list = self.B.UL(*items)
-            self._member_list.set("id", "members")
-        return self._member_list
+        items = []
+        for member in self.set.members:
+            if isinstance(member, FilterSet):
+                member_class = "set"
+                label = member.name
+            else:
+                member_class = "filter"
+                label = member.title
+            items.append(self.B.LI(label, self.B.CLASS(member_class)))
+        return self.B.UL(*items, id="members")
 
-    @property
+    @cached_property
     def members(self):
         """Ordered sequence of selected FilterSet and/or Doc objects."""
 
-        if not hasattr(self, "_members"):
-            self._members = []
-            members = self.fields.getvalue("members")
-            self.logger.info("members are %s", members)
-            for member in loads(members):
-                types = member["type"].split()
-                name = member["name"]
-                key = name.lower().strip()
-                if "filter" in types:
-                    self._members.append(self.filters[key])
-                elif "set" in types:
-                    self._members.append(self.sets[key])
-                else:
-                    message = "unrecognized type for member: %s"
-                    self.logger.warning(message, member)
-        return self._members
+        members = []
+        json = self.fields.getvalue("members")
+        self.logger.info("member json is %s", json)
+        for member in loads(json):
+            types = member["type"].split()
+            name = member["name"]
+            key = name.lower().strip()
+            if "filter" in types:
+                members.append(self.filters[key])
+            elif "set" in types:
+                members.append(self.sets[key])
+            else:
+                message = "unrecognized type for member: %s"
+                self.logger.warning(message, member)
+        return members
 
-    @property
+    @cached_property
     def notes(self):
         """Extended information about the set (from the form)."""
         return self.fields.getvalue("notes") or None
 
-    @property
+    @cached_property
     def name(self):
         """Editable set name value from the form."""
+        return self.fields.getvalue("name")
 
-        if not hasattr(self, "_name"):
-            self._name = self.fields.getvalue("name")
-        return self._name
+    @property
+    def same_window(self):
+        """Don't create new browser tabs."""
+        return self.buttons
 
     @property
     def set(self):
@@ -249,40 +238,24 @@ class Control(Controller):
         """Allow save() to refresh the set object."""
         self._set = value
 
-    @property
+    @cached_property
     def set_list(self):
         """HTML ul object for the filter sets which can be made members."""
 
-        if not hasattr(self, "_set_list"):
-            items = []
-            for filter_set in sorted(self.sets.values()):
-                items.append(self.B.LI(filter_set.name, self.B.CLASS("set")))
-            self._set_list = self.B.UL(*items)
-            self._set_list.set("id", "sets")
-        return self._set_list
+        items = []
+        for filter_set in sorted(self.sets.values()):
+            items.append(self.B.LI(filter_set.name, self.B.CLASS("set")))
+        return self.B.UL(*items, id="sets")
 
-    @property
+    @cached_property
     def sets(self):
         """Dictionary of `FilterSet` objects, indexed by normalized names."""
-        if not hasattr(self, "_sets"):
-            self._sets = {}
-            for id, name in FilterSet.get_filter_sets(self.session):
-                key = name.lower().strip()
-                self._sets[key] = FilterSet(self.session, id=id, name=name)
-        return self._sets
 
-    @property
-    def subtitle(self):
-        """String to be displayed under the main banner."""
-
-        if hasattr(self, "_subtitle"):
-            return self._subtitle
-        return self.SUBTITLE
-
-    @subtitle.setter
-    def subtitle(self, value):
-        """Make this value modifiable on the fly."""
-        self._subtitle = value
+        sets = {}
+        for id, name in FilterSet.get_filter_sets(self.session):
+            key = name.lower().strip()
+            sets[key] = FilterSet(self.session, id=id, name=name)
+        return sets
 
 
 if __name__ == "__main__":

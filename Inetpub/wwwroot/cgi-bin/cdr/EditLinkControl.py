@@ -3,6 +3,7 @@
 """Menu for editing CDR linking tables.
 """
 
+from functools import cached_property
 from cdrcgi import Controller, navigateTo, REQUEST
 
 
@@ -55,23 +56,42 @@ class Control(Controller):
             self.form_page.form.append(button)
         self.form_page.send()
 
-    @property
+    @cached_property
+    def alerts(self):
+        """Show a message indicating successful deletion."""
+
+        if self.deleted:
+            message = "Successfully deleted link type {self.deleted!r}."
+            return [dict(message=message, type="success")]
+        return []
+
+    @cached_property
     def buttons(self):
         """Override to specify custom buttons for this page."""
+        return self.ADD_NEW_LINK_TYPE, self.SHOW_ALL
 
-        return (
-            self.ADD_NEW_LINK_TYPE,
-            self.SHOW_ALL,
-        )
+    @cached_property
+    def deleted(self):
+        """Name of link type which was just successfully deleted, if any."""
+        return self.fields.getvalue("deleted")
 
-    @property
+    @cached_property
     def link_types(self):
-        if not hasattr(self, "_link_types"):
-            query = self.Query("link_type", "id", "name").order("name")
-            rows = query.execute(self.cursor).fetchall()
-            self._link_types = [tuple(row) for row in rows]
-        return self._link_types
+        """List of existing link types for the menu."""
 
+        query = self.Query("link_type", "id", "name").order("name")
+        rows = query.execute(self.cursor).fetchall()
+        return [tuple(row) for row in rows]
+
+    @cached_property
+    def returned(self):
+        """True if we returned here in an automatically opened browser tab."""
+        return self.fields.getvalue("returned")
+
+    @cached_property
+    def same_window(self):
+        """If this browser tab was created automatically, don't open more."""
+        return self.buttons if self.deleted or self.returned else []
 
 if __name__ == "__main__":
     """Don't execute the script if loaded as a module."""

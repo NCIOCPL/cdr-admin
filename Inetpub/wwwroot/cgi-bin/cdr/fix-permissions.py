@@ -23,8 +23,17 @@ class Control(Controller):
         command = f"{self.fix_permissions} {path}"
         self.logger.info("fixing permissions for %s", path)
         try:
-            result = run_command(command, merge_output=True)
-            self.send_page(result.stdout, text_type="plain")
+            result = run_command(command, merge_output=False)
+            output = []
+            if result.stdout:
+                output.append("Standard output:\n")
+                output.append(result.stdout)
+            if result.stderr:
+                output.append("Error output:\n")
+                output.append(result.stderr)
+            if not result.stdout and not result.stderr:
+                output.append("No output.")
+            self.send_page("\n".join(output), text_type="plain")
         except Exception as e:
             self.logger.exception(command)
             self.send_page(f"{command}: {e}")

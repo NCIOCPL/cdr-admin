@@ -508,6 +508,11 @@ class Control(Controller):
         """Dictionary of Media valid-values lists."""
         return dict(getDoctype("guest", "Media").vvLists)
 
+    @cached_property
+    def wide_css(self):
+        """We need more horizontal space for the report table."""
+        return self.Reporter.Table.WIDE_CSS
+
     def build_tables(self):
         """Show the report if we have all the information we need."""
 

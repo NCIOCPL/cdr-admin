@@ -3,6 +3,7 @@
 """Find phrases in Glossary documents.
 """
 
+from functools import cached_property
 from cdrcgi import Controller
 from cdrapi.docs import Doc
 from lxml import etree
@@ -69,15 +70,12 @@ function add_term_field() {
 }
 """)
 
-    @property
+    @cached_property
     def audience(self):
         """Optional audience for narrowing the report."""
+        return self.fields.getvalue("audience")
 
-        if not hasattr(self, "_audience"):
-            self._audience = self.fields.getvalue("audience")
-        return self._audience
-
-    @property
+    @cached_property
     def columns(self):
         """Headers for the report's table."""
 
@@ -88,35 +86,30 @@ function add_term_field() {
             self.Reporter.Column("Definitions", width="600px"),
         )
 
-    @property
+    @cached_property
     def docs(self):
         """Sequence of GlossaryDoc objects containing the user's term(s)."""
 
-        if not hasattr(self, "_docs"):
-            self._docs = []
-            query = self.Query("pub_proc_cg p", "p.id", "c.int_val", "p.xml")
-            query.join("query_term_pub c", "c.doc_id = p.id")
-            query.where(query.Condition("c.path", self.CONCEPT_PATH))
-            row = query.execute(self.cursor).fetchone()
-            while row:
-                doc = GlossaryDoc(self, row.id, row.int_val, row.xml)
-                if doc.row:
-                    self._docs.append(doc)
-                row = self.cursor.fetchone()
-        return self._docs
+        docs = []
+        query = self.Query("pub_proc_cg p", "p.id", "c.int_val", "p.xml")
+        query.join("query_term_pub c", "c.doc_id = p.id")
+        query.where(query.Condition("c.path", self.CONCEPT_PATH))
+        row = query.execute(self.cursor).fetchone()
+        while row:
+            doc = GlossaryDoc(self, row.id, row.int_val, row.xml)
+            if doc.row:
+                docs.append(doc)
+            row = self.cursor.fetchone()
+        return docs
 
-    @property
+    @cached_property
     def language(self):
         """Optional language for narrowing the report."""
 
-        if not hasattr(self, "_language"):
-            self._language = None
-            language = self.fields.getvalue("language")
-            if language in ("English", "Spanish"):
-                self._language = language
-        return self._language
+        language = self.fields.getvalue("language")
+        return language if language in ("English", "Spanish") else None
 
-    @property
+    @cached_property
     def regex(self):
         """
         Create a compiled regular expression for finding the caller's phrases.
@@ -132,40 +125,34 @@ function add_term_field() {
         does).
         """
 
-        if not hasattr(self, "_regex"):
-            phrases = [GlossaryDoc.normalize(phrase) for phrase in self.terms]
-            phrases = sorted(phrases, key=len, reverse=True)
-            expressions = []
-            for phrase in phrases:
-                expressions.append(phrase
-                                   .replace("\\", r"\\")
-                                   .replace("+",  r"\+")
-                                   .replace(" ",  r"\s+")
-                                   .replace(".",  r"\.")
-                                   .replace("^",  r"\^")
-                                   .replace("$",  r"\$")
-                                   .replace("*",  r"\*")
-                                   .replace("?",  r"\?")
-                                   .replace("{",  r"\{")
-                                   .replace("}",  r"\}")
-                                   .replace("[",  r"\[")
-                                   .replace("]",  r"\]")
-                                   .replace("|",  r"\|")
-                                   .replace("(",  r"\(")
-                                   .replace(")",  r"\)")
-                                   .replace("'",  "['\u2019]"))
-            expressions = "|".join(expressions)
-            expression = f"(?<!\\w)({expressions})(?!\\w)"
-            self._regex = compile(expression, self.REGEX_FLAGS)
-        return self._regex
+        phrases = [GlossaryDoc.normalize(phrase) for phrase in self.terms]
+        expressions = []
+        for phrase in sorted(phrases, key=len, reverse=True)
+            expressions.append(phrase
+                               .replace("\\", r"\\")
+                               .replace("+",  r"\+")
+                               .replace(" ",  r"\s+")
+                               .replace(".",  r"\.")
+                               .replace("^",  r"\^")
+                               .replace("$",  r"\$")
+                               .replace("*",  r"\*")
+                               .replace("?",  r"\?")
+                               .replace("{",  r"\{")
+                               .replace("}",  r"\}")
+                               .replace("[",  r"\[")
+                               .replace("]",  r"\]")
+                               .replace("|",  r"\|")
+                               .replace("(",  r"\(")
+                               .replace(")",  r"\)")
+                               .replace("'",  "['\u2019]"))
+        expressions = "|".join(expressions)
+        expression = f"(?<!\\w)({expressions})(?!\\w)"
+        return compile(expression, self.REGEX_FLAGS)
 
-    @property
+    @cached_property
     def rows(self):
         """Rows for the report's table."""
-
-        if not hasattr(self, "_rows"):
-            self._rows = [doc.row for doc in sorted(self.docs)]
-        return self._rows
+        return [doc.row for doc in sorted(self.docs)]
 
     @property
     def terms(self):

@@ -10,20 +10,33 @@ from collections import defaultdict
 from datetime import datetime
 from functools import cached_property
 from cdrapi.docs import Doc
-from cdrcgi import Controller
+from cdrcgi import Controller, BasicWebPage, SESSION
+from cdrcgi import FormFieldFactory as Factory
 from nci_thesaurus import EVS, Normalizer, Term
 
 
 class Control(Controller):
     """Top-level logic for the script."""
 
-    SUBTITLE = "Drug Term Refresh"
+    SUBTITLE = "Refresh Drug Terms"
     LOGNAME = "updates-from-evs"
     CSS = "../../stylesheets/RefreshDrugTermsFromEVS.css"
     SORT_BY_NAME = "Sort By Name"
     SORT_BY_ID = "Sort By CDR ID"
     SUPPRESSED = "unrefreshable_drug_term"
     SUPPRESS = f"INSERT INTO {SUPPRESSED} (id) VALUES (?)"
+    CSS = (
+        "table { width: 100%; margin-top: 2rem; }",
+        "caption { margin-bottom: 1rem; font-size: 1.2em; }",
+        "thead th { font-size: 1.1em; }",
+        ".cb-row th, caption { text-align: left; }",
+        ".cb-row th { border-left: none; border-right: none; }",
+        ".cb-row th { padding: 2rem 0 1rem; }",
+        ".footnote { font-size: .9em; font-style: italic; color: green; }",
+        ".usa-button { margin-top: 2rem; }",
+        ".insertion { color: red; }",
+        ".deletion { text-decoration: line-through; }",
+    )
 
     def populate_form(self, page):
         """Show terms differing from the EVS.
@@ -32,7 +45,7 @@ class Control(Controller):
         results above the form.
 
         Pass:
-            page - HTMLPage object where we communicate with the user
+            page - HTMLPage object (replaced by BasicWebPage object)
         """
 
         # Suppress any drug terms we've been asked to remove from the page.
@@ -49,23 +62,19 @@ class Control(Controller):
             self.logger.info("committed suppressions")
 
         # Perform and report any requested updates from the EVS.
+        start = datetime.now()
+        page = BasicWebPage()
+        url = f"{self.HTMLPage.USWDS}/css/uswds.min.css"
+        page.head.append(page.B.LINK(href=url, rel="stylesheet"))
+        page.head.append(page.B.STYLE("\n".join(self.CSS)))
+        page.wrapper.append(page.B.H1(self.SUBTITLE))
         actions = self.fields.getlist("actions")
         if actions:
             self.logger.info("actions: %r", actions)
             EVS.show_updates(self, page, actions)
             self.logger.info("actions applied")
 
-        # Remember settings which should be carried forward.
-        page.form.append(page.hidden_field("concepts", self.concepts_path))
-        page.form.append(page.hidden_field("sort", self.sort))
-
-        # Start building the form.
-        start = datetime.now()
-        page.head.append(page.B.LINK(href=self.CSS, rel="stylesheet"))
-        body = page.B.TBODY()
-
         # Check each of the EVS concepts for deltas with the CDR documents.
-        terms = 0
         if self.sort == "name":
             concepts = sorted(self.concepts.values())
         else:
@@ -78,6 +87,19 @@ class Control(Controller):
             for doc_id in sorted(doc_ids):
                 if len(doc_ids[doc_id]) == 1:
                     concepts.append(doc_ids[doc_id][0])
+
+        # Start building the form.
+        form = page.B.FORM(method="POST", action=self.script)
+        page.wrapper.append(form)
+        form.append(Factory.hidden_field(SESSION, self.session))
+        form.append(Factory.hidden_field("concepts", self.concepts_path))
+        form.append(Factory.hidden_field("sort", self.sort))
+        for button in self.buttons:
+            form.append(Factory.button(button))
+
+        # Create a table showing deltas we have found.
+        terms = 0
+        tbody = page.B.TBODY()
         for concept in concepts:
             doc = self.__doc_for_code(concept.code)
             if not doc or doc.cdr_id in self.suppressed:
@@ -90,10 +112,10 @@ class Control(Controller):
             label = f"Refresh CDR{doc.cdr_id} from {code} ({name})"
             value = f"{code}-{doc.cdr_id}"
             opts = dict(value=value, label=label)
-            refresh = page.checkbox("actions", **opts)
+            refresh = Factory.checkbox("actions", **opts)
             opts = dict(value=doc.cdr_id, label=f"Suppress CDR{doc.cdr_id}")
-            suppress = page.checkbox("suppress", **opts)
-            body.append(
+            suppress = Factory.checkbox("suppress", **opts)
+            tbody.append(
                 page.B.TR(
                     page.B.TH(suppress, refresh, colspan="3"),
                     page.B.CLASS("cb-row")
@@ -105,7 +127,7 @@ class Control(Controller):
                     page.B.TD(doc.name),
                     page.B.TD(concept.name),
                 )
-                body.append(row)
+                tbody.append(row)
             if concept.other_names_differ(doc):
                 c_names = set(concept.normalized_other_names)
                 d_names = set(doc.normalized_other_names)
@@ -127,7 +149,7 @@ class Control(Controller):
                     page.B.TD(doc_list),
                     page.B.TD(concept_list),
                 )
-                body.append(row)
+                tbody.append(row)
             if concept.normalized_definitions != doc.normalized_definitions:
                 if len(doc.definitions) == 1:
                     old_def = doc.definitions[0]
@@ -148,7 +170,7 @@ class Control(Controller):
                     page.B.TD(old_def),
                     page.B.TD(new_def),
                 )
-                body.append(row)
+                tbody.append(row)
 
         # Assemble the table and connect it to the page.
         caption = f"Drug Terms Which Can Be Refreshed From the EVS ({terms})"
@@ -156,21 +178,24 @@ class Control(Controller):
             page.B.CAPTION(caption),
             page.B.THEAD(
                 page.B.TR(
-                    page.B.TH("Element", page.B.CLASS("sticky")),
-                    page.B.TH("CDR", page.B.CLASS("sticky")),
-                    page.B.TH("EVS", page.B.CLASS("sticky")),
+                    page.B.TH("Element"),
+                    page.B.TH("CDR"),
+                    page.B.TH("EVS"),
                 )
             ),
-            body
+            tbody
         )
+        form.append(table)
+
+        # Summarize what we did and how long it took.
         elapsed = datetime.now() - start
-        msg = f"Checked {len(self.concepts)} EVS concepts in {elapsed}."
-        row = page.B.TR(page.B.TD(msg, page.B.CLASS("footnote"), colspan="3"))
-        body.append(row)
-        page.form.append(table)
+        message = f"Checked {len(self.concepts)} EVS concepts in {elapsed}."
+        page.wrapper.append(page.B.P(message, page.B.CLASS("footnote")))
+        page.send()
 
     def run(self):
         """Allow the user to change the sort order."""
+
         if self.request == self.SORT_BY_ID:
             self.redirect(self.script, sort="id", concepts=self.concepts_path)
         elif self.request == self.SORT_BY_NAME:
@@ -186,12 +211,9 @@ class Control(Controller):
     def buttons(self):
         """Custom list of action buttons."""
 
-        standard = [self.SUBMIT, self.SUBMENU, self.ADMINMENU, self.LOG_OUT]
         if self.sort == "id":
-            buttons = [self.SORT_BY_NAME]
-        else:
-            buttons = [self.SORT_BY_ID]
-        return buttons + standard
+            return self.SUBMIT, self.SORT_BY_NAME
+        return self.SUBMIT, self.SORT_BY_ID
 
     @cached_property
     def codes(self):

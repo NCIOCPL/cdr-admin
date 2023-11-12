@@ -120,7 +120,7 @@ class Control(Controller):
                     string = html.tostring(self.html, **opts)
                     return string.replace("@@PRE@@", self.__pre)
             page = Page(self.display, self.TITLE, **opts)
-            page.form.append(page.B.PRE("@@PRE@@"))
+            page.main.append(page.B.PRE("@@PRE@@"))
             page.add_css("\n".join(self.CSS))
             page.send()
 

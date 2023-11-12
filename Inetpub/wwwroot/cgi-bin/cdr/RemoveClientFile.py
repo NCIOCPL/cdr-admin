@@ -63,7 +63,7 @@ class Control(Controller):
         paths = [p for p in self.client_files.rglob("*") if p.is_file()]
         paths = [p.relative_to(self.client_files) for p in paths]
         paths = [str(p) for p in paths]
-        return [["", "- Select file -"]] + sorted(paths)
+        return [["", "- Select file -"]] + sorted(paths, key=str.lower)
 
     @cached_property
     def logs(self):
@@ -91,6 +91,11 @@ class Control(Controller):
             ])
             return self.HTMLPage.B.PRE(message)
         return None
+
+    @cached_property
+    def same_window(self):
+        """Don't open a new tab when processing the form."""
+        return [self.SUBMIT]
 
     def __refresh_manifest(self):
         """Rebuild the client manifest file.

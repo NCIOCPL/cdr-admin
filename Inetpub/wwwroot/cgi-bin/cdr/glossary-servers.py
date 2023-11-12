@@ -8,6 +8,7 @@ popups. That data is serialized and sent to each of the servers on the
 list managed by this script.
 """
 
+from functools import cached_property
 from cdrcgi import Controller
 from cdr import getControlGroup, updateCtl
 
@@ -115,25 +116,23 @@ class Control(Controller):
             if alias not in new:
                 opts["name"] = alias
                 updateCtl(self.session.name, "Inactivate", **opts)
-        self._alert = f"Glossary Servers Saved: {len(new):d}"
         s = "" if len(new) == 1 else "s"
+        alert = f"Successfully stored {len(new):d} glossary server{s}."
+        self.alerts.append(dict(message=alert, type="success"))
         self.logger.info("%d server%s saved by %s", len(new), s, self.user)
         self.show_form()
 
-    @property
+    @cached_property
     def alerts(self):
         """Information to display at the top of the form."""
-
-        if hasattr(self, "_alert"):
-            return [dict(message=self._alert, type="success")]
         return []
 
-    @property
+    @cached_property
     def same_window(self):
         """Keep everything on the same tab."""
         return [self.SUBMIT]
 
-    @property
+    @cached_property
     def servers(self):
         """Dictionary of name->URL mappings for the glossary servers.
 
@@ -155,25 +154,7 @@ class Control(Controller):
             group = dict(Primary="https://{}".format(server))
         return group
 
-    @property
-    def subtitle(self):
-        """String displayed directly below the main banner."""
-
-        if not hasattr(self, "_subtitle"):
-            self._subtitle = self.SUBTITLE
-        return self._subtitle
-
-    @subtitle.setter
-    def subtitle(self, value):
-        """Let the save routing show what it did.
-
-        Pass:
-            value - new value to be displayed
-        """
-
-        self._subtitle = value
-
-    @property
+    @cached_property
     def user(self):
         """User account name string (for logging)."""
         return self.session.user_name
