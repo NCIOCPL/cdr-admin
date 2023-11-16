@@ -162,11 +162,6 @@ xxfieldset { width: 1024px; }
         self.show_form()
 
     @cached_property
-    def alerts(self):
-        """Notifications to be displaed at the top."""
-        return []
-
-    @cached_property
     def buttons(self):
         """Customize form buttons."""
         return [self.REMOVE] # self.ADD, self.REMOVE, self.COMPARE

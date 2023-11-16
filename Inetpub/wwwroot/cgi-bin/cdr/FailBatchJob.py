@@ -89,11 +89,6 @@ table.usa-table th:first-child { text-align: center; }
         self.show_form()
 
     @cached_property
-    def alerts(self):
-        """Register queued alert messages here."""
-        return []
-
-    @cached_property
     def batch_jobs(self):
         """Batch jobs marked for resolution by the user."""
 

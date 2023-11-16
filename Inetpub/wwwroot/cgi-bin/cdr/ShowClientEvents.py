@@ -6,6 +6,7 @@ Tools used for tracking down what really happened when a user
 reports anomalies in stored versions of CDR documents.
 """
 
+from functools import cached_property
 import datetime
 from cdrcgi import Controller
 
@@ -46,13 +47,10 @@ class Control(Controller):
         """The string describing the report's range."""
         return f"{len(self.rows)} Events From {self.start} To {self.end}"
 
-    @property
+    @cached_property
     def end(self):
         """End of the report's date range."""
-
-        if not hasattr(self, "_end"):
-            self._end = self.fields.getvalue("end") or str(self.TODAY)
-        return self._end
+        return str(self.parse_date(self.fields.getvalue("end")) or self.TODAY)
 
     @property
     def rows(self):
@@ -73,14 +71,12 @@ class Control(Controller):
             self._rows = [tuple(row) for row in query.execute(self.cursor)]
         return self._rows
 
-    @property
+    @cached_property
     def start(self):
         """Start of the report's date range."""
 
-        if not hasattr(self, "_start"):
-            default = self.TODAY - datetime.timedelta(7)
-            self._start = self.fields.getvalue("start") or str(default)
-        return self._start
+        default = self.TODAY - datetime.timedelta(7)
+        return str(self.parse_date(self.fields.getvalue("start")) or default)
 
     @property
     def user(self):

@@ -91,11 +91,6 @@ class Control(Controller):
         )
 
     @cached_property
-    def alerts(self):
-        """Queue messages for the top of the page here."""
-        return []
-
-    @cached_property
     def buttons(self):
         """Form has no Submit button."""
         return []

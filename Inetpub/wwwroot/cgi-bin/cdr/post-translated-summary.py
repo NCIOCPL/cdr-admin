@@ -3,6 +3,7 @@
 """Create new summary document for translated version (CGI interface).
 """
 
+from functools import cached_property
 from cdrcgi import Controller
 from cdrapi.docs import Doc
 
@@ -21,89 +22,82 @@ class Control(Controller):
         """
 
         fieldset = page.fieldset("Translated Summary")
-        if self.message is not None:
-            page.form.append(self.message)
         fieldset.append(page.file_field("file", label="Summary File"))
-        fieldset.append(page.text_field("comment"))
+        fieldset.append(page.text_field("comment", value=self.comment))
         page.form.append(fieldset)
         page.form.set("enctype", "multipart/form-data")
 
     def show_report(self):
-        """Cycle back to the form."""
+        """Post the document and loop back to the form."""
+
+        if not self.session.can_do("CREATE WS SUMMARIES"):
+            self.bail("Account not authorized for adding WS summaries.")
+        if not self.document:
+            self.alerts.append(dict(
+                message="Summary document not posted.",
+                type="warning",
+            ))
+        else:
+            try:
+                self.document.save(**self.opts)
+                self.alerts.append(dict(
+                    message=f"Successfully created {self.document.cdr_id}.",
+                    type="success",
+                ))
+            except Exception as e:
+                self.logger.exception("Save failure")
+                self.alerts.append(dict(
+                    message=f"Failure: {e}",
+                    type="error",
+                ))
         self.show_form()
 
-    @property
+    @cached_property
     def comment(self):
         """Override the default comment as appropriate."""
+        return self.fields.getvalue("comment", self.COMMENT)
 
-        if not hasattr(self, "_comment"):
-            self._comment = self.fields.getvalue("comment", self.COMMENT)
-        return self._comment
-
-    @property
+    @cached_property
     def document(self):
         """Uploaded summary document to be posted."""
 
-        if not hasattr(self, "_document"):
-            self._document = None
-            if self.file_bytes:
-                opts = dict(doctype="Summary", xml=self.file_bytes)
-                self._document = Doc(self.session, **opts)
-        return self._document
+        if not self.file_bytes:
+            return None
+        return Doc(self.session, doctype="Summary", xml=self.file_bytes)
 
-    @property
+    @cached_property
     def file_bytes(self):
         """UTF-8 serialization of the document to be posted."""
 
-        if not hasattr(self, "_file_bytes"):
-            self._file_bytes = None
-            if "file" in list(self.fields.keys()):
-                field = self.fields["file"]
-                if field.file:
-                    segments = []
-                    while True:
-                        more_bytes = field.file.read()
-                        if not more_bytes:
-                            break
-                        segments.append(more_bytes)
-                else:
-                    segments = [field.value]
-                self._file_bytes = b"".join(segments)
-        return self._file_bytes
+        if "file" not in list(self.fields.keys()):
+            return None
+        field = self.fields["file"]
+        if field.file:
+            segments = []
+            while True:
+                more_bytes = field.file.read()
+                if not more_bytes:
+                    break
+                segments.append(more_bytes)
+        else:
+            segments = [field.value]
+        return b"".join(segments)
 
-    @property
-    def message(self):
-        """Paragraph element describing the outcome of a post action."""
-
-        if not hasattr(self, "_message"):
-            self._message = None
-            if self.document:
-                if not self.session.can_do("CREATE WS SUMMARIES"):
-                    error = "Account not authorized for adding WS summaries."
-                    self.bail(error)
-                try:
-                    self.document.save(**self.opts)
-                    message = f"Saved {self.document.cdr_id}."
-                    message_class = self.HTMLPage.B.CLASS("info center")
-                except Exception as e:
-                    self.logger.exception("Save failure")
-                    message = f"Failure: {e}"
-                    message_class = self.HTMLPage.B.CLASS("error center")
-                self._message = self.HTMLPage.B.P(message, message_class)
-        return self._message
-
-    @property
+    @cached_property
     def opts(self):
         """Options passed the the `Doc.save()` method."""
 
-        if not hasattr(self, "_opts"):
-            self._opts = dict(
-                version=True,
-                unlock=True,
-                comment=self.comment,
-                reason=self.comment,
-            )
-        return self._opts
+        return dict(
+            version=True,
+            unlock=True,
+            comment=self.comment,
+            reason=self.comment,
+        )
+
+    @cached_property
+    def same_window(self):
+        """Avoid opening new browser tabs."""
+        return [self.SUBMIT]
 
 
 if __name__ == "__main__":

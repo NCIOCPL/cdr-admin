@@ -3,6 +3,7 @@
 """Show the XML for CDR documents.
 """
 
+from functools import cached_property
 from collections import OrderedDict
 from cdrcgi import Controller
 from cdrapi.docs import Doc, Doctype
@@ -67,12 +68,13 @@ class Control(Controller):
                 fieldset.append(page.radio_button("selection_method", **opts))
             page.form.append(fieldset)
             fieldset = page.fieldset("Document ID", id="by-id-block")
-            fieldset.append(page.text_field("doc-id", label="CDR ID"))
+            opts = dict(label="CDR ID", value=self.id)
+            fieldset.append(page.text_field("doc-id", **opts))
             page.form.append(fieldset)
             fieldset = page.fieldset("Title Or Title Pattern")
             fieldset.set("id", "by-title-block")
             fieldset.append(page.B.P(self.TITLE_HELP))
-            fieldset.append(page.text_field("title"))
+            fieldset.append(page.text_field("title", value=self.fragment))
             opts = dict(label="Doc Type", options=self.doctypes, multiple=True)
             fieldset.append(page.select("doctype", **opts))
             page.form.append(fieldset)
@@ -108,37 +110,30 @@ class Control(Controller):
         else:
             self.send_page(self.xml, text_type="xml")
 
-    @property
+    @cached_property
     def doctype(self):
         """Document type string(s) selected by the user to narrow search."""
 
-        if not hasattr(self, "_doctype"):
-            self._doctype = self.fields.getlist("doctype")
-            if set(self._doctype) - set(self.doctypes):
-                self.bail()
-        return self._doctype
+        doctype = self.fields.getlist("doctype")
+        if set(doctype) - set(self.doctypes):
+            self.bail()
+        return doctype
 
-    @property
+    @cached_property
     def doctypes(self):
         """Valid value strings for available CDR document types."""
+        return Doctype.list_doc_types(self.session)
 
-        if not hasattr(self, "_doctypes"):
-            self._doctypes = Doctype.list_doc_types(self.session)
-        return self._doctypes
-
-    @property
+    @cached_property
     def fragment(self):
         """String for matching CDR document by title substring."""
+        return self.fields.getvalue("title", "").strip()
 
-        if not hasattr(self, "_fragment"):
-            self._fragment = self.fields.getvalue("title", "").strip()
-        return self._fragment
-
-    @property
+    @cached_property
     def id(self):
         """Integer for the document to be displayed."""
 
-        if not hasattr(self, "_id"):
+        if self.selection_method == "id":
             self._id = self.fields.getvalue("doc-id")
             if self._id:
                 try:
@@ -150,7 +145,7 @@ class Control(Controller):
         return self._id
 
     @property
-    def method(self):
+    def xxmethod(self):
         """Carry the parameters in the URL."""
         return "GET"
 

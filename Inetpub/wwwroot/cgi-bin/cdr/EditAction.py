@@ -96,11 +96,6 @@ class Control(Controller):
         self._action = value
 
     @cached_property
-    def alerts(self):
-        """Add to this list as appropriate."""
-        return []
-
-    @cached_property
     def buttons(self):
         """Identify our custom navigation buttons."""
 

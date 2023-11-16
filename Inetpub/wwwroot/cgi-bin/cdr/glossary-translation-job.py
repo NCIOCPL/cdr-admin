@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 
 """Interface for creating/editing a glossary translation job.
-
-JIRA::OCECDR-4489
 """
 
 from functools import cached_property
@@ -33,13 +31,12 @@ class Control(Controller):
         self.cursor.execute(query, self.doc_id)
         self.conn.commit()
         self.logger.info("removed translation job for CDR%d", self.doc_id)
-        message = f"Translation job for CDR {self.doc_id} successfully removed."
+        message = f"Translation job for CDR{self.doc_id} successfully removed."
         parms = dict(message=message)
         self.redirect("glossary-translation-jobs.py", **parms)
 
     def populate_form(self, page):
-        """
-        Show the form for editing/creating a transation job.
+        """Show the form for editing/creating a transation job.
 
         Pass:
             page - object used to collect the form fields
@@ -153,11 +150,6 @@ jQuery(function() {{
             self.redirect("glossary-translation-jobs.py", **parms)
 
     @cached_property
-    def alerts(self):
-        """Queue messages here."""
-        return []
-
-    @cached_property
     def assigned_to(self):
         """Integer for the account ID of the user who is assigned this task."""
 
@@ -195,11 +187,12 @@ jQuery(function() {{
             return None
         try:
             doc = Doc(self.session, id=id)
+            doctype = doc.doctype.name
         except Exception:
             self.logger.exception("id %r", id)
             self.bail("Invalid document ID")
-        if not doc.doctype.name.lower().startswith("glossary"):
-            self.bail(f"CDR{doc.id} is a {doc.doctype} document")
+        if not doctype.lower().startswith("glossary"):
+            self.bail(f"CDR{doc.id} is a {doctype} document")
         return doc
 
     @cached_property
@@ -406,7 +399,7 @@ class Job:
     @cached_property
     def subtitle(self):
         """Override for string displayed at the top of the page."""
-        return f"Translation job for {self.doc_id}"
+        return f"Translation job for CDR{self.doc_id}"
 
 
 if __name__ == "__main__":

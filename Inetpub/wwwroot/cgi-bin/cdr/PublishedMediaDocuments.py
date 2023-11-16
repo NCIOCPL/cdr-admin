@@ -5,8 +5,9 @@
 Split out from PubStatsByDate.py.
 """
 
+from functools import cached_property
 from cdrcgi import Controller
-import datetime
+from datetime import date, timedelta
 
 
 class Control(Controller):
@@ -53,8 +54,8 @@ class Control(Controller):
             page - HTMLPage object where we put the form
         """
 
-        end = datetime.date.today()
-        start = end - datetime.timedelta(7)
+        end = date.today()
+        start = end - timedelta(7)
 
         fieldset = page.fieldset("Language(s)")
         for language in self.LANGUAGES:
@@ -91,38 +92,28 @@ class Control(Controller):
             fieldset.append(page.checkbox("audience", **opts))
         page.form.append(fieldset)
 
-    @property
+    @cached_property
     def audience(self):
         """Audience selected from the form, if only one."""
 
-        if not hasattr(self, "_audience"):
-            self._audience = None
-            audiences = self.fields.getlist("audience")
-            if len(audiences) == 1:
-                self._audience = audiences[0]
-        return self._audience
+        audiences = self.fields.getlist("audience")
+        return audiences[0] if len(audiences) == 1 else None
 
-    @property
-    def language(self):
-        """Language selected from the form, if only one."""
-
-        if not hasattr(self, "_language"):
-            self._language = None
-            languages = self.fields.getlist("language")
-            if len(languages) == 1:
-                self._language = languages[0]
-        return self._language
-
-    @property
+    @cached_property
     def end(self):
         """End of the date range for the report."""
 
-        if not hasattr(self, "_end"):
-            end = self.fields.getvalue("end", str(self.started))[:10]
-            self._end = f"{end} 23:59:59"
-        return self._end
+        end = self.parse_date(self.fields.getvalue("end")) or date.today()
+        return f"{end} 23:59:59"
 
-    @property
+    @cached_property
+    def language(self):
+        """Language selected from the form, if only one."""
+
+        languages = self.fields.getlist("language")
+        return languages[0] if len(languages) == 1 else None
+
+    @cached_property
     def rows(self):
         """Values for the report table."""
 
@@ -231,13 +222,15 @@ class Control(Controller):
                 ])
         return rows
 
-    @property
+    @cached_property
     def start(self):
         """Beginning of the date range for the report."""
+        return self.parse_date(self.fields.getvalue("start")) or "2001-01-01"
 
-        if not hasattr(self, "_start"):
-            self._start = self.fields.getvalue("start", "2001-01-01")[:10]
-        return self._start
+    @cached_property
+    def wide_css(self):
+        """Give the report table more room."""
+        return self.Reporter.Table.WIDE_CSS
 
 
 if __name__ == "__main__":

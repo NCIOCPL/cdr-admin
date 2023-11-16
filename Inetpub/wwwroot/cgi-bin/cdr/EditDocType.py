@@ -142,11 +142,6 @@ class Control(Controller):
         self.show_form()
 
     @cached_property
-    def alerts(self):
-        """Add to this list as appropriate."""
-        return []
-
-    @cached_property
     def active(self):
         """Boolean representing whether the doctype is active (Y or N)."""
         return "Y" if "active" in self.fields.getlist("options") else "N"

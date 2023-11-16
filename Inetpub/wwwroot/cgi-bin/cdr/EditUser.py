@@ -162,11 +162,6 @@ jQuery(function() {
         self.show_form()
 
     @cached_property
-    def alerts(self):
-        """Add to this list as appropriate."""
-        return []
-
-    @cached_property
     def authmode(self):
         """Get the authmode value from the form field."""
         return self.fields.getvalue("authmode")

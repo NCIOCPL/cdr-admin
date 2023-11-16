@@ -160,11 +160,6 @@ fieldset { width: 800px; }
         """Avoid opening a new tab for these commands."""
         return "Save", "Delete"
 
-    @cached_property
-    def alerts(self):
-        """Append to this list as needed."""
-        return []
-
     def inactivate(self):
         """Suppress a value which is no longer needed."""
 

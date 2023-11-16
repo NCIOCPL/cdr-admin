@@ -122,7 +122,7 @@ class Control(Controller):
 
     @property
     def end(self):
-        return self.fields.getvalue("end")
+        return self.parse_date(self.fields.getvalue("end"))
 
     @property
     def format(self):
@@ -149,7 +149,7 @@ class Control(Controller):
 
     @property
     def start(self):
-        return self.fields.getvalue("start")
+        return self.parse_date(self.fields.getvalue("start"))
 
     @property
     def terms(self):

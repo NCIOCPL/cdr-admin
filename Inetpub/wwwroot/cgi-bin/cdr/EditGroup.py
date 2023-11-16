@@ -134,11 +134,6 @@ class Control(Controller):
         return self.session.list_actions()
 
     @cached_property
-    def alerts(self):
-        """Add to this list as appropriate."""
-        return []
-
-    @cached_property
     def allowed_actions(self):
         """Checkboxes checked for the "action" groups."""
 

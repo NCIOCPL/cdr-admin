@@ -42,16 +42,19 @@ class Control(Controller):
 
         # Add fields for selecting the document to be filtered.
         fieldset = page.fieldset("Document")
-        fieldset.append(page.text_field("DocId", value="62902", label="Doc ID"))
-        fieldset.append(page.text_field("DocVer", value="lastp", label="Doc Version"))
+        opts = dict(value="62902", label="Doc ID")
+        fieldset.append(page.text_field("DocId", **opts))
+        opts = dict(value="lastp", label="Doc Version")
+        fieldset.append(page.text_field("DocVer", **opts))
         page.form.append(fieldset)
 
         # Let the user configure miscellaneous options for the filtering.
         fieldset = page.fieldset("Miscellaneous Options")
-        fieldset.append(page.text_field("newdtd", value="pdqCG.dtd", label="DTD"))
+        opts = dict(value="pdqCG.dtd", label="DTD")
+        fieldset.append(page.text_field("newdtd", **opts))
         page.form.append(fieldset)
 
-        # Seed the form with a single filter field, to which the user can add more.
+        # Start with a single filter field, to which the user can add more.
         fieldset = page.fieldset("Filter(s)", id="filters")
         legend = fieldset.find("legend")
         add_button = page.B.SPAN(
@@ -81,18 +84,23 @@ class Control(Controller):
             ("isqc", "QC Report", True),
         )
         for id, label, checked in checkboxes:
-            opts = dict(widget_id=id, label=label, checked=checked, value="true")
-            fieldset.append(page.checkbox(id, **opts))
+            opts = dict(widget_id=id, label=label, checked=checked)
+            fieldset.append(page.checkbox(id, value="true", **opts))
         page.form.append(fieldset)
 
-        # Let the user specify which type of QC report is wanted (if applicable).
+        # Ask which type of QC report is wanted (if applicable).
         fieldset = page.fieldset("Summary Markup")
         buttons = (
             ("Y", "rsmarkup", "Redline/Strikeout, New Patient", True),
             ("N", "bu", "Bold/Underline", False),
         )
         for value, id, label, checked in buttons:
-            opts = dict(widget_id=id, label=label, value=value, checked=checked)
+            opts = dict(
+                widget_id=id,
+                label=label,
+                value=value,
+                checked=checked,
+            )
             fieldset.append(page.radio_button("rsmarkup", **opts))
         page.form.append(fieldset)
 
@@ -103,8 +111,8 @@ class Control(Controller):
             ("advisory", "Advisory", False),
         )
         for id, label, checked in checkboxes:
-            opts = dict(widget_id=id, label=label, checked=checked, value="true")
-            fieldset.append(page.checkbox(id, **opts))
+            opts = dict(widget_id=id, label=label, checked=checked)
+            fieldset.append(page.checkbox(id, value="true", **opts))
         page.form.append(fieldset)
 
         # Which revision levels should be applied?
@@ -115,8 +123,8 @@ class Control(Controller):
             ("proposed", "proposed", False),
         )
         for id, label, checked in checkboxes:
-            opts = dict(widget_id=id, label=label, checked=checked, value="true")
-            fieldset.append(page.checkbox(id, **opts))
+            opts = dict(widget_id=id, label=label, checked=checked)
+            fieldset.append(page.checkbox(id, value="true", **opts))
         page.form.append(fieldset)
 
         # Add options applicable to glossary filtering.
@@ -126,8 +134,8 @@ class Control(Controller):
             ("glosshp", "Health Professional", True),
         )
         for id, label, checked in checkboxes:
-            opts = dict(widget_id=id, label=label, checked=checked, value="true")
-            fieldset.append(page.checkbox(id, **opts))
+            opts = dict(widget_id=id, label=label, checked=checked)
+            fieldset.append(page.checkbox(id, value="true", **opts))
         page.form.append(fieldset)
 
         # Optional elements to be included.
@@ -139,8 +147,8 @@ class Control(Controller):
             ("loeref", "LOE Refs", False),
         )
         for id, label, checked in checkboxes:
-            opts = dict(widget_id=id, label=label, checked=checked, value="true")
-            fieldset.append(page.checkbox(id, **opts))
+            opts = dict(widget_id=id, label=label, checked=checked)
+            fieldset.append(page.checkbox(id, value="true", **opts))
         page.form.append(fieldset)
 
         # Add fields for a custom parameter (more can be added).
@@ -157,7 +165,8 @@ class Control(Controller):
         )
         legend.append(add_button)
         fieldset.append(page.B.DIV(
-            page.text_field("parm-name-1", label="Name", wrapper_classes="parm-name"),
+            opts = dict(label="Name", wrapper_classes="parm-name")
+            page.text_field("parm-name-1", **opts),
             page.text_field("parm-value-1", label="Value"),
             page.B.CLASS("parameter")
         ))
@@ -510,8 +519,9 @@ class Control(Controller):
     def validation_table(self):
         """Assemble the table showing the validation results."""
 
-        if self.fields.getvalue("validate") != "Y" and self.request != self.VALIDATE:
-            return None
+        if self.fields.getvalue("validate") != "Y":
+            if self.request != self.VALIDATE:
+                return None
         self.dtd.validate(self.filter_result.result_tree)
         errors = self.dtd.error_log.filter_from_errors()
         rows = []

@@ -135,11 +135,6 @@ class Control(Controller):
         navigateTo(self.EDIT_SETS, self.session.name, deleted=name)
 
     @cached_property
-    def alerts(self):
-        """Add to this list to queue alert notifications."""
-        return []
-
-    @cached_property
     def buttons(self):
         """Create custom action list (this isn't a report)."""
 

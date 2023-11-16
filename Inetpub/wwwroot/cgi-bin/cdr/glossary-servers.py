@@ -123,11 +123,6 @@ class Control(Controller):
         self.show_form()
 
     @cached_property
-    def alerts(self):
-        """Information to display at the top of the form."""
-        return []
-
-    @cached_property
     def same_window(self):
         """Keep everything on the same tab."""
         return [self.SUBMIT]

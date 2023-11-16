@@ -138,12 +138,12 @@ header   = cdrcgi.header(title, title, getSectionTitle(repType),
     *.gg              { border: 1px solid green;
                         background: #99FF66;
                         color: #006600; }
-    *.comgroup          { background: #EEE; /*#C9C9C9;*/
+    *.comgroup          { background: #f8f8f8; /*#C9C9C9;*/
                           margin-bottom: 8px;
                           margin-left: -.5rem;
                           padding: .5rem .5rem .5rem .5rem; }
     .comgroup:first-of-type { margin-top: .75rem; }
-    .comgroup div { background: #EEE; }
+    .comgroup div { background: #f8f8f8; }
     .comgroup div:first-child .usa-checkbox__label { margin-top: .1rem; }
     .comments-extra .subheading { font-weight: bold; }
     .comments-extra p { font-style: italic; }
@@ -370,11 +370,14 @@ header   = cdrcgi.header(title, title, getSectionTitle(repType),
      }
      function showOptions(obj) {
          var el = document.getElementById(obj);
+         var button = document.getElementById("show-options");
          if (el.style.display == 'none') {
              el.style.display = 'block';
+             button.textContent = "Hide Individual Options";
          }
          else {
              el.style.display = 'none';
+             button.textContent = "Show Individual Options";
          }
      }
      function selectImageVersion(obj) {
@@ -797,9 +800,10 @@ if letUserPickVersion:
      <INPUT TYPE='hidden' NAME='ReportType' VALUE='%s'>
 """ % (repType or "")
 
-    form += """\
+    legend = f"Select Document Version For CDR{intId}"
+    form += f"""\
      <fieldset class="usa-fieldset">
-      <legend class="usa-legend">&nbsp;Select document version&nbsp;</legend>
+      <legend class="usa-legend">&nbsp;{legend}&nbsp;</legend>
       <!-- div style="width: 100%; text-align: center;">
       <div style="margin: 0 auto;" -->
       <SELECT NAME='DocVersion' class="usa-select">
@@ -1074,9 +1078,15 @@ if letUserPickVersion:
            </div>
           </div>
           <div>
+        <!--
            Click <a onclick="showOptions('hide');" title="More options"
                     style="color: blue; text-decoration: underline;">here</a>
            for individual options ...
+        -->
+           <button id="show-options"
+                   onclick="showOptions('hide');"
+                   class="usa-button"
+                   type="button">Show Individual Options</button>
           </div>
          </fieldset>
 """

@@ -53,11 +53,6 @@ class Control(Controller):
         else:
             Controller.run(self)
 
-    @cached_property
-    def alerts(self):
-        """Append to this list as needed."""
-        return []
-
     @property
     def buttons(self):
         """Override to specify custom buttons for this page."""

@@ -5,6 +5,7 @@
 https://tracker.nci.nih.gov/browse/OCECDR-4489
 """
 
+from functools import cached_property
 from cdrcgi import Controller, navigateTo
 
 
@@ -24,58 +25,24 @@ class Control(Controller):
     PURGE = "Purge"
     SUMMARY = "Summary"
     GLOSSARY = "Glossary"
-    REPORTS_MENU = SUBMENU = "Reports"
-    ADMINMENU = "Admin"
-    CSS = "th, td { background-color: #e8e8e8; border-color: #bbb; }"
-
-    def populate_form(self, page):
-        """Override to replace the standard form with a table of jobs.
-
-        Instead of form fields, we're actually displaying a table
-        containing one row for each job in the queue, sorted by
-        job state, with a sub-sort on user name and date of last
-        state transition.
-
-        Change in requirements: the queue must now support re-assigning
-        jobs in bulk.
-
-        Pass:
-            page - HTMLPage object on which we place the table
-        """
-
-        if self.message:
-            para = page.B.P(self.message, page.B.CLASS("strong info center"))
-            page.form.append(para)
-        fieldset = page.fieldset("Assign To")
-        for row in self.translators:
-            opts = dict(value=row.id, label=row.fullname)
-            fieldset.append(page.radio_button("assign_to", **opts))
-        page.form.append(fieldset)
-        fields = ("j.english_id", "d.title", "s.value_name",
-                  "u.fullname", "j.state_date", "j.comments")
-        query = self.Query("media_translation_job j", *fields)
-        query.join("usr u", "u.id = j.assigned_to")
-        query.join("document d", "d.id = j.english_id")
-        query.join("media_translation_state s", "s.value_id = j.state_id")
-        query.order("j.state_date", "s.value_pos", "u.fullname")
-        rows = query.execute(self.cursor).fetchall()
-        table = page.B.TABLE(
-            page.B.THEAD(
-                page.B.TR(
-                    page.B.TH("SELECT JOB"),
-                    page.B.TH("CDR ID EN"),
-                    page.B.TH("TITLE EN"),
-                    page.B.TH("CDR ID ES"),
-                    page.B.TH("STATUS"),
-                    page.B.TH("STATUS DATE"),
-                    page.B.TH("ASSIGNED TO"),
-                    page.B.TH("COMMENT"),
-                )
-            ),
-            page.B.TBODY(*[Job(self, row).row for row in rows]),
-        )
-        page.form.append(table)
-        page.add_css(self.CSS)
+    COLUMNS = (
+        "\u2713",
+        "Doc ID EN",
+        "Title EN",
+        "Doc ID ES",
+        "Status",
+        "Status Date",
+        "Assigned To",
+        "Comment",
+    )
+    FIELDS = (
+        "j.english_id",
+        "d.title",
+        "s.value_name",
+        "u.fullname",
+        "j.state_date",
+        "j.comments",
+    )
 
     def run(self):
         """Override base class method, as we support extra buttons/tasks."""
@@ -100,7 +67,8 @@ class Control(Controller):
             )
             count = self.cursor.rowcount
             self.conn.commit()
-            self.message = f"Purged jobs for {count:d} published translations."
+            message = f"Purged jobs for {count:d} published translations."
+            self.alerts.append(dict(message=message, type="success"))
         elif self.request == self.ASSIGN:
             count = 0
             fields = "state_id", "comments", "assigned_to"
@@ -129,8 +97,70 @@ class Control(Controller):
                 self.cursor.execute(update, params)
                 self.conn.commit()
                 count += 1
-            self.message = f"Re-assigned {count:d} jobs"
+            message = f"Re-assigned {count:d} jobs."
+            self.alerts.append(dict(message=message, type="success"))
         Controller.run(self)
+
+    def show_form(self):
+        """Overridden because the form needs a very wide table."""
+
+        class Page(self.HTMLPage):
+            """Derived class so we can override the layout of main."""
+
+            @cached_property
+            def main(self):
+                """Move the form outside the grid container so it's wider."""
+
+                return self.B.E(
+                    "main",
+                    self.B.DIV(
+                        self.B.H1("Media Translation Job Queue"),
+                        self.B.CLASS("grid-container")
+                    ),
+                    self.form,
+                    self.B.CLASS("usa-section")
+                )
+
+        opts = dict(
+            control=self,
+            action=self.script,
+            session=self.session,
+            method=self.method,
+        )
+        page = Page(self.title, **opts)
+        container = page.B.DIV(page.B.CLASS("grid-container"))
+        fieldset = page.fieldset("Assign To")
+        for row in self.translators:
+            opts = dict(value=row.id, label=row.fullname)
+            fieldset.append(page.radio_button("assign_to", **opts))
+        container.append(fieldset)
+        for label in self.buttons:
+            container.append(page.button(label, onclick=self.SAME_WINDOW))
+        for alert in self.alerts:
+            message = alert["message"]
+            del alert["message"]
+            page.add_alert(message, **alert)
+        page.form.append(container)
+        page.form.append(self.table.node)
+        page.add_css("""\
+form { width: 90%; margin: 0 auto; }
+.usa-table { margin-top: 3rem; }
+.usa-table caption { font-size: 1.3rem; text-align: center; }
+.usa-table th:first-child { text-align: center; }
+.clickable.usa-checkbox__label {  margin-top: -.25rem; margin-left: .75rem; }
+""")
+        page.send()
+
+    @cached_property
+    def alerts(self):
+        """Messages to be displayed at the top of the page."""
+
+        alerts = []
+        if self.message:
+            alerts.append(dict(message=self.message, type="success"))
+        if self.warning:
+            alerts.append(dict(message=self.warning, type="warning"))
+        return alerts
 
     @property
     def assignee(self):
@@ -148,46 +178,54 @@ class Control(Controller):
                 self.bail()
         return self._assignee
 
-    @property
+    @cached_property
     def buttons(self):
         """Add our custom buttons for the extra tasks."""
+        return self.ASSIGN, self.ADD, self.PURGE, self.GLOSSARY, self.SUMMARY
 
-        return (
-            self.ADD,
-            self.ASSIGN,
-            self.PURGE,
-            self.GLOSSARY,
-            self.SUMMARY,
-            self.REPORTS_MENU,
-            self.ADMINMENU,
-            self.LOG_OUT,
-        )
-
-    @property
+    @cached_property
     def message(self):
-        """Optional string, displayed prominently above the jobs table."""
+        """Information about successfully performed action just taken."""
+        return self.fields.getvalue("message")
 
-        if hasattr(self, "_message"):
-            return self._message
+    @cached_property
+    def rows(self):
+        """Rows for the table of queued jobs."""
 
-    @message.setter
-    def message(self, value):
-        """This is how the purge action reports its activity."""
-        self._message = value
+        query = self.Query("media_translation_job j", *self.FIELDS)
+        query.join("usr u", "u.id = j.assigned_to")
+        query.join("document d", "d.id = j.english_id")
+        query.join("media_translation_state s", "s.value_id = j.state_id")
+        query.order("j.state_date", "s.value_pos", "u.fullname")
+        rows = query.execute(self.cursor).fetchall()
+        return [Job(self, row).row for row in rows]
 
-    @property
+    @cached_property
+    def same_window(self):
+        """Don't open any more new browser tabs."""
+        return self.buttons
+
+    @cached_property
+    def table(self):
+        """Table of queued glossary translation jobs."""
+        return self.Reporter.Table(self.rows, cols=self.COLUMNS, caption="Jobs")
+
+    @cached_property
     def translators(self):
         """Get the list of users who can translate Media documents."""
 
-        if not hasattr(self, "_translators"):
-            query = self.Query("usr u", "u.id", "u.fullname")
-            query.join("grp_usr x", "x.usr = u.id")
-            query.join("grp g", "g.id = x.grp")
-            query.where("u.expired IS NULL")
-            query.where("g.name = 'Spanish Media Translators'")
-            query.order("u.fullname")
-            self._translators = query.execute(self.cursor).fetchall()
-        return self._translators
+        query = self.Query("usr u", "u.id", "u.fullname")
+        query.join("grp_usr x", "x.usr = u.id")
+        query.join("grp g", "g.id = x.grp")
+        query.where("u.expired IS NULL")
+        query.where("g.name = 'Spanish Media Translators'")
+        query.order("u.fullname")
+        return query.execute(self.cursor).fetchall()
+
+    @cached_property
+    def warning(self):
+        """Warning message passed on from the form page."""
+        return self.fields.getvalue("warning")
 
 
 class Job:
@@ -206,76 +244,68 @@ class Job:
         self.__control = control
         self.__row = row
 
-    @property
+    @cached_property
     def comments(self):
         """Notes on the translation job."""
 
-        if not hasattr(self, "_comments"):
-            self._comments = self.__row.comments or ""
-            if len(self._comments) > 40:
-                self._comments = self._comments[:40] + "..."
-        return self._comments
+        comments = self.__row.comments or ""
+        return comments[:40] + "..."  if len(comments) > 40 else comments
 
-    @property
+    @cached_property
     def date(self):
         """Date when the current job state was assigned."""
         return str(self.__row.state_date)[:10]
 
-    @property
+    @cached_property
     def english_id(self):
         """CDR ID of the media document being translated."""
         return self.__row.english_id
 
-    @property
+    @cached_property
     def row(self):
         """
         Create a row for the job queue table, showing information about
         this individual translation job.
         """
 
-        B = self.__control.HTMLPage.B
-        url = self.URL.format(self.__control.session, self.english_id)
-        link = B.A(f"CDR{self.english_id:d}", href=url, title="edit job")
-        checkbox = B.INPUT(
-            id=str(self.english_id),
-            type="checkbox",
-            name="assignments",
-            value=str(self.english_id)
-        )
-        return B.TR(
-            B.TD(checkbox, B.CLASS("center")),
-            B.TD(link),
-            B.TD(self.title),
-            B.TD(f"CDR{self.spanish_id:d}" if self.spanish_id else ""),
-            B.TD(self.state),
-            B.TD(self.date, B.CLASS("nowrap")),
-            B.TD(self.user),
-            B.TD(self.comments)
+        Page = self.__control.HTMLPage
+        Cell = self.__control.Reporter.Cell
+        doc_id = str(self.english_id)
+        url = self.URL.format(self.__control.session, doc_id)
+        opts = dict(widget_id=doc_id, value=doc_id, label="\u00a0")
+        checkbox = Page.checkbox("assignments", **opts)
+        return (
+            Cell(checkbox, center=True),
+            Cell(f"CDR{doc_id}", href=url, title="edit job"),
+            self.title,
+            f"CDR{self.spanish_id:d}" if self.spanish_id else "",
+            self.state,
+            Cell(self.date, classes="nowrap"),
+            self.user,
+            self.comments,
         )
 
-    @property
+    @cached_property
     def spanish_id(self):
         """CDR ID of the Spanish version's document (if it exists)."""
 
-        if not hasattr(self, "_spanish_id"):
-            query = self.__control.Query("query_term", "doc_id")
-            query.where("path = '/Media/TranslationOf/@cdr:ref'")
-            query.where(query.Condition("int_val", self.english_id))
-            row = query.execute(self.__control.cursor).fetchone()
-            self._spanish_id = row.doc_id if row else None
-        return self._spanish_id
+        query = self.__control.Query("query_term", "doc_id")
+        query.where("path = '/Media/TranslationOf/@cdr:ref'")
+        query.where(query.Condition("int_val", self.english_id))
+        row = query.execute(self.__control.cursor).fetchone()
+        return row.doc_id if row else None
 
-    @property
+    @cached_property
     def state(self):
         """Which state is the translation job in?"""
         return self.__row.value_name
 
-    @property
+    @cached_property
     def title(self):
         """Title of the summary document."""
         return self.__row.title.split(";")[0]
 
-    @property
+    @cached_property
     def user(self):
         """Full name of the translator assigned to this job."""
         return self.__row.fullname

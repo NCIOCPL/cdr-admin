@@ -120,14 +120,7 @@ class Control(Controller):
         except Exception as e:
             self.logger.exception("Failure queueing report")
             self.bail(f"Unable to start job: {e}")
-        session = self.session.name
-        args = session, self.title, self.JOB_NAME, self.script, self.SUBMENU
-        self.job.show_status_page(*args)
-
-    @cached_property
-    def alerts(self):
-        """Queue top-of-page messages here."""
-        return []
+        self.job.show_status_page(self.session)
 
     @cached_property
     def args(self):

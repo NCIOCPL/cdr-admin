@@ -97,21 +97,6 @@ class Control(Controller):
         else:
             Controller.run(self)
 
-    def xxxshow_report(self):
-
-        css = ".report .usa-table { width: 90%; margin: 3rem auto 1.25rem; }"
-        if self.format == "html":
-            table = self.report.page.form.find("table")
-            report_footer = self.report.page.main.find("p")
-            report_footer.addprevious(table)
-            self.report.page.add_css(css)
-        self.report.send(self.format)
-
-    @property
-    def wide_css(self):
-        """Override so we can widen the report table."""
-        return self.Reporter.Table.WIDE_CSS
-
     @cached_property
     def buttons(self):
         """Customize the form's buttons."""
@@ -262,6 +247,11 @@ class Control(Controller):
         if type not in {t[0] for t in self.TYPES}:
             self.bail()
         return type
+
+    @property
+    def wide_css(self):
+        """Override so we can widen the report table."""
+        return self.Reporter.Table.WIDE_CSS
 
 
 class Job:

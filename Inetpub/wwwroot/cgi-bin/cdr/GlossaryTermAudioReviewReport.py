@@ -83,7 +83,7 @@ class Control(Controller):
     @property
     def end(self):
         """Optional end to report's date range."""
-        return self.fields.getvalue("end_date")
+        return self.parse_date(self.fields.getvalue("end_date"))
 
     @property
     def language(self):
@@ -112,7 +112,7 @@ class Control(Controller):
     @property
     def start(self):
         """Optional start to report's date range."""
-        return self.fields.getvalue("start_date")
+        return self.parse_date(self.fields.getvalue("start_date"))
 
     @property
     def status(self):

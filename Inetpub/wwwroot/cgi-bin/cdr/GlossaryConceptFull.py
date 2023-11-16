@@ -63,11 +63,6 @@ class Control(Controller):
             self.concept.show_report()
 
     @cached_property
-    def alerts(self):
-        """Queue up top-of-page messages here."""
-        return []
-
-    @cached_property
     def concept(self):
         """Subject of the report."""
         return Concept(self) if self.id else None

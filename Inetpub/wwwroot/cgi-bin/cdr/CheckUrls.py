@@ -166,8 +166,7 @@ class Control(Controller):
                 job.queue()
             except Exception as e:
                 self.bail(f"Could not start job: {e}")
-            args = self.TITLE, self.subtitle, self.script, self.SUBMENU
-            job.show_status_page(self.session, *args)
+            job.show_status_page(self.session)
 
     @property
     def args(self):

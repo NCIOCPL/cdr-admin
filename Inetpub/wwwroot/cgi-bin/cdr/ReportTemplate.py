@@ -4,6 +4,7 @@
 """
 
 from datetime import date, timedelta
+from functools import cached_property
 from cdrcgi import Controller
 
 
@@ -82,23 +83,19 @@ class Control(Controller):
         fieldset.append(page.date_field("end", value=self.end))
         page.form.append(fieldset)
 
-    @property
+    @cached_property
     def end(self):
         """Ending date for the date range on which we are to report."""
 
-        if not hasattr(self, "_end"):
-            end = self.parse_date(self.fields.getvalue("end"))
-            self._end = end if end else date.today()
-        return self._end
+        end = self.parse_date(self.fields.getvalue("end"))
+        return end if end else date.today()
 
-    @property
+    @cached_property
     def start(self):
         """Start date for the date range on which we are to report."""
 
-        if not hasattr(self, "_start"):
-            start = self.parse_date(self.fields.getvalue("start"))
-            self._start = start if start else self.end - timedelta(7)
-        return self._start
+        start = self.parse_date(self.fields.getvalue("start"))
+        return start if start else self.end - timedelta(7)
 
 
 if __name__ == "__main__":

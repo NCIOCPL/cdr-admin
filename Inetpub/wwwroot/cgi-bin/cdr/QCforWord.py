@@ -5,6 +5,7 @@
 This gets around the length limitation on parameters in a GET URL.
 """
 
+from functools import cached_property
 from cdrcgi import Controller, sendPage, DOCID
 from cdrapi.docs import Doc
 from cdr import FILTERS
@@ -26,19 +27,17 @@ class Control(Controller):
             self.logger.exception("Report failure")
             self.bail(e)
 
-    @property
+    @cached_property
     def doc(self):
         """Document to be filtered and displayed."""
 
-        if not hasattr(self, "_doc"):
-            id = self.fields.getvalue(DOCID)
-            if not id:
-                self.bail("Missing document ID")
-            version = self.fields.getvalue("DocVersion")
-            self._doc = Doc(self.session, id=id, version=version)
-        return self._doc
+        id = self.fields.getvalue(DOCID)
+        if not id:
+            self.bail("Missing document ID")
+        version = self.fields.getvalue("DocVersion")
+        return Doc(self.session, id=id, version=version)
 
-    @property
+    @cached_property
     def filter_key(self):
         """String used to select filters for the report.
 
@@ -46,23 +45,18 @@ class Control(Controller):
         completely misleading name.
         """
 
-        if not hasattr(self, "_doctype"):
-            self._doctype = self.fields.getvalue("DocType")
-            if not self._doctype:
-                self._doctype = self.doc.doctype.name
-        return self._doctype
+        return self.fields.getvalue("DocType") or self.doc.doctype.name
 
-    @property
+    @cached_property
     def filters(self):
         """XSL/T filters to be applied to the document."""
 
-        if not hasattr(self, "_filters"):
-            self._filters = FILTERS.get(self.filter_key)
-            if not self._filters:
-                self.bail(f"Filter for {self.filter_key} not supported")
-        return self._filters
+        filters = FILTERS.get(self.filter_key)
+        if not filters:
+            self.bail(f"Filter for {self.filter_key} not supported")
+        return filters
 
-    @property
+    @cached_property
     def parms(self):
         """Filtering parameters."""
 

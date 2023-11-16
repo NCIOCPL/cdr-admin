@@ -3,13 +3,15 @@
 """Track the processing of audio pronunciation media documents.
 """
 
+from functools import cached_property
 from cdrcgi import Controller
 from cdrbatch import CdrBatch
 
 
 class Control(Controller):
 
-    JOB_NAME = SUBTITLE = "Audio Pronunciation Recordings Tracking Report"
+    SUBTITLE = "Pronunciation Recordings Tracking Report"
+    JOB_NAME = "Audio Pronunciation Recordings Tracking Report"
     LANGUAGES = dict(all="All", en="English", es="Spanish")
     LONG_REPORTS = "lib/Python/CdrLongReports.py"
     ARGS = "start", "end", "language"
@@ -45,55 +47,43 @@ class Control(Controller):
         except Exception as e:
             self.logger.exception("Failure queueing report")
             self.bail(f"Unable to start job: {e}")
-        session = self.session.name
-        args = session, self.title, self.JOB_NAME, self.script, self.SUBMENU
-        self.job.show_status_page(*args)
+        self.job.show_status_page(self.session)
 
-    @property
+    @cached_property
     def args(self):
         """Arguments for the batch job."""
         return [(name, getattr(self, name)) for name in self.ARGS]
 
-    @property
+    @cached_property
     def email(self):
         """Email address to which we send the notification."""
+        return self.fields.getvalue("email") or self.user.email
 
-        if not hasattr(self, "_email"):
-            self._email = self.fields.getvalue("email")
-            if not self._email:
-                self._email = self.user.email
-        return self._email
-
-    @property
+    @cached_property
     def user(self):
         """The currently logged-in user."""
 
-        if not hasattr(self, "_user"):
-            opts = dict(id=self.session.user_id)
-            self._user = self.session.User(self.session, **opts)
-        return self._user
+        opts = dict(id=self.session.user_id)
+        return self.session.User(self.session, **opts)
 
-    @property
+    @cached_property
     def end(self):
         """End of the date range for the report."""
 
-        default = self.started.strftime("%Y-%m-%d")
-        return self.fields.getvalue("end_date") or default
+        value = self.parse_date(self.fields.getvalue("end_date"))
+        return str(value or self.started.strftime("%Y-%m-%d"))
 
-    @property
+    @cached_property
     def job(self):
         """Batch job for the report."""
+        return CdrBatch(**self.opts)
 
-        if not hasattr(self, "_job"):
-            self._job = CdrBatch(**self.opts)
-        return self._job
-
-    @property
+    @cached_property
     def language(self):
         """Language code selected for the report."""
         return self.fields.getvalue("language")
 
-    @property
+    @cached_property
     def opts(self):
         """Options for the batch job constructor."""
 
@@ -104,10 +94,12 @@ class Control(Controller):
             command=self.LONG_REPORTS,
         )
 
-    @property
+    @cached_property
     def start(self):
         """Beginning of the date range for the report."""
-        return self.fields.getvalue("start_date") or "2011-01-01"
+
+        start = self.parse_date(self.fields.getvalue("start_date"))
+        return str(start or "2011-01-01")
 
 
 if __name__ == "__main__":

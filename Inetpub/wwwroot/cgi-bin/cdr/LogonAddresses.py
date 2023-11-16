@@ -60,7 +60,7 @@ class Control(Controller):
     @cached_property
     def end(self):
         """End of the date range for the report."""
-        return self.fields.getvalue("end")
+        return self.parse_date(self.fields.getvalue("end"))
 
     @cached_property
     def rows(self):
@@ -132,7 +132,7 @@ class Control(Controller):
 
         start = self.fields.getvalue("start")
         if start:
-            return start
+            return self.parse_date(start)
         today = datetime.date.today()
         return today - datetime.timedelta(7)
 

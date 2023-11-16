@@ -81,11 +81,6 @@ function change_file() {{
             self.alerts.append(dict(message=message, type="warning"))
         self.show_form()
 
-    @cached_property
-    def alerts(self):
-        """Add to this list when we save successfully."""
-        return []
-
     @property
     def buttons(self):
         """This form uses a custom action button."""

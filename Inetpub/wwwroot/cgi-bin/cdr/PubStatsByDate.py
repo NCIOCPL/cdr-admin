@@ -3,8 +3,9 @@
 """Show count of updated documents by document type.
 """
 
-from cdrcgi import Controller
-import datetime
+from functools import cached_property
+from cdrcgi import Controller, Reporter
+from datetime import date, timedelta
 
 
 class Control(Controller):
@@ -12,13 +13,13 @@ class Control(Controller):
 
     SUBTITLE = "Publishing Job Statistics by Date"
     COLUMNS = (
-        "Doc Type",
-        "Re-Added",
-        "New",
-        "Updated",
-        "Updated*",
-        "Removed",
-        "Total",
+        Reporter.Column("Doc Type", classes="text-left"),
+        Reporter.Column("Re-Added", classes="text-right"),
+        Reporter.Column("New", classes="text-right"),
+        Reporter.Column("Updated", classes="text-right"),
+        Reporter.Column("Updated*", classes="text-right"),
+        Reporter.Column("Removed", classes="text-right"),
+        Reporter.Column("Total", classes="text-right"),
     )
 
     def build_tables(self):
@@ -37,8 +38,8 @@ class Control(Controller):
             page - HTMLPage object where we put the form
         """
 
-        end = datetime.date.today()
-        start = end - datetime.timedelta(7)
+        end = date.today()
+        start = end - timedelta(7)
         fieldset = page.fieldset("Date Range")
         fieldset.append(page.date_field("start", value=start))
         fieldset.append(page.date_field("end", value=end))
@@ -67,23 +68,17 @@ class Control(Controller):
         fieldset = self.report.page.fieldset("Key")
         fieldset.append(self.key)
         self.report.page.form.append(fieldset)
-        self.report.page.add_css(
-            "table { width: 725px; } "
-            "fieldset {width: 700px; }"
-        )
+        self.report.page.add_css("dt { font-weight: bold; }")
         self.report.send()
 
-    @property
+    @cached_property
     def doctype(self):
         """Document type(s) selected for the report from the form."""
 
-        if not hasattr(self, "_doctype"):
-            self._doctype = self.fields.getlist("doctype")
-            if "all" in self._doctype:
-                self._doctype = []
-        return self._doctype
+        doctypes = self.fields.getlist("doctype")
+        return [] if "all" in doctypes else doctypes
 
-    @property
+    @cached_property
     def doctypes(self):
         """Document type strings for the form's checkboxes.
 
@@ -91,25 +86,21 @@ class Control(Controller):
         set speeds up the query by orders of magnitude.
         """
 
-        if not hasattr(self, "_doctypes"):
-            query = self.Query("doc_type t", "t.name", "d.doc_type").unique()
-            query.order("t.name")
-            query.join("document d", "d.doc_type = t.id")
-            query.join("pub_proc_cg c", "c.id = d.id")
-            rows = query.execute(self.cursor).fetchall()
-            self._doctypes = [row.name for row in rows]
-        return self._doctypes
+        query = self.Query("doc_type t", "t.name", "d.doc_type").unique()
+        query.order("t.name")
+        query.join("document d", "d.doc_type = t.id")
+        query.join("pub_proc_cg c", "c.id = d.id")
+        rows = query.execute(self.cursor).fetchall()
+        return [row.name for row in rows]
 
-    @property
+    @cached_property
     def end(self):
         """End of the date range for the report."""
 
-        if not hasattr(self, "_end"):
-            end = self.fields.getvalue("end", str(self.started))[:10]
-            self._end = f"{end} 23:59:59"
-        return self._end
+        end = self.parse_date(self.fields.getvalue("end")) or date.today()
+        return f"{end} 23:59:59"
 
-    @property
+    @cached_property
     def key(self):
         """Guide explaining what the numbers in each column mean."""
 
@@ -154,63 +145,57 @@ class Control(Controller):
             )
         )
 
-    @property
+    @cached_property
     def new(self):
         """Counts of new documents by doctype."""
 
-        if not hasattr(self, "_new"):
-            query = self.Query("doc_type t", "t.name", "COUNT(*)")
-            query.join("all_docs d", "d.doc_type = t.id")
-            query.join("##ganzneu n", "n.doc_id = d.id")
-            if self.doctype:
-                query.where(query.Condition("t.name", self.doctype, "IN"))
-            query.group("t.name")
-            rows = query.execute(self.cursor).fetchall()
-            self._new = dict([tuple(row) for row in rows])
-        return self._new
+        query = self.Query("doc_type t", "t.name", "COUNT(*)")
+        query.join("all_docs d", "d.doc_type = t.id")
+        query.join("##ganzneu n", "n.doc_id = d.id")
+        if self.doctype:
+            query.where(query.Condition("t.name", self.doctype, "IN"))
+        query.group("t.name")
+        rows = query.execute(self.cursor).fetchall()
+        return dict([tuple(row) for row in rows])
 
-    @property
+    @cached_property
     def removed(self):
         """Counts by doctype of removed documents."""
 
-        if not hasattr(self, "_removed"):
-            query = self.Query("doc_type t", "t.name", "COUNT(*)")
-            query.join("all_docs d", "d.doc_type = t.id")
-            query.join("##removed r", "r.doc_id = d.id")
-            query.where(query.Condition("r.started", self.start, ">="))
-            if self.doctype:
-                query.where(query.Condition("t.name", self.doctype, "IN"))
-            query.group("t.name")
-            self.logger.info("removed: %s", query)
-            rows = query.execute(self.cursor).fetchall()
-            self._removed = dict([tuple(row) for row in rows])
-        return self._removed
+        query = self.Query("doc_type t", "t.name", "COUNT(*)")
+        query.join("all_docs d", "d.doc_type = t.id")
+        query.join("##removed r", "r.doc_id = d.id")
+        query.where(query.Condition("r.started", self.start, ">="))
+        if self.doctype:
+            query.where(query.Condition("t.name", self.doctype, "IN"))
+        query.group("t.name")
+        self.logger.info("removed: %s", query)
+        rows = query.execute(self.cursor).fetchall()
+        return dict([tuple(row) for row in rows])
 
-    @property
+    @cached_property
     def resurrected(self):
         """Counts of re-added (after removal) documents by doctype."""
 
-        if not hasattr(self, "_resurrected"):
-            query = self.Query("doc_type t", "t.name", "COUNT(*)")
-            query.join("all_docs d", "d.doc_type = t.id")
-            query.join("##phoenix p", "p.doc_id = d.id")
-            query.where(query.Condition("p.started", self.start, ">="))
-            query.where(query.Condition("p.started", self.end, "<="))
-            if self.doctype:
-                query.where(query.Condition("t.name", self.doctype, "IN"))
-            query.group("t.name")
-            rows = query.execute(self.cursor).fetchall()
-            self._resurrected = dict([tuple(row) for row in rows])
-        return self._resurrected
+        query = self.Query("doc_type t", "t.name", "COUNT(*)")
+        query.join("all_docs d", "d.doc_type = t.id")
+        query.join("##phoenix p", "p.doc_id = d.id")
+        query.where(query.Condition("p.started", self.start, ">="))
+        query.where(query.Condition("p.started", self.end, "<="))
+        if self.doctype:
+            query.where(query.Condition("t.name", self.doctype, "IN"))
+        query.group("t.name")
+        rows = query.execute(self.cursor).fetchall()
+        return dict([tuple(row) for row in rows])
 
-    @property
+    @cached_property
     def rows(self):
         """Values for the report table."""
 
-        self.__create_removed_table()
-        self.__create_prevpub_table()
-        self.__create_ganzneu_table()
-        self.__create_phoenix_table()
+        self.__create_temporary_removed_table()
+        self.__create_temporary_prevpub_table()
+        self.__create_temporary_ganzneu_table()
+        self.__create_temporary_phoenix_table()
         doctypes = sorted(self.doctype) if self.doctype else self.doctypes
         rows = []
         for doctype in doctypes:
@@ -230,13 +215,10 @@ class Control(Controller):
             ])
         return rows
 
-    @property
+    @cached_property
     def start(self):
         """Beginning of the date range for the report."""
-
-        if not hasattr(self, "_start"):
-            self._start = self.fields.getvalue("start", "2001-01-01")[:10]
-        return self._start
+        return self.parse_date(self.fields.getvalue("start", "2001-01-01"))
 
     @property
     def updated(self):
@@ -279,7 +261,7 @@ class Control(Controller):
                     self._updated[row.name] = [row.n, 0]
         return self._updated
 
-    def __create_removed_table(self):
+    def __create_temporary_removed_table(self):
         """Find documents removed no later than the end of the date range."""
 
         fields = "d.doc_id", "MAX(p.started) as started"
@@ -295,7 +277,7 @@ class Control(Controller):
         self.logger.info("##removed: %s", query)
         self.conn.commit()
 
-    def __create_prevpub_table(self):
+    def __create_temporary_prevpub_table(self):
         """Find documents which were published at least once before range."""
 
         query = self.Query("pub_proc_doc d", "d.doc_id").unique()
@@ -307,7 +289,7 @@ class Control(Controller):
         query.execute(self.cursor)
         self.conn.commit()
 
-    def __create_ganzneu_table(self):
+    def __create_temporary_ganzneu_table(self):
         """Find documents first published during our date range."""
 
         subquery = self.Query("##prevpub", "doc_id")
@@ -324,7 +306,7 @@ class Control(Controller):
         query.execute(self.cursor)
         self.conn.commit()
 
-    def __create_phoenix_table(self):
+    def __create_temporary_phoenix_table(self):
         """Find docs which had been remove and then published again."""
 
         fields = "d.doc_id", "MIN(p.started) AS started"

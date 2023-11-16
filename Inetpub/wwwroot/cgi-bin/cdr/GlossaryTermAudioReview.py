@@ -304,11 +304,6 @@ class Control(Controller):
         self.send_bytes(mp3_bytes, mp3_name, "audio/mpeg")
 
     @cached_property
-    def alerts(self):
-        """Message queue for top of page."""
-        return []
-
-    @cached_property
     def audio_set(self):
         """Information about the set of MP3 files being reviewed."""
 

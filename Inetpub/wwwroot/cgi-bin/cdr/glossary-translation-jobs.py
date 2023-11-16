@@ -25,8 +25,6 @@ class Control(Controller):
     PURGE = "Purge"
     SUMMARY = "Summary"
     MEDIA = "Media"
-    REPORTS_MENU = SUBMENU = "Reports"
-    ADMINMENU = "Admin"
     COLUMNS = (
         "\u2713",
         "Doc ID",
@@ -200,7 +198,7 @@ form { width: 90%; margin: 0 auto; }
         rows = query.execute(self.cursor).fetchall()
         return [Job(self, row).row for row in rows]
 
-    @property
+    @cached_property
     def same_window(self):
         """Don't open any more new browser tabs."""
         return self.buttons
@@ -249,9 +247,7 @@ class Job:
         """Notes on the translation job."""
 
         comments = self.__row.comments or ""
-        if len(comments) > 40:
-            comments = comments[:40] + "..."
-        return comments
+        return comments[:40] + "..."  if len(comments) > 40 else comments
 
     @cached_property
     def date(self):

@@ -26,36 +26,47 @@ class Control(Controller):
     CONCEPT_PATH = "/GlossaryTermName/GlossaryTermConcept/@cdr:ref"
     COLUMNS = "Documents", "Count"
     URL = "https://cdr.cancer.gov/cgi-bin/cdr/PDQContentCounts.py?format=excel"
+    INSTRUCTIONS = (
+        "This report pulls together counts of published PDQ content "
+        "of various types for inclusion in more widely disseminated "
+        "communications. Use the form below for specifying the format "
+        "in which the report should be generated."
+    )
 
     def populate_form(self, page):
-        """Go straight to the report path for Excel."""
+        """Ask the user which flavor or report to generate."""
 
-        if self.format == "excel":
+        if not self.fields.getvalue("prompt"):
             self.show_report()
-        page.form.append(self.table.node)
-        page.main.append(self.footer)
+        fieldset = page.fieldset("Instructions")
+        fieldset.append(page.B.P(self.INSTRUCTIONS))
+        page.form.append(fieldset)
+        page.add_output_options()
+        page.add_css(self.CSS)
 
     def build_tables(self):
         """Wrap the table in a sequence."""
         return [self.table]
 
     @cached_property
-    def buttons(self):
-        """No buttons necessary."""
-        return []
-
-    @cached_property
     def table(self):
         """Used for both HTML and Excel reports."""
 
         rows = []
+        caption = None
         for title, count in self.rows:
             rows.append([title, self.Reporter.Cell(count, right=True)])
-        columns = (
-            self.Reporter.Column("Documents", width="250px"),
-            self.Reporter.Column("Count", width="50px"),
-        )
-        caption = "Counts" if self.format == "excel" else None
+        if self.format == "excel":
+            columns = (
+                self.Reporter.Column("Documents", width="250px"),
+                self.Reporter.Column("Count", width="50px"),
+            )
+            caption = "Counts"
+        else:
+            columns = (
+                self.Reporter.Column("Documents"),
+                self.Reporter.Column("Count", classes="text-right"),
+            )
         return self.Reporter.Table(rows, caption=caption, columns=columns)
 
     @cached_property
