@@ -55,7 +55,7 @@ class Control(Controller):
         page.add_css("""
 #action-list ul { list-style-type: none; column-width: 15rem; }
 #action-list a { text-decoration: none; }
-#action-list a:visited { color: #005ea2; }
+#action-list a:visited { color: """ + page.LINK_COLOR + """; }
 p.text-red { border: red solid 2px; padding: 1rem; margin: 2rem 0; }
 p.text-red code strong { color: blue; }
 """)

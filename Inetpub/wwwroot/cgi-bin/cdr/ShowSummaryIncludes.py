@@ -16,7 +16,7 @@
 """
 
 from functools import cached_property
-from cdrcgi import Controller
+from cdrcgi import Controller, BasicWebPage
 from cdrapi.docs import Doc
 
 
@@ -33,6 +33,7 @@ class Control(Controller):
         Comment="comment",
     )
     CSS = (
+        #"#report-elements  { width: 40rem; margin: 0 auto; }",
         ".summary          { color: blue; font-weight: normal; }",
         ".module-link      { color: red; }",
         ".misc-doc-link    { color: brown; }",
@@ -43,7 +44,9 @@ class Control(Controller):
         ".comment          { color: fuchsia; }",
         ".error            { color: red; font-weight: bold; }",
         ".element-list     { margin-bottom: 2rem; }",
-        ".element-list li  { margin-bottom: 0; }",
+        ".element-list li  { margin-bottom: 0; line-height: 1.5 }",
+        ".element-list, dl { font-size: 1.06rem; }",
+        "dl *              { line-height: 1.3 }",
     )
     DOCTYPES = [
         ("cis", "Cancer Information Summaries", True),
@@ -80,12 +83,15 @@ class Control(Controller):
         for tag in sorted(self.ELEMENTS):
             element = B.LI(tag, B.CLASS(self.ELEMENTS[tag]))
             elements.append(element)
-        self.report.page.form.append(B.H2("Report Elements"))
-        self.report.page.form.append(elements)
-        self.report.page.form.append(B.H2("Summaries"))
-        self.report.page.form.append(dl)
-        self.report.page.add_css("\n".join(self.CSS))
-        self.report.send()
+        report = BasicWebPage()
+        report.wrapper.append(report.B.H1(self.SUBTITLE))
+        report.wrapper.append(B.H2("Report Elements"))
+        report.wrapper.append(elements)
+        report.wrapper.append(B.H2("Summaries"))
+        report.wrapper.append(dl)
+        report.wrapper.append(self.footer)
+        report.head.append(report.B.STYLE("\n".join(self.CSS)))
+        report.send()
 
     @cached_property
     def doctype(self):

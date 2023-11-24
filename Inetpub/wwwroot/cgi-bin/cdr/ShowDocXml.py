@@ -13,14 +13,18 @@ from cdrapi.users import Session
 # ---------------------------------------------------------------------
 title = "CDR Document XML"
 fields = FieldStorage()
-docId = fields.getvalue(DOCID) or bail("No Document", title)
+error = "No Document"
+id = fields.getvalue(DOCID) or fields.getvalue("id") or bail(error, title)
 
 # ---------------------------------------------------------------------
 # Filter the document's XML.
 # ---------------------------------------------------------------------
 session = Session("guest")
-doc = Doc(session, id=docId)
-xml = doc.xml
+doc = Doc(session, id=id)
+try:
+    xml = doc.xml
+except Exception as e:
+    bail(f"Fetching XML for document {id}: {e}")
 
 # ---------------------------------------------------------------------
 # Send it.

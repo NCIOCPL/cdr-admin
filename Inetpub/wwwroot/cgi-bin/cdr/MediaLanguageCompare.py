@@ -77,8 +77,7 @@ function check_selection_method(method) {
 }
 jQuery(function() {
     var method = jQuery("input[name='selection_method']:checked").val();
-    // check_selection_method(method);
-    check_selection_method('title');
+    check_selection_method(method);
 });
 """
 
@@ -106,20 +105,23 @@ jQuery(function() {
         # Otherwise, this is a fresh form.
         else:
 
-            # Have the user pick the Media document seleciton method.
+            # Have the user pick the Media document selection method.
             fieldset = page.fieldset("Selection Method")
-            checked = False
             for method in self.METHODS:
                 value = method.split()[-1].lower()
+                checked = value == self.selection_method
                 opts = dict(label=f"By {method}", value=value, checked=checked)
                 fieldset.append(page.radio_button("selection_method", **opts))
-                checked = True
             page.form.append(fieldset)
 
             # Add the field for choosing a single document by ID.
             fieldset = page.fieldset("Media ID")
             fieldset.set("class", "by-id-block usa-fieldset")
-            opts = dict(label="CDR ID", tooltip="Enter CDR ID")
+            opts = dict(
+                label="CDR ID",
+                tooltip="Enter CDR ID",
+                value=self.cdr_id
+            )
             fieldset.append(page.text_field("cdr-id", **opts))
             page.form.append(fieldset)
 
@@ -134,8 +136,17 @@ jQuery(function() {
         # Add options for filtering by diagnoses and/or categories.
         fieldset = page.fieldset("Report Filtering")
         fieldset.set("class", "by-search-block usa-fieldset")
-        opts = dict(options=["all"]+self.diagnoses, multiple=True)
+        opts = dict(
+            options=["all"]+self.diagnoses,
+            multiple=True,
+            default=self.diagnosis,
+        )
         fieldset.append(page.select("diagnosis", **opts))
+        opts = dict(
+            options=["all"]+self.categories,
+            multiple=True,
+            default=self.category,
+        )
         opts["options"] = ["all"] + self.categories
         fieldset.append(page.select("category", **opts))
         page.form.append(fieldset)
@@ -493,20 +504,21 @@ jQuery(function() {
 
         # Build a query using the user's filtering criteria.
         c_path = '/Media/MediaContent/Categories/Category'
-        d_path = '/Media/MediaContent/Diagnoses/Diagnosis'
+        d_path = '/Media/MediaContent/Diagnoses/Diagnosis/@cdr:ref'
         i_path = '/Media/PhysicalMedia/ImageData/ImageEncoding'
         s_path = '/Media/ProcessingStatuses/ProcessingStatus'
         sd_path = f'{s_path}/ProcessingStatusDate'
         query = self.Query("query_term i", "i.doc_id").unique()
         query.where(f"i.path = '{i_path}'")
         if self.category:
+            values = [value for value in self.category]
             query.join("query_term c", "c.doc_id = i.doc_id")
             query.where(query.Condition("c.path", c_path))
             query.where(query.Condition("c.value", self.category, "IN"))
         if self.diagnosis:
             query.join("query_term d", "d.doc_id = i.doc_id")
             query.where(query.Condition("d.path", d_path))
-            query.where(query.Condition("d.value", self.diagnosis, "IN"))
+            query.where(query.Condition("d.int_val", self.diagnosis, "IN"))
         if self.start or self.end:
             query.join("query_term sd", "sd.doc_id = i.doc_id")
             query.where(query.Condition("sd.path", sd_path))

@@ -158,8 +158,7 @@ $(function() { chk_cdrid(); chk_pmid(); });
             page.add_alert(message, type=type)
         if error:
             page.add_alert(error, type="error")
-        page.body.append(page.B.SCRIPT(src=f"{page.USWDS}/js/uswds.min.js"))
-        sendPage(page.tostring())
+        page.send()
 
 
 class Citation:

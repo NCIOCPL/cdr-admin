@@ -203,9 +203,10 @@ class Control(Controller):
             fieldset = page.fieldset("Audio Zip Files")
             fieldset.append(table)
             page.form.append(fieldset)
+            color = f"color: {page.LINK_COLOR};"
             rules += [
-                ".usa-form td a { text-decoration: None; color: #005ea2}",
-                ".usa-form td a:visited { color: #005ea2; }",
+                f".usa-form td a {{ text-decoration: None; {color} }}",
+                f".usa-form td a:visited {{ {color} }}",
             ]
         page.add_css("\n".join(rules))
 

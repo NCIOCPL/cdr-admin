@@ -162,21 +162,20 @@ form { width: 90%; margin: 0 auto; }
             alerts.append(dict(message=self.warning, type="warning"))
         return alerts
 
-    @property
+    @cached_property
     def assignee(self):
         """New translator for a job."""
 
-        if not hasattr(self, "_assignee"):
-            assignee = self.fields.getvalue("assign_to")
-            if not assignee:
-                self.bail("No translator selected")
-            try:
-                self._assignee = int(assignee)
-            except Exception:
-                self.bail()
-            if self._assignee not in [row.id for row in self.translators]:
-                self.bail()
-        return self._assignee
+        value = self.fields.getvalue("assign_to")
+        if not value:
+            self.bail("No translator selected")
+        try:
+            assignee = int(value)
+        except Exception:
+            self.bail()
+        if assignee not in [row.id for row in self.translators]:
+            self.bail()
+        return assignee
 
     @cached_property
     def buttons(self):

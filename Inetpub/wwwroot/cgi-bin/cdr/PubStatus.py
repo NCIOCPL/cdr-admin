@@ -171,6 +171,11 @@ class Control(Controller):
             page_opts=dict(session=self.session, action=self.script),
         )
         report = self.Reporter(self.title, self.tables, **opts)
+        if self.job_details:
+            report.page.add_css("""\
+.overview td:first-child, .overview th:first-child {
+  width: 20rem;
+}""")
         if self.alert:
             report.page.add_alert(self.alert, type="success")
         if self.show_summary:
@@ -401,8 +406,8 @@ class JobDetails:
             label = labels[i]
             rows.append((Cell(label, bold=True, right=True), value))
         flavor = "Push" if "Push" in self.row.pub_subset else "Publishing"
-        caption = f"{flavor} Job {self.id}"
-        return self.control.Reporter.Table(rows, caption=caption)
+        opts = dict(caption=f"{flavor} Job {self.id}", classes="overview")
+        return self.control.Reporter.Table(rows, **opts)
 
     @cached_property
     def parameters(self):
@@ -414,7 +419,7 @@ class JobDetails:
         rows = query.execute(self.control.cursor).fetchall()
         rows = [tuple(row) for row in rows]
         columns = "Name", "Value"
-        opts = dict(columns=columns, caption="Parameters")
+        opts = dict(columns=columns, caption="Parameters", classes="overview")
         return self.control.Reporter.Table(rows, **opts)
 
     @cached_property
@@ -641,18 +646,17 @@ class JobDetails:
 
             Cell = self.job.control.Reporter.Cell
             row = [
-                Cell(self.id, right=True),
-                Cell(self.version, right=True),
+                Cell(self.id),
+                Cell(self.version),
                 self.doctype,
                 self.title,
-                Cell("Yes" if self.failed else "No", center=True),
-                Cell("Yes" if not self.failed and self.messages else "No",
-                     center=True),
+                Cell("Yes" if self.failed else "No"),
+                Cell("Yes" if not self.failed and self.messages else "No"),
             ]
             if self.job.is_push:
                 row.append(self.action)
             else:
-                row.append(Cell("Yes" if self.removed else "No", center=True))
+                row.append(Cell("Yes" if self.removed else "No"))
             return row
 
         @cached_property

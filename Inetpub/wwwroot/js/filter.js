@@ -1,8 +1,8 @@
 function add_filter_field() {
     var id = jQuery(".filter").length + 1;
     jQuery("#filters").append('<div class="labeled-field filter"> ' +
-        '<label class="usa-label" for="filter-' + id + '">Filter ' + id +
-        '</label> ' +
+        //'<label class="usa-label" for="filter-' + id + '">Filter ' + id +
+        //'</label> ' +
         '<input name="filter" id="filter-' + id + '" ' +
         'class="usa-input usa-input--xl"> ' +
         '</div>');

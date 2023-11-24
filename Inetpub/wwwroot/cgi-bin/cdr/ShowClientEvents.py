@@ -8,7 +8,7 @@ reports anomalies in stored versions of CDR documents.
 
 from functools import cached_property
 import datetime
-from cdrcgi import Controller
+from cdrcgi import Controller, BasicWebPage
 
 
 class Control(Controller):
@@ -36,11 +36,14 @@ class Control(Controller):
         """Bypass the from, which isn't used."""
         self.show_report()
 
-    def build_tables(self):
-        """Create the only table this report uses."""
+    def show_report(self):
+        """Override to accommodate the report's wide table."""
 
-        opts = dict(columns=self.COLUMNS, caption=self.caption)
-        return self.Reporter.Table(self.rows, **opts)
+        report = BasicWebPage()
+        report.wrapper.append(report.B.H1(self.SUBTITLE))
+        report.wrapper.append(self.table.node)
+        report.wrapper.append(self.footer)
+        report.send()
 
     @property
     def caption(self):
@@ -77,6 +80,13 @@ class Control(Controller):
 
         default = self.TODAY - datetime.timedelta(7)
         return str(self.parse_date(self.fields.getvalue("start")) or default)
+
+    @cached_property
+    def table(self):
+        """Create the single table used for this report."""
+
+        opts = dict(columns=self.COLUMNS, caption=self.caption)
+        return self.Reporter.Table(self.rows, **opts)
 
     @property
     def user(self):

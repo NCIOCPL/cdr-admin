@@ -16,10 +16,27 @@ class Control(Controller):
     COLS = "Linking Doc ID", "Linked Doc ID", "Updated"
     CAPTION = "Updates"
     EXPRESSION = compile(r"for (CDR\d+) (\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)")
+    INSTRUCTIONS = (
+        "This report shows summary documents in which the denormalized "
+        "titles in SummaryRef elements have been updated by a global change "
+        "job to reflect modifications in the titles of the linked summaries. "
+        "Each row in the report has three columns, showing the CDR ID of the "
+        "linking and linked summary documents, as well as the date and time "
+        "when each linking document was modified."
+    )
 
-    def show_form(self):
-        """Redirect from the unnecessary form straight to the report."""
-        self.show_report()
+    def populate_form(self, page):
+        """Explain the report.
+
+        Required positional argument:
+          page - instance of the HTMLPage class
+        """
+
+        if not self.fields.getvalue("prompt"):
+            self.show_report()
+        fieldset = page.fieldset("Instructions")
+        fieldset.append(page.B.P(self.INSTRUCTIONS))
+        page.form.append(fieldset)
 
     def build_tables(self):
         """Assemble the report table."""

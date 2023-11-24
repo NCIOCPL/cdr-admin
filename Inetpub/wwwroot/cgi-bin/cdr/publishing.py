@@ -37,11 +37,10 @@ class Control(Controller):
             page.form.append(page.hidden_field("subset", self.subset.name))
             if self.subset.user_can_select_docs:
                 fieldset = page.fieldset("Documents to Publish")
-                help = "Separate IDs with whitespace; 'CDR' prefix is optional"
-                img = page.B.IMG(src=self.HELP, title=help)
                 opts = dict(label="Enter CDR IDs", rows=3)
                 field = page.textarea("docs", **opts)
-                field.append(img)
+                help = "Separate IDs with whitespace; 'CDR' prefix is optional"
+                field.find("label").set("title", help)
                 fieldset.append(field)
                 page.form.append(fieldset)
             fieldset = page.fieldset("Job Options")
@@ -61,8 +60,6 @@ class Control(Controller):
                     opts["value"] = p.default or ""
                     field = page.text_field(p.name, **opts)
                 if help:
-                    #img = page.B.IMG(src=self.HELP, title=help)
-                    #field.find("label").append(img)
                     field.find("label").set("title", help)
                 fieldset.append(field)
             user = self.session.User(self.session, id=self.session.user_id)
@@ -74,8 +71,6 @@ class Control(Controller):
             opts = dict(options=yes_no, default=notify)
             field = page.select("notify", **opts)
             if help:
-                #img = page.B.IMG(src=self.HELP, title=help)
-                #field.append(img)
                 field.find("label").set("title", help)
             fieldset.append(field)
             label = "Address(es)"
@@ -83,8 +78,6 @@ class Control(Controller):
             opts = dict(value=email, label="Address(es)")
             field = page.text_field("email", **opts)
             if help:
-                #img = page.B.IMG(src=self.HELP, title=help)
-                #field.append(img)
                 field.find("label").set("title", help)
             fieldset.append(field)
             label = "No Output"
@@ -93,8 +86,6 @@ class Control(Controller):
             opts = dict(label=label, options=yes_no, default=no)
             field = page.select("no-output", **opts)
             if help:
-                #img = page.B.IMG(src=self.HELP, title=help)
-                #field.append(img)
                 field.find("label").set("title", help)
             fieldset.append(field)
             page.form.append(fieldset)
@@ -223,7 +214,7 @@ class Control(Controller):
         value = self.fields.getvalue("docs", "")
         ids = re.findall(r"\d+", value)
         for id in sorted([int(id) for id in ids], reverse=True):
-            doc = self.Candidate(self.session, id)
+            doc = self.Candidate(self.session, id=id)
             problem = None
             if doc.is_meeting_recording:
                 problem = "meeting recording"
@@ -231,7 +222,7 @@ class Control(Controller):
                 problem = "summary module"
             if problem:
                 self.alerts.append(dict(
-                    message=f"Attempt to publish {problem} CDR{doc_id}",
+                    message=f"Attempt to publish {problem} CDR{doc.id}.",
                     type="error",
                 ))
             else:
@@ -273,6 +264,7 @@ class Control(Controller):
                 try:
                     info.scrub(value)
                 except Exception as e:
+                    self.logger.exception("parameters")
                     self.bail(str(e))
                 parameters[p.name] = value
         return parameters
@@ -351,7 +343,7 @@ class Control(Controller):
             return True if query.execute(self.cursor).fetchall() else False
 
         @cached_property
-        def is_module_only(self, doc_id):
+        def is_module_only(self):
             """Is this a summary which can only be used as a module?
 
             We don't allow publication of summary modules, which are
@@ -634,10 +626,11 @@ class PublishingSystem:
 
 
 if __name__ == "__main__":
-    "Don't execute the script if loaded as a module."""
+    """Don't execute the script if loaded as a module."""
 
     control = Control()
     try:
         control.run()
     except Exception as e:
+        control.logger.exception("publishing failed")
         control.bail(str(e))

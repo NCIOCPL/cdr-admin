@@ -91,10 +91,27 @@ class Control(Controller):
           page - instance of the cdrcgi.HTMLPage class
         """
 
-        fieldset = page.fieldset("Instructions")
+        #fieldset = page.fieldset("Instructions")
+        #for paragraph in self.INSTRUCTIONS:
+        #    fieldset.append(page.B.P(paragraph))
+        #page.form.append(fieldset)
+        button = page.B.BUTTON(
+            "Instructions",
+            page.B.CLASS("usa-accordion__button"),
+            type="button",
+        )
+        button.set("aria-expanded", "false")
+        button.set("aria-controls", "instructions")
+        payload = page.B.DIV(id="instructions")
+        header = page.B.H4(button)
+        header.set("class", "usa-accordion__heading")
+        payload.set("class", "usa-accordion__content usa-prose")
+        accordion = page.B.DIV(header, payload)
+        # accordion.set("class", "usa-accordion usa-accordion--bordered")
+        accordion.set("class", "usa-accordion")
         for paragraph in self.INSTRUCTIONS:
-            fieldset.append(page.B.P(paragraph))
-        page.form.append(fieldset)
+            payload.append(page.B.P(paragraph))
+        page.form.append(accordion)
         fieldset = page.fieldset("Choose EVS Utility")
         utilities = page.B.UL(id="utilities")
         for label, script in self.UTILITIES:
@@ -103,11 +120,13 @@ class Control(Controller):
             utilities.append(page.B.LI(link))
         fieldset.append(utilities)
         page.form.append(fieldset)
+        color = f"color: {page.LINK_COLOR};"
         page.add_css(
             "#utilities { list-style: none; }\n"
             ".usa-form #utilities a { text-decoration: none; }\n"
-            ".usa-form #utilities a:visited { color: #005ea2; }\n"
+            f".usa-form #utilities a:visited {{ {color} }}\n"
             ".usa-form #utilities li { margin-bottom: .5rem; }\n"
+            ".usa-accordion { margin-bottom: 2rem; }\n"
         )
 
     @cached_property

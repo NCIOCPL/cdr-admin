@@ -25,12 +25,15 @@ class Control(Controller):
         ul = page.B.UL()
         script = self.EDIT_LINK_TYPE
         for id, name in self.link_types:
-            ul.append(page.B.LI(page.menu_link(script, name, id=id)))
+            link = page.menu_link(script, name, id=id)
+            link.set("target", "_blank")
+            ul.append(page.B.LI(link))
         fieldset.append(ul)
         page.form.append(fieldset)
         page.add_css("""
 #link-type-list ul { list-style-type: none; column-width: 15rem; }
 #link-type-list a { text-decoration: none; }
+#link-type-list a:visited { color: """ + page.LINK_COLOR + """; }
 """)
 
     def run(self):

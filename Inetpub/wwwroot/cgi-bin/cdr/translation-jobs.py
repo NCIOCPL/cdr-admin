@@ -8,6 +8,7 @@ jobs, as well as a button for creating a new job, and a button for
 clearing out jobs which have run the complete processing course.
 """
 
+from functools import cached_property
 from cdrcgi import Controller, navigateTo
 
 
@@ -19,8 +20,16 @@ class Control(Controller):
     PURGE = "Purge"
     GLOSSARY = "Glossary"
     MEDIA = "Media"
-    REPORTS_MENU = SUBMENU = "Reports"
-    ADMINMENU = "Admin"
+    COLUMNS = (
+        "CDR ID",
+        "Title",
+        "Audience",
+        "Status",
+        "Assigned To",
+        "Date",
+        "Type of Change",
+        "Comments",
+    )
     FIELDS = (
         "d.id",
         "d.title",
@@ -35,6 +44,8 @@ class Control(Controller):
     def run(self):
         """Override base class method, as we support extra buttons/tasks."""
 
+        if not self.session.can_do("MANAGE TRANSLATION QUEUE"):
+            self.bail("not authorized")
         if self.request == self.ADD:
             navigateTo("translation-job.py", self.session.name)
         elif self.request == self.GLOSSARY:
@@ -53,26 +64,81 @@ class Control(Controller):
             )
             count = self.cursor.rowcount
             self.conn.commit()
-            self.message = f"Purged jobs for {count:d} published translations."
+            message = f"Purged jobs for {count:d} published translations."
+            self.alerts.append(dict(message=message, type="success"))
         Controller.run(self)
 
-    def populate_form(self, page):
-        """Override to replace the standard form with a table of jobs.
+    def show_form(self):
+        """Overridden because the form needs a very wide table."""
 
-        Instead of form fields, we're actually displaying a table
-        containing one row for each job in the queue, sorted by
-        job state, with a sub-sort on user name and date of last
-        state transition.
+        class Page(self.HTMLPage):
+            """Derived class so we can override the layout of main."""
 
-        Pass:
-            page - HTMLPage object on which we place the table
-        """
+            @cached_property
+            def main(self):
+                """Move the form outside the grid container so it's wider."""
 
-        if not self.session.can_do("MANAGE TRANSLATION QUEUE"):
-            self.bail("not authorized")
+                return self.B.E(
+                    "main",
+                    self.B.DIV(
+                        self.B.H1("Summary Translation Job Queue"),
+                        self.B.CLASS("grid-container")
+                    ),
+                    self.form,
+                    self.B.CLASS("usa-section")
+                )
+
+        opts = dict(
+            control=self,
+            action=self.script,
+            session=self.session,
+            method=self.method,
+        )
+        page = Page(self.title, **opts)
+        container = page.B.DIV(page.B.CLASS("grid-container"))
+        for label in self.buttons:
+            container.append(page.button(label, onclick=self.SAME_WINDOW))
+        for alert in self.alerts:
+            message = alert["message"]
+            del alert["message"]
+            page.add_alert(message, **alert)
+        page.form.append(container)
+        page.form.append(self.table.node)
+        page.add_css("""\
+form { width: 90%; margin: 0 auto; }
+.usa-table { margin-top: 3rem; }
+.usa-table caption { font-size: 1.3rem; text-align: center; }
+.usa-table th:first-child { text-align: center; }
+.clickable.usa-checkbox__label {  margin-top: -.25rem; margin-left: .75rem; }
+td.svpc, td.svpc a, td.svpc a:visited { color: green; }
+""")
+        page.send()
+
+    @cached_property
+    def alerts(self):
+        """Messages to be displayed at the top of the page."""
+
+        alerts = []
         if self.message:
-            para = page.B.P(self.message, page.B.CLASS("strong info center"))
-            page.body.append(para)
+            alerts.append(dict(message=self.message, type="success"))
+        if self.warning:
+            alerts.append(dict(message=self.warning, type="warning"))
+        return alerts
+
+    @cached_property
+    def buttons(self):
+        """Add our custom buttons for the extra tasks."""
+        return self.ADD, self.PURGE, self.GLOSSARY, self.MEDIA
+
+    @cached_property
+    def message(self):
+        """Information about successfully performed action just taken."""
+        return self.fields.getvalue("message")
+
+    @cached_property
+    def rows(self):
+        """Rows for the table of queued jobs."""
+
         query = self.Query("summary_translation_job j", *self.FIELDS)
         query.join("usr u", "u.id = j.assigned_to")
         query.join("document d", "d.id = j.english_id")
@@ -82,61 +148,29 @@ class Control(Controller):
                     "q.doc_id = d.id AND q.path = '/Summary/@SVPC'")
         query.order("q.value DESC", "s.value_pos", "u.fullname", "j.state_date")
         rows = query.execute(self.cursor).fetchall()
-        table = page.B.TABLE(
-            page.B.CLASS("report"),
-            page.B.THEAD(
-                page.B.TR(
-                    page.B.TH("CDR ID"),
-                    page.B.TH("Title"),
-                    page.B.TH("Audience"),
-                    page.B.TH("Status"),
-                    page.B.TH("Assigned To"),
-                    page.B.TH("Date"),
-                    page.B.TH("Type of Change"),
-                    page.B.TH("Comments")
-                )
-            ),
-            page.B.TBODY(*[Job(self, row).row for row in rows]),
-        )
-        page.body.append(table)
-        page.add_css(
-            "th, td {"
-            "    background-color: #e8e8e8; border-color: #bbb;"
-            "}"
-            " tr.svpc td, tr.svpc td a { color: green; }"
-        )
+        return [Job(self, row).row for row in rows]
 
-    @property
-    def buttons(self):
-        """Add our custom buttons for the extra tasks."""
+    @cached_property
+    def same_window(self):
+        """Don't open any more new browser tabs."""
+        return self.buttons
 
-        return (
-            self.ADD,
-            self.PURGE,
-            self.GLOSSARY,
-            self.MEDIA,
-            self.REPORTS_MENU,
-            self.ADMINMENU,
-            self.LOG_OUT,
-        )
+    @cached_property
+    def table(self):
+        """Table of queued glossary translation jobs."""
+        return self.Reporter.Table(self.rows, cols=self.COLUMNS, caption="Jobs")
 
-    @property
-    def message(self):
-        """Optional string to be displayed prominently above the jobs table."""
-
-        if hasattr(self, "_message"):
-            return self._message
-
-    @message.setter
-    def message(self, value):
-        """This is how the purge action reports its activity."""
-        self._message = value
+    @cached_property
+    def warning(self):
+        """Warning message passed on from the form page."""
+        return self.fields.getvalue("warning")
 
 
 class Job:
     """Information for a single CDR summary translation job."""
 
     SCRIPT = "translation-job.py"
+    URL = "translation-job.py?Session={}&english_id={}"
 
     def __init__(self, control, row):
         """Store the caller's values.
@@ -149,12 +183,12 @@ class Job:
         self.__control = control
         self.__row = row
 
-    @property
+    @cached_property
     def audience(self):
         """Audience for the summary document."""
         return self.__row.title.split(";")[-1]
 
-    @property
+    @cached_property
     def comments(self):
         """Possibly truncated comments for the last column in the row."""
 
@@ -163,12 +197,12 @@ class Job:
             comments = f"{comments} ..."
         return comments
 
-    @property
+    @cached_property
     def date(self):
         """State date for the job."""
         return str(self.__row.state_date)[:10]
 
-    @property
+    @cached_property
     def link(self):
         """Link to the job from its ID column."""
 
@@ -176,24 +210,26 @@ class Job:
         opts = dict(href=url, title="edit job")
         return self.__control.HTMLPage.B.A(f"CDR{self.__row.id:d}", **opts)
 
-    @property
+    @cached_property
     def row(self):
         """Values for the job table."""
 
-        B = self.__control.HTMLPage.B
-        return B.TR(
-            B.TD(self.link),
-            B.TD(self.title),
-            B.TD(self.audience),
-            B.TD(self.__row.state),
-            B.TD(self.__row.user),
-            B.TD(self.date, B.CLASS("nowrap")),
-            B.TD(self.__row.change),
-            B.TD(self.comments),
-            B.CLASS("svpc" if self.__row.svpc else "pdq"),
+        Cell = self.__control.Reporter.Cell
+        doc_id = str(self.__row.id)
+        url = self.URL.format(self.__control.session, doc_id)
+        classes = "svpc" if self.__row.svpc else "pdq"
+        return (
+            Cell(f"CDR{doc_id}", href=url, title="edit job", classes=classes),
+            Cell(self.title, classes=classes),
+            Cell(self.audience, classes=classes),
+            Cell(self.__row.state, classes=classes),
+            Cell(self.__row.user, classes=classes),
+            Cell(self.date, classes=f"{classes} nowrap"),
+            Cell(self.__row.change, classes=classes),
+            Cell(self.comments, classes=classes),
         )
 
-    @property
+    @cached_property
     def title(self):
         """Title of the summary document."""
         return self.__row.title.split(";")[0]

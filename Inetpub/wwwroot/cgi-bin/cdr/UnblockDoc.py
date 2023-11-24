@@ -3,6 +3,7 @@
 """Make a blocked document active.
 """
 
+from functools import cached_property
 from cdrcgi import Controller
 from cdrapi.docs import Doc
 
@@ -18,41 +19,41 @@ class Control(Controller):
             page - HTMLPage where everything happens
         """
 
-        # if we have a request, process it and display the outcome.
-        if self.doc:
-            if self.doc.active_status == Doc.BLOCKED:
-                try:
-                    self.doc.set_status(Doc.ACTIVE)
-                    message = f"Successfully unblocked {self.doc.cdr_id}"
-                    message = page.B.P(message, page.B.CLASS("info center"))
-                except Exception as e:
-                    message = page.B.P(str(e), page.B.CLASS("error center"))
-            else:
-                message = f"{self.doc.cdr_id} is not blocked"
-                message = page.B.P(message, page.B.CLASS("error center"))
-            fieldset = page.fieldset("Processing Results")
-            fieldset.append(message)
-            page.form.append(fieldset)
-
-        # In any case, put up the form requesting a document ID.
         fieldset = page.fieldset("Document To Be Unblocked")
         fieldset.append(page.text_field("id", label="Document ID"))
         page.form.append(fieldset)
 
-    @property
     def show_report(self):
-        """Circle back to the form."""
+        """Process the request and circle back to the form."""
+
+        if not self.doc:
+            message = "A CDR document ID is required."
+            self.alerts.append(dict(message=message, type="error"))
+        else:
+            try:
+                if self.doc.active_status == Doc.BLOCKED:
+                    self.doc.set_status(Doc.ACTIVE)
+                    message = f"Successfully unblocked {self.doc.cdr_id}."
+                    self.alerts.append(dict(message=message, type="success"))
+                else:
+                    message = f"{self.doc.cdr_id} is not blocked."
+                    self.alerts.append(dict(message=message, type="warning"))
+            except Exception as e:
+                message = f"Unblock failed: {e}"
+                self.alerts.append(dict(message=message, type="error"))
         self.show_form()
 
-    @property
+    @cached_property
     def doc(self):
         """Document to be unblocked."""
 
-        if not hasattr(self, "_doc"):
-            self._doc = self.fields.getvalue("id")
-            if self._doc:
-                self._doc = Doc(self.session, id=self._doc)
-        return self._doc
+        id = self.fields.getvalue("id")
+        return Doc(self.session, id=id) if id else None
+
+    @cached_property
+    def same_window(self):
+        """Don't open new browser tabs."""
+        return [self.SUBMIT]
 
 
 if __name__ == "__main__":

@@ -71,7 +71,7 @@ class Control(Controller):
         opts = dict(
             value="name:Passthrough Filter",
             widget_id="filter-1",
-            label="Filter 1",
+            label="",
             wrapper_classes="filter",
         )
         fieldset.append(page.text_field("filter", **opts))
@@ -164,8 +164,8 @@ class Control(Controller):
             page.B.CLASS("term-button")
         )
         legend.append(add_button)
+        opts = dict(label="Name", wrapper_classes="parm-name")
         fieldset.append(page.B.DIV(
-            opts = dict(label="Name", wrapper_classes="parm-name")
             page.text_field("parm-name-1", **opts),
             page.text_field("parm-value-1", label="Value"),
             page.B.CLASS("parameter")
@@ -293,14 +293,14 @@ class Control(Controller):
             id = Doc.extract_id(id)
         except Exception:
             self.bail("Unrecognized document ID format")
-        version = self.fields.getvalue("DocVer", "0")
+        version = self.fields.getvalue("DocVer") or "0"
 
         # If no version is specified the default version is the CWD
         # which is indicated with a version=None.  Need to allow
         # "None" as a valid value.
         allowed = "None", "last", "lastp"
         if not version.isdigit() and version not in allowed:
-            self.bail(f"Invalid version {version!r}")
+            self.bail(f"Invalid version {version!r}.")
         return Doc(self.session, id=id, version=version)
 
     @cached_property
@@ -486,6 +486,10 @@ class Control(Controller):
         """True if images display option is requested."""
         return self.fields.getvalue("images") == "true"
 
+    @cached_property
+    def same_window(self):
+        """Reduce generation of new browser tabs."""
+        return [self.SUBMIT] if self.request else []
     @property
     def standard_wording(self):
         """True if standard wording display options are requested."""

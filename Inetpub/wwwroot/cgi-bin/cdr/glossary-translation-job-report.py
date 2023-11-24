@@ -5,8 +5,8 @@
 https://tracker.nci.nih.gov/browse/OCECDR-4487
 """
 
-from functools import cached_property
 from datetime import date, timedelta
+from functools import cached_property
 from cdrcgi import Controller
 
 
@@ -285,7 +285,7 @@ class Job:
                 return True
         return False
 
-    @property
+    @cached_property
     def comments(self):
         """String for notes on this job."""
         return self.__row.comments
@@ -295,7 +295,7 @@ class Job:
         """String for the date portion of the date/time value."""
         return str(self.__row.state_date)[:10]
 
-    @property
+    @cached_property
     def doc_id(self):
         """Integer for the CDR ID of the glossary document."""
         return self.__row.doc_id

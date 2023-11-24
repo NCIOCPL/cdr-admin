@@ -27,8 +27,18 @@ class Control(Controller):
 
         # Remove a term from the list of suppressed terms.
         if self.id:
-            self.cursor.execute(self.DELETE, (self.id,))
-            self.conn.commit()
+            try:
+                self.cursor.execute(self.DELETE, (self.id,))
+                self.conn.commit()
+                message = (
+                    f"Removed CDR{self.id} from the set of suppressed "
+                    "terms."
+                )
+                self.alerts.append(dict(message=message, type="success"))
+            except Exception as e:
+                self.logger.exception("removing %s", self.id)
+                message = f"Failure unsuppressing CDR{self.id}: {e}"
+                self.alerts.append(dict(message=message, type="error"))
 
         # Show the suppressed terms.
         fieldset = page.fieldset("Click term to unsuppress")
@@ -43,14 +53,6 @@ class Control(Controller):
     def id(self):
         """ID of term to be removed from the "suppressed" list."""
         return self.fields.getvalue("id")
-
-    @cached_property
-    def subtitle(self):
-        """What to display under the main banner."""
-
-        if self.id:
-            return f"Removed CDR{self.id} from the set of suppressed terms"
-        return "Suppressed Drug Terms"
 
     @cached_property
     def suppressed(self):

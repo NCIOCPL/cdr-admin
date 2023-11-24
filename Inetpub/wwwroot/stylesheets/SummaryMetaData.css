@@ -1,3 +1,13 @@
+body {
+    font-family: Arial, sans-serif;
+    font-size: 1em;
+    margin: 0;
+    padding: .5rem;
+}
+body > div { width: auto; }
+h1 { font-size: 1.4em; margin-left: 2rem; }
+table { margin: 1rem auto 2rem; }
+th, td { padding: .25rem; }
 .top-section {
     font-weight: bold;
 }
@@ -9,12 +19,13 @@
 }
 table.general {
     width: 1024px;
-    margin-top: 40px;
+    margin-top: 3rem;
 }
 table.general td:first-child {
-    width: 150px;
     text-align: right;
+    text-wrap: nowrap;
     vertical-align: middle;
-    padding-right: 10px;
     font-weight: bold;
+    padding-right: .5rem;
+    width: 10rem;
 }

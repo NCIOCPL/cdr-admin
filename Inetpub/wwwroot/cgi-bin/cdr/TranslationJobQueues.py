@@ -46,7 +46,7 @@ class Control(Controller):
             ".usa-form a { text-decoration: none; }\n"
             "fieldset .usa-list--unstyled { margin-top: 1.5rem; }\n"
             "fieldset .usa-list li { padding-left: 3rem; }\n"
-            ".usa-form a:visited { color: #005ea2; }\n"
+            f".usa-form a:visited {{ color: {page.LINK_COLOR}; }}\n"
         )
 
     @property

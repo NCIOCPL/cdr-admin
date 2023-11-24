@@ -201,7 +201,10 @@ class Control(cdrcgi.Controller):
             label = menu["label"]
             positions = [labels.index(label)] if label in labels else []
             script = page.find_menu_link(menu, positions)
-            self.navigate_to(script, self.session.name)
+            opts = dict(show_news=True)
+            if self.logged_out:
+                opts["logged_out"] = True
+            self.navigate_to(script, self.session, **opts)
 
     @functools.cached_property
     def form_page(self):
@@ -212,6 +215,11 @@ class Control(cdrcgi.Controller):
     def buttons(self):
         """This page needs no buttons."""
         return []
+
+    @functools.cached_property
+    def show_news(self):
+        """Show news items when the user hits the home page."""
+        return True
 
     @property
     def user(self):

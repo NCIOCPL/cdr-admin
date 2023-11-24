@@ -204,7 +204,7 @@ jQuery(function() {{
             self.bail(f"CDR{doc.id} is a {doctype} document")
         return doc
 
-    @property
+    @cached_property
     def english_id(self):
         """Integer for the CDR ID of the Media document being translated."""
         return self.english_doc.id if self.english_doc else None

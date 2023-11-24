@@ -95,8 +95,7 @@ class Control(Controller):
 
         # Suppress this block if selecting documents by type (the default).
         fieldset = page.fieldset("Document ID")
-        fieldset.set("class", "by-id-block usa-fieldset")
-        fieldset.set("hidden")
+        fieldset.set("class", "hidden by-id-block usa-fieldset")
         fieldset.append(page.text_field("cdr-id", label="CDR ID"))
         page.form.append(fieldset)
 

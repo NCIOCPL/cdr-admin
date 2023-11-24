@@ -50,7 +50,6 @@ class Control(Controller):
                 opts = dict(label=label, value=id, checked=checked)
                 fieldset.append(page.radio_button("DocId", **opts))
                 checked = False
-            # page.add_css("fieldset { width: 1024px; }")
         else:
             if self.fragment:
                 fieldset = page.fieldset("Error")
@@ -114,92 +113,81 @@ class Control(Controller):
         self.report.page.add_css("\n".join(self.CSS))
         self.report.send()
 
-    @property
+    @cached_property
     def all(self):
         """True if we should report on all changes."""
         return self.scope == "all"
 
-    @property
+    @cached_property
     def doc(self):
         """The summary document for the report."""
 
-        if not hasattr(self, "_doc"):
-            self._doc = Doc(self.session, id=self.id)
-            if not self._doc.title:
-                self.bail(f"CDR{self.id} not found")
-        return self._doc
+        doc = Doc(self.session, id=self.id)
+        if not doc.title:
+            self.bail(f"CDR{self.id} not found")
+        return doc
 
-    @property
+    @cached_property
     def end(self):
         """End of date range for the report."""
+        return self.parse_date(self.fields.getvalue("end"))
 
-        if not hasattr(self, "_end"):
-            self._end = self.parse_date(self.fields.getvalue("end"))
-        return self._end
-
-    @property
+    @cached_property
     def fragment(self):
         """Title fragment for the summary."""
         return self.fields.getvalue("title")
 
-    @property
+    @cached_property
     def id(self):
         """Document ID for the report."""
 
-        if not hasattr(self, "_id"):
-            self._id = self.fields.getvalue("DocId")
-            if self._id:
-                try:
-                    self._id = Doc.extract_id(self._id)
-                except Exception:
-                    self.bail("Invalid ID")
-            elif self.summaries and len(self.summaries) == 1:
-                self._id = self.summaries[0][0]
-        return self._id
+        id = self.fields.getvalue("DocId", "").strip()
+        if id:
+            try:
+                return Doc.extract_id(id)
+            except Exception:
+                self.bail("Invalid ID")
+        elif self.summaries and len(self.summaries) == 1:
+            return self.summaries[0][0]
+        return None
 
-    @property
+    @cached_property
     def no_results(self):
         """Suppress the message we'd get with no tables."""
         return None
 
-    @property
+    @cached_property
     def scope(self):
         """How is the user deciding which versions to report on?"""
 
-        if not hasattr(self, "_scope"):
-            self._scope = self.fields.getvalue("scope")
-            if self._scope not in self.SCOPES:
-                self.bail()
-        return self._scope
+        scope = self.fields.getvalue("scope")
+        if scope not in self.SCOPES:
+            self.bail()
+        return scope
 
-    @property
+    @cached_property
     def sections(self):
         """Sequence of sections of the report, one for each change."""
 
-        if not hasattr(self, "_sections"):
-            last_section = None
-            sections = []
-            for version, version_date in self.versions:
-                display_date = version_date.strftime("%m/%d/%Y")
-                doc = Doc(self.session, id=self.id, version=version)
-                response = doc.filter(self.FILTER)
-                html = str(response.result_tree).strip()
-                if html != last_section:
-                    last_section = html
-                    html = html.replace("@@PubVerDate@@", display_date)
-                    sections.append(lxml.html.fragments_fromstring(html))
-            self._sections = reversed(sections)
-        return self._sections
+        last_section = None
+        sections = []
+        for version, version_date in self.versions:
+            display_date = version_date.strftime("%m/%d/%Y")
+            doc = Doc(self.session, id=self.id, version=version)
+            response = doc.filter(self.FILTER)
+            html = str(response.result_tree).strip()
+            if html != last_section:
+                last_section = html
+                html = html.replace("@@PubVerDate@@", display_date)
+                sections.append(lxml.html.fragments_fromstring(html))
+        return reversed(sections)
 
-    @property
+    @cached_property
     def start(self):
         """Beginning of date range for the report."""
+        return self.parse_date(self.fields.getvalue("start"))
 
-        if not hasattr(self, "_start"):
-            self._start = self.parse_date(self.fields.getvalue("start"))
-        return self._start
-
-    @property
+    @cached_property
     def same_window(self):
         """Decide when to avoid opening a new browser tab."""
         return [self.SUBMIT] if self.fragment or self.id else []
@@ -209,39 +197,35 @@ class Control(Controller):
         """Don't show the left navigation column on followup pages."""
         return True if self.id or self.fragment else False
 
-    @property
+    @cached_property
     def summaries(self):
         """Sequence of ID/title tuples for the summary picklist."""
 
-        if not hasattr(self, "_summaries"):
-            self._summaries = None
-            if self.fragment:
-                fragment = f"{self.fragment}%"
-                query = self.Query("document d", "d.id", "d.title").order(2)
-                query.join("doc_type t", "t.id = d.doc_type")
-                query.where("t.name = 'Summary'")
-                query.where(query.Condition("d.title", fragment, "LIKE"))
-                rows = query.execute(self.cursor).fetchall()
-                self._summaries = [tuple(row) for row in rows]
-        return self._summaries
+        if self.fragment:
+            return None
+        fragment = f"{self.fragment}%"
+        query = self.Query("document d", "d.id", "d.title").order(2)
+        query.join("doc_type t", "t.id = d.doc_type")
+        query.where("t.name = 'Summary'")
+        query.where(query.Condition("d.title", fragment, "LIKE"))
+        rows = query.execute(self.cursor).fetchall()
+        return [tuple(row) for row in rows]
 
-    @property
+    @cached_property
     def versions(self):
         """Sequence of num/date for versions to be included in the report."""
 
-        if not hasattr(self, "_versions"):
-            query = self.Query("doc_version", "num", "dt").order("num")
-            query.where(query.Condition("id", self.id))
-            if not self.all:
-                if self.start:
-                    query.where(query.Condition("dt", self.start, ">="))
-                if self.end:
-                    end = f"{self.end} 23:59:59"
-                    query.where(query.Condition("dt", end, "<="))
-            query.where("publishable = 'Y'")
-            rows = query.execute(self.cursor).fetchall()
-            self._versions = [tuple(row) for row in rows]
-        return self._versions
+        query = self.Query("doc_version", "num", "dt").order("num")
+        query.where(query.Condition("id", self.id))
+        if not self.all:
+            if self.start:
+                query.where(query.Condition("dt", self.start, ">="))
+            if self.end:
+                end = f"{self.end} 23:59:59"
+                query.where(query.Condition("dt", end, "<="))
+        query.where("publishable = 'Y'")
+        rows = query.execute(self.cursor).fetchall()
+        return [tuple(row) for row in rows]
 
 
 if __name__ == "__main__":
