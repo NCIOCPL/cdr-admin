@@ -3,6 +3,8 @@
 """Show the tables of contents for one or more Cancer Information Summaries.
 """
 
+from collections import defaultdict
+from functools import cached_property
 from cdrcgi import Controller, HTMLPage, bail
 from cdrapi import db
 from cdrapi.docs import Doc
@@ -362,7 +364,7 @@ jQuery(function() {
 
         return self.fields.getvalue("method")
 
-    @property
+    @cached_property
     def report_page(self):
         """Assemble the HTMLPage object for the report.
 
@@ -370,20 +372,24 @@ jQuery(function() {
         instead of letting the base class take care of that for us.
         """
 
-        if not hasattr(self, "_report_page"):
-            self.logger.info("processing %d summaries", len(self.summaries))
-            page = HTMLPage(self.title, subtitle=self.report_title)
-            page.body.set("id", "summaries-toc-report")
-            board = None
-            for summary in sorted(self.summaries):
-                self.logger.debug("processing %s", summary.title)
-                if self.selection_method == "board" and summary.board != board:
-                    page.body.append(page.B.H4(summary.board))
-                    board = summary.board
+        self.logger.info("processing %d summaries", len(self.summaries))
+        page = HTMLPage(self.title, subtitle=self.report_title)
+        page.body.set("id", "summaries-toc-report")
+        boards = defaultdict(list)
+        for summary in sorted(self.summaries):
+            self.logger.debug("processing %s", summary.title)
+            if self.selection_method != "board" or not summary.boards:
+                boards[""].append(summary)
+            else:
+                for board in summary.boards:
+                    boards[board].append(summary)
+        for board in sorted(boards):
+            if board:
+                page.body.append(page.B.H4(board))
+            for summary in boards[board]:
                 for node in summary.nodes:
                     page.body.append(node)
-            self._report_page = page
-        return self._report_page
+        return page
 
     @property
     def report_title(self):
@@ -494,8 +500,8 @@ class Summary:
         self.__control = control
         self.__row = row
 
-    @property
-    def board(self):
+    @cached_property
+    def boards(self):
         """String for the summary's PDQ Editorial board.
 
         A summary typically has multiple board links. Only one will
@@ -503,30 +509,44 @@ class Summary:
         picklist. For a Spanish summary, we have to find the English
         summary of which it is a translation, as that is the document
         which will have the link to the editorial board we need.
+
+        2023-11-29: Requirements have changed, and now a summary can
+        have more than one PDQ editorial board. Only include the ones
+        which match the user's selection(s). See OCECDR-5298.
         """
 
-        if not hasattr(self, "_board"):
-            self._board = "Board not found"
-            b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
-            t_path = "/Summary/TranslationOf/@cdr:ref"
-            query = db.Query("query_term_pub b", "b.int_val").unique()
-            if self.control.language == "english":
-                query.where(query.Condition("b.path", b_path))
-                query.where(query.Condition("b.doc_id", self.id))
-            else:
-                query.join("query_term_pub t", "t.int_val = b.doc_id")
-                query.where(query.Condition("t.path", t_path))
-                query.where(query.Condition("t.doc_id", self.id))
-            for row in query.execute(self.control.cursor).fetchall():
-                board = self.control.boards.get(row.int_val)
-                if board:
-                    self._board = str(board)
-        return self._board
+        b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
+        t_path = "/Summary/TranslationOf/@cdr:ref"
+        query = db.Query("query_term_pub b", "b.int_val").unique()
+        if self.control.language == "english":
+            query.where(query.Condition("b.path", b_path))
+            query.where(query.Condition("b.doc_id", self.id))
+        else:
+            query.join("query_term_pub t", "t.int_val = b.doc_id")
+            query.where(query.Condition("t.path", t_path))
+            query.where(query.Condition("t.doc_id", self.id))
+        if self.control.board and "all" not in self.control.board:
+            query.where(query.Condition("b.int_val", self.control.board, "IN"))
+        boards = []
+        for row in query.execute(self.control.cursor).fetchall():
+            board = self.control.boards.get(row.int_val)
+            if board:
+                boards.append(str(board))
+        return boards
 
-    @property
+    @cached_property
     def control(self):
         """Access to report parameters and database connectivity."""
         return self.__control
+
+    @cached_property
+    def html(self):
+        """Filtered HTML for the report."""
+
+        opts = dict(id=self.id, version=self.version)
+        doc = Doc(self.control.session, **opts)
+        result = doc.filter(*self.FILTERS, parms=self.parms)
+        return str(result.result_tree).strip()
 
     @property
     def id(self):
@@ -540,15 +560,13 @@ class Summary:
         We use XSL/T filtering to generate the HTML fragments
         for the report for this summary, which we then parse
         so they can be added to the page object.
+
+        Don't cache these, as they might need to appear in more
+        than one place in the report. We do cache the filtered
+        HTML string, though.
         """
 
-        if not hasattr(self, "_nodes"):
-            opts = dict(id=self.id, version=self.version)
-            doc = Doc(self.control.session, **opts)
-            result = doc.filter(*self.FILTERS, parms=self.parms)
-            html = str(result.result_tree).strip()
-            self._nodes = self.H.fragments_fromstring(html)
-        return self._nodes
+        return self.H.fragments_fromstring(self.html)
 
     @property
     def parms(self):
@@ -573,10 +591,7 @@ class Summary:
 
     def __lt__(self, other):
         """Support sorting a sequence of `Summary` objects."""
-
-        title = self.title.lower()
-        other_title = other.title.lower()
-        return (self.board, title) < (other.board, other_title)
+        return self.title.lower() < other.title.lower()
 
 
 if __name__ == "__main__":
