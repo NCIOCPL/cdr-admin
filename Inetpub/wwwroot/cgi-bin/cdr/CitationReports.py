@@ -31,7 +31,7 @@ class Control(Controller):
         ol = page.B.OL()
         page.form.append(ol)
         for display, script in (
-            ("Citations Linked to Summaries", "CitationsInSummaries.py"),
+            ("Citations Linked From Summaries", "CitationsInSummaries.py"),
             ("New Citations Report", "NewCitations.py"),
         ):
             ol.append(page.B.LI(page.menu_link(script, display)))

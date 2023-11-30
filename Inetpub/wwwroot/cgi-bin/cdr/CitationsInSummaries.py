@@ -12,7 +12,7 @@ from CdrLongReports import CitationsInSummaries
 
 
 class Control(Controller):
-    TITLE = "Citations In Summaries"
+    SUBTITLE = "Citations Linked From Summaries"
     COLS = (
         Reporter.Column("Citation ID", width="60px"),
         Reporter.Column("Citation Title", width="1000px"),
@@ -21,7 +21,7 @@ class Control(Controller):
         Reporter.Column("Summary Title", width="500px"),
         Reporter.Column("Summary Boards", width="500px"),
     )
-    OPTS = dict(columns=COLS, caption=TITLE, sheet_name=TITLE)
+    OPTS = dict(columns=COLS, caption=SUBTITLE, sheet_name=SUBTITLE)
     LINK_PATH = "/Summary/%CitationLink/@cdr:ref"
     LOGNAME = "CitationsInSummaries"
     LONG_REPORTS = "lib/Python/CdrLongReports.py"
