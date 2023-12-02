@@ -9,8 +9,7 @@ from cdrapi.docs import Doc
 from cdrapi.settings import Tier
 import requests
 import lxml.html.builder
-# pylint: disable-next=import-error
-from requests.packages.urllib3.exceptions import InsecureRequestWarning
+from urllib3.exceptions import InsecureRequestWarning
 # pylint: disable-next=no-member
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
@@ -131,10 +130,10 @@ class Control(Controller):
                 message = f"Limited to {self.limit} summaries for testing."
                 self.logger.info(message)
                 self.alerts.append(dict(message=message, type="info"))
-        except Exception as e:
+        except Exception:
             value = self.fields.getvalue("limit")
             self.logger.exception("checking limit %r", value)
-            message = f"Limit must be a positive integer."
+            message = "Limit must be a positive integer."
             self.alerts.append(dict(message=message, type="error"))
             return False
         return True

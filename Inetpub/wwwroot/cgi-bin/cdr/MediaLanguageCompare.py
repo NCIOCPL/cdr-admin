@@ -219,7 +219,7 @@ jQuery(function() {
         audiences = self.fields.getvalue("audience") or "Patients"
         if audiences in self.AUDIENCES:
             return [audiences]
-        return list(AUDIENCES)
+        return list(self.AUDIENCES)
 
     @cached_property
     def categories(self):
@@ -404,7 +404,7 @@ jQuery(function() {
             classes = "double"
         else:
             language = self.LANGUAGE_CODES[self.languages]
-            h1.append(B.DIV("Showing Only {language} Media"))
+            h1.append(B.DIV(f"Showing Only {language} Media"))
             classes = "single"
         h1.append(B.DIV(str(date.today())))
         header = B.E("header", h1)
@@ -466,7 +466,6 @@ jQuery(function() {
 
                 # Show the description(s) if requested.
                 if "description" in self.display:
-                    path = ".//ContentDescription"
                     for node in media.doc.root.findall(".//ContentDescription"):
                         audience = node.get("audience")
                         if audience in self.audiences:
@@ -511,7 +510,6 @@ jQuery(function() {
         query = self.Query("query_term i", "i.doc_id").unique()
         query.where(f"i.path = '{i_path}'")
         if self.category:
-            values = [value for value in self.category]
             query.join("query_term c", "c.doc_id = i.doc_id")
             query.where(query.Condition("c.path", c_path))
             query.where(query.Condition("c.value", self.category, "IN"))

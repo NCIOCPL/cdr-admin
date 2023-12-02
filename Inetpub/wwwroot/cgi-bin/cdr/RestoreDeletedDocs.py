@@ -87,7 +87,7 @@ class Control(Controller):
                         self.logger.warning(message)
                         self.alerts.append(dict(message=message, type="error"))
                 except Exception as e:
-                    self.logger.exception(cdr_id)
+                    self.logger.exception(doc.cdr_id)
                     self.alerts.append(dict(
                         message=f"{doc.cdr_id}: {e}",
                         type="error",

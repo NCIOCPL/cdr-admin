@@ -4,7 +4,7 @@
 """
 
 from functools import cached_property
-from cdrcgi import Controller, navigateTo
+from cdrcgi import Controller
 
 
 class Control(Controller):
@@ -18,7 +18,7 @@ class Control(Controller):
     def run(self):
         """Override base class to add action for new button."""
         if self.request == self.ADD_NEW_GROUP:
-            navigateTo(self.EDIT_GROUP, self.session.name)
+            self.navigate_to(self.EDIT_GROUP, self.session.name)
         else:
             Controller.run(self)
 

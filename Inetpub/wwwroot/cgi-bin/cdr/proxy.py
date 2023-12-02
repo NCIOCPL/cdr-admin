@@ -9,7 +9,7 @@ from re import compile
 from sys import stdout
 from urllib.parse import urlparse
 from requests import get
-from cdrcgi import Controller, sendPage
+from cdrcgi import Controller
 
 # TODO: Get Acquia to fix their broken certificates.
 from urllib3.exceptions import InsecureRequestWarning
@@ -145,4 +145,4 @@ if __name__ == "__main__":
         control.run()
     except Exception:
         control.logger.exception("Failure")
-        sendPage("", textType="plain")
+        control.send_page("", textType="plain")

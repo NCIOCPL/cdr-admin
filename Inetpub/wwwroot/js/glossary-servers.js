@@ -65,6 +65,9 @@ function remove_server(id) {
     jQuery.each(blocks, function(i, server) {
         add_server_block(i + 1, server["alias"], server["url"]);
     });
+    if (blocks.length === 0) {
+        add_server_block();
+    }
     add_buttons();
 }
 

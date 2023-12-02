@@ -6,7 +6,7 @@
 from functools import cached_property
 import os
 import cdr
-from cdrcgi import Controller, bail
+from cdrcgi import Controller
 
 
 class Control(Controller):
@@ -47,20 +47,19 @@ function change_file() {{
         """Override the top-level entry point, as this isn't a report."""
 
         if not self.session.can_do("SET_SYS_VALUE"):
-            bail("You are not authorized to use this tool")
+            self.bail("You are not authorized to use this tool")
         if self.request == self.SAVE:
             try:
                 self.save()
             except Exception as e:
                 self.logger.exception("Failure saving")
-                bail(str(e))
+                self.bail(str(e))
         else:
             Controller.run(self)
 
     def save(self):
         """Save the currently edited configuration file if changed."""
 
-        classes = "info center"
         stripped = self.content.strip().replace("\r", "")
         original = self.original.strip().replace("\r", "")
         self.logger.debug("stripped=%r", stripped)
@@ -81,50 +80,44 @@ function change_file() {{
             self.alerts.append(dict(message=message, type="warning"))
         self.show_form()
 
-    @property
+    @cached_property
     def buttons(self):
         """This form uses a custom action button."""
         return [self.SAVE]
 
-    @property
+    @cached_property
     def content(self):
         """Current content of the configuration file being edited."""
 
-        if not hasattr(self, "_content"):
-            content = self.fields.getvalue("content", self.original)
-            self._content = content.replace("\r", "")
-        return self._content
+        return self.fields.getvalue("content", self.original).replace("\r", "")
 
-    @property
+    @cached_property
     def filename(self):
         """Configuration file currently being edited."""
 
-        if not hasattr(self, "_filename"):
-            self._filename = self.fields.getvalue("filename") or self.FILES[0]
-            if self._filename not in self.FILES:
-                bail()
-        return self._filename
+        filename = self.fields.getvalue("filename") or self.FILES[0]
+        if filename not in self.FILES:
+            self.bail()
+        return filename
 
-    @property
+    @cached_property
     def filepath(self):
         """Where the current configuration file is stored."""
         return r"{}\cdr{}".format(self.DIRECTORY, self.filename)
 
-    @property
+    @cached_property
     def files(self):
         """Value/display pairs for the file picklist."""
         return [(name, f"cdr{name}") for name in self.FILES]
 
-    @property
+    @cached_property
     def original(self):
         """The unedited content for the current configuration file."""
 
-        if not hasattr(self, "_original"):
-            with open(self.filepath, encoding="utf-8", newline="\n") as fp:
-                self._original = fp.read()
-        return self._original
+        with open(self.filepath, encoding="utf-8", newline="\n") as fp:
+            return fp.read()
 
-    @property
+    @cached_property
     def same_window(self):
         """Stay on the same browser tab for this form."""
         return self.buttons

@@ -10,9 +10,9 @@ from lxml import etree
 import json
 import requests
 import cdr
-import cdrcgi
 from cdrapi import db
 from cdrapi.settings import Tier
+from cdrcgi import Controller, FieldStorage
 
 
 class Control:
@@ -25,7 +25,7 @@ class Control:
         """Run the report (top-level entry point)."""
 
         if cdr.isProdHost():
-            cdrcgi.bail("Can't compare the production server to itself")
+            Controller.bail("Can't compare the production server to itself")
         lines = []
         for name in sorted(self.filter_names, key=str.lower):
             if name not in self.local_filters:
@@ -85,7 +85,7 @@ class Control:
         """CGI parameters."""
 
         if not hasattr(self, "_fields"):
-            self._fields = cdrcgi.FieldStorage()
+            self._fields = FieldStorage()
         return self._fields
 
     @property
@@ -119,7 +119,7 @@ class Control:
                 response = requests.get(url)
                 if response.status_code != requests.codes.ok:
                     msg = f"{url}: {response.status_code} ({response.reason})"
-                    cdrcgi.bail(msg)
+                    Controller.bail(msg)
                 self._prod_filters[filt.name] = response.text
             try:
                 with open(self.CACHED_PROD_FILTERS, "w") as fp:

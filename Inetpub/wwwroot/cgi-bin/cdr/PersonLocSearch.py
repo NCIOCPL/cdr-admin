@@ -4,7 +4,7 @@
 """
 
 from cdrapi.docs import Doc
-from cdrcgi import AdvancedSearch, BASE, SESSION
+from cdrcgi import AdvancedSearch
 
 
 class PersonSearch(AdvancedSearch):
@@ -51,14 +51,14 @@ td ul { margin-top: 0; margin-bottom: 0; }
         # Housekeeping before we get into the loop for the search results.
         table = page.body.find(".//table")
         table.set("class", "usa-table usa-table--borderless")
-        session_parm = f"&{SESSION}={self.session.name}"
+        session_parm = f"&{self.SESSION}={self.session.name}"
         filter_parms = dict(repName="dummy", includeHomeAddresses="yes")
 
         # Walk through each row in the results set.
         for i, row in enumerate(self.rows):
             doc = Doc(self.session, id=row[0])
             title = row[1]
-            url = f"{BASE}/QcReport.py?DocId={doc.cdr_id}{session_parm}"
+            url = f"{self.BASE}/QcReport.py?DocId={doc.cdr_id}{session_parm}"
             link = page.B.A(doc.cdr_id, href=url)
 
             # Find addresses for the person.

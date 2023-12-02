@@ -28,7 +28,7 @@ OCECDR-5301: Filter in pdqdocs out of date
 from functools import cached_property
 from lxml import etree, html
 from cdrapi.docs import Doc
-from cdrcgi import Controller, sendPage
+from cdrcgi import Controller
 
 
 class Control(Controller):
@@ -48,7 +48,7 @@ class Control(Controller):
         """Override the base class version, as this isn't a tabular report."""
 
         page = self.transform(self.doc_root, section=self.section)
-        sendPage(html.tostring(page, **self.OPTS))
+        self.send_page(html.tostring(page, **self.OPTS))
 
     @cached_property
     def doc_id(self):

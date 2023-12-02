@@ -5,7 +5,7 @@
 
 from datetime import date
 from functools import cached_property
-from cdrcgi import Controller, Reporter, bail
+from cdrcgi import Controller, Reporter
 from cdr import Board
 from cdrapi import db
 
@@ -87,7 +87,7 @@ function check_board(val) {
         boards = self.fields.getlist("board")
         for board in boards:
             if board != "all" and int(board) not in self.boards:
-                bail()
+                self.bail()
         return boards
 
     @cached_property
@@ -113,7 +113,7 @@ function check_board(val) {
         if not report_type:
             report_type = self.BY_BOARD
         elif report_type not in self.REPORT_TYPES:
-            bail()
+            self.bail()
         return report_type
 
     @cached_property
@@ -165,6 +165,14 @@ function check_board(val) {
             )
             rows.append(row)
         return Reporter.Table(rows, columns=cols, caption=self.caption)
+
+    @cached_property
+    def wide_css(self):
+        """The "by date" flavor needs more room."""
+
+        if self.report_type == self.BY_DATE:
+            return self.Reporter.Table.WIDE_CSS
+        return None
 
 
 class Meeting:

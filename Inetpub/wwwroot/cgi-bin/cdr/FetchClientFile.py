@@ -7,7 +7,6 @@ from cdrcgi import Controller
 from functools import cached_property
 from pathlib import Path
 from sys import stdout
-from cdr import run_command
 
 
 class Control(Controller):
@@ -49,11 +48,6 @@ class Control(Controller):
             stdout.buffer.write(headers.encode("utf-8"))
             if file_bytes:
                 stdout.buffer.write(file_bytes)
-
-    @cached_property
-    def buttons(self):
-        """Customize the action buttons on the banner bar."""
-        return self.SUBMIT, self.DEVMENU, self.ADMINMENU, self.LOG_OUT
 
     @cached_property
     def client_files(self):

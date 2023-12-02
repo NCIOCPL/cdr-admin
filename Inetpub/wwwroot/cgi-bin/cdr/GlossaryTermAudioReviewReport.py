@@ -142,11 +142,11 @@ class Control(Controller):
                 approved += audio_set.approved
                 rejected += audio_set.rejected
                 unreviewed += audio_set.unreviewed
-            row = [
-                Reporter.Cell(approved, center=True),
-                Reporter.Cell(rejected, center=True),
-                Reporter.Cell(unreviewed, center=True),
-            ]
+            row = approved, rejected, unreviewed
+            #    Reporter.Cell(approved, center=True),
+            #    Reporter.Cell(rejected, center=True),
+            #    Reporter.Cell(unreviewed, center=True),
+            #]
             opts = dict(columns=self.STATUSES, caption="Status Totals")
             self._summary_table = Reporter.Table([row], **opts)
         return self._summary_table
@@ -189,8 +189,9 @@ class AudioSet:
                 def row(self):
                     return (
                         self.name,
-                        Reporter.Cell(str(self.date)[:19], center=True),
-                        self.user
+                        #Reporter.Cell(str(self.date)[:19], center=True),
+                        str(self.date)[:19],
+                        self.user,
                     )
             status = self.control.status[0]
             query = self.control.Query("term_audio_mp3 m", *self.FIELDS)

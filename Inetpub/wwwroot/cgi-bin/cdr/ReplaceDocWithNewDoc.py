@@ -167,7 +167,7 @@ class Control(Controller):
                 if doc and doc.lock:
                     doc.check_in()
             except Exception as e:
-                control.logger.exception(f"Failure unlocking {which_doc} doc")
+                self.logger.exception(f"Failure unlocking {which_doc} doc")
                 self.alerts.append(dict(
                     message=f"Failure unlocking {which_doc} doc: {e}",
                     type="error",

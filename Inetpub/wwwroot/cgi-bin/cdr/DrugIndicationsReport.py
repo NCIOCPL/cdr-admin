@@ -5,7 +5,7 @@ This script actually generates four different reports (with one of those
 having two options), based on the parameters chosen at run time.
 """
 
-from cdrcgi import Controller, Reporter, bail
+from cdrcgi import Controller, Reporter
 from cdrapi import db
 
 
@@ -164,7 +164,7 @@ jQuery(function() {
         if not hasattr(self, "_grouping"):
             self._grouping = self.fields.getvalue("grouping")
             if self._grouping not in [g[0] for g in self.GROUPINGS]:
-                bail()
+                self.bail()
         return self._grouping
 
     @property
@@ -180,7 +180,7 @@ jQuery(function() {
             for indication in self._indication:
                 if indication != "all":
                     if indication not in self.all_indications:
-                        bail()
+                        self.bail()
         return self._indication
 
     @property
@@ -244,7 +244,7 @@ jQuery(function() {
         if not hasattr(self, "_type"):
             self._type = self.fields.getvalue("type")
             if self._type not in [t[0] for t in self.TYPES]:
-                bail()
+                self.bail()
         return self._type
 
 

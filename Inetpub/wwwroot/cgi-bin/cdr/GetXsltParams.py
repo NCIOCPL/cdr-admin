@@ -12,6 +12,7 @@
 from lxml import etree
 from lxml.html import builder
 from cdrapi import db
+from cdrcgi import BasicWebPage
 
 TITLE = "Global Filter Parameters"
 
@@ -70,16 +71,9 @@ def main():
     for name in sorted(Parameter.parameters, key=str.lower):
         parm = Parameter.parameters[name]
         parm.add_rows(tbody)
-    page = builder.HTML(
-        builder.HEAD(
-            builder.TITLE(TITLE),
-            builder.LINK(rel="stylesheet", href="/stylesheets/cdr.css"),
-            builder.STYLE("th { text-align: right; vertical-align: top; }")
-        ),
-        builder.BODY(builder.TABLE(caption, tbody), builder.CLASS("report"))
-    )
-    print("Content-type: text/html\n")
-    print(etree.tostring(page, pretty_print=True).decode("ascii"))
+    page = BasicWebPage()
+    page.wrapper.append(builder.TABLE(caption, tbody))
+    page.send()
 
 
 if __name__ == "__main__":

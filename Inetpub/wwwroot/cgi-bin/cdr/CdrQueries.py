@@ -8,7 +8,7 @@ from json import dumps
 import sys
 from lxml.html import tostring
 import lxml.html.builder as B
-from cdrcgi import Controller, Reporter, bail, REQUEST
+from cdrcgi import Controller, Reporter
 from cdrapi import db
 
 
@@ -192,7 +192,7 @@ jQuery(function() {{
         if self.sql:
             rows = self.rows
             if not self.cursor.description:
-                bail("No query results")
+                self.bail("No query results")
             payload = dict(columns=self.cursor.description, rows=rows)
             print("Content-type: application/json\n")
             print(dumps(payload, default=str, indent=2))
@@ -207,7 +207,7 @@ jQuery(function() {{
         B = self.form_page.B
         button_classes = B.CLASS("button usa-button")
         delete_classes = B.CLASS("button usa-button usa-button--secondary")
-        opts = dict(type="submit", name=REQUEST)
+        opts = dict(type="submit", name=self.REQUEST)
         for value in list(self.buttons):
             classes = delete_classes if value == "Delete" else button_classes
             button = B.INPUT(classes, value=value, **opts)
@@ -358,4 +358,4 @@ if __name__ == "__main__":
     try:
         Control().run()
     except Exception as e:
-        bail(f"Failure: {e}")
+        Controller.bail(f"Failure: {e}")

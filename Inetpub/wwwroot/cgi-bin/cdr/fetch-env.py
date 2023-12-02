@@ -1,17 +1,13 @@
 #!/usr/bin/env python
 
-# ----------------------------------------------------------------------
-# Dump the server environment variables as json. Requires permission.
-# ----------------------------------------------------------------------
+"""Dump the server environment variables as json. Requires permission.
+"""
 
-import json
-import os
-import cdr
-import cdrcgi
+from json import dumps
+from os import environ
+from cdrcgi import Controller
 
-fields = cdrcgi.FieldStorage()
-session = cdrcgi.getSession(fields)
-if not session or not cdr.canDo(session, "GET SYS CONFIG"):
-    cdrcgi.bail("go away")
-environ = dict(os.environ)
-print(f"Content-type: application/json\n\n{json.dumps(environ, indent=2)}")
+control = Controller(subtitle="Dump Environment")
+if not control.session.can_do("GET SYS CONFIG"):
+    control.bail("go away")
+control.send_page(dumps(dict(environ), indent=2), mime_type="application/json")

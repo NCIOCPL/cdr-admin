@@ -14,7 +14,7 @@ See https://tracker.nci.nih.gov/browse/OCECDR-5095.
 """
 
 from functools import cached_property
-from cdrcgi import Controller, HTMLPage, bail
+from cdrcgi import Controller
 from cdrapi import db
 from cdrapi.docs import Doc, Link
 from cdr import Board, getDoctype
@@ -147,9 +147,9 @@ class Control(Controller):
             if self.language != "english":
                 columns.append(f"{name} (es)")
         if self.language != "spanish":
-            columns.append(f"Image Link (en)")
+            columns.append("Image Link (en)")
         if self.language != "english":
-            columns.append(f"Image Link (es)")
+            columns.append("Image Link (es)")
         return columns
 
     @cached_property

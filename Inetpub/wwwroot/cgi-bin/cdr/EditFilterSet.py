@@ -5,7 +5,7 @@
 
 from functools import cached_property
 from json import loads
-from cdrcgi import Controller, bail, navigateTo
+from cdrcgi import Controller
 from cdrapi.docs import FilterSet
 
 
@@ -34,7 +34,7 @@ class Control(Controller):
         """Handle our custom actions."""
 
         if not self.session.can_do("MODIFY FILTER SET"):
-            bail("You are not authorized to use this page")
+            self.bail("You are not authorized to use this page")
         try:
             request = self.request or self.fields.getvalue("action")
             if request == self.SAVE:
@@ -42,10 +42,10 @@ class Control(Controller):
             elif self.request == self.DELETE:
                 return self.delete()
             elif self.request == self.SETS:
-                navigateTo(self.EDIT_SETS, self.session.name)
+                self.navigate_to(self.EDIT_SETS, self.session.name)
         except Exception as e:
             self.logger.exception("Failure")
-            bail(str(e))
+            self.bail(str(e))
         Controller.run(self)
 
     def populate_form(self, page):
@@ -118,7 +118,7 @@ class Control(Controller):
             self.alerts.append(dict(message=message, type="success"))
         except Exception as e:
             self.logger.exception("failure saving %s", self.name)
-            bail(str(e))
+            self.bail(str(e))
         self._set = filter_set
         self.show_form()
 
@@ -131,8 +131,8 @@ class Control(Controller):
             filter_set.delete()
         except Exception as e:
             self.logger.exception("failure deleting %s", self.set.name)
-            bail(str(e))
-        navigateTo(self.EDIT_SETS, self.session.name, deleted=name)
+            self.bail(str(e))
+        self.navigate_to(self.EDIT_SETS, self.session.name, deleted=name)
 
     @cached_property
     def buttons(self):

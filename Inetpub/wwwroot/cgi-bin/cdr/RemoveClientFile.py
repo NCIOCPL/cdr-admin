@@ -41,11 +41,6 @@ class Control(Controller):
         self.show_form()
 
     @cached_property
-    def buttons(self):
-        """Customize the action buttons on the banner bar."""
-        return self.SUBMIT, self.DEVMENU, self.ADMINMENU, self.LOG_OUT
-
-    @cached_property
     def client_files(self):
         """Location where the client files are stored."""
 

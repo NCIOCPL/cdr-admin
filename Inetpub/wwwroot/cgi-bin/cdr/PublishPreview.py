@@ -9,7 +9,7 @@ from functools import cached_property
 from json import loads
 from re import search
 from sys import stderr
-from cdrcgi import Controller, DOCID
+from cdrcgi import Controller
 from cdrapi.publishing import DrupalClient
 from cdrapi.docs import Doc
 from cdrapi.users import Session
@@ -87,7 +87,10 @@ class Control(Controller):
     def id(self):
         """CDR ID for the doccument to process."""
 
-        id = self.fields.getvalue(DOCID) if self.opts is None else self.opts.id
+        if self.opts is not None:
+            id = self.opts.id
+        else:
+            id = self.fields.getvalue(self.DOCID)
         if not id:
             self.bail("Required document ID missing")
         try:
@@ -102,7 +105,6 @@ class Control(Controller):
     def monitor(self):
         """If True, print progress to the console."""
         return self.opts.monitor if self.opts is not None else False
-
 
     @cached_property
     def opts(self):
@@ -178,6 +180,7 @@ class Summary:
     """Base class for PDQ summary documents (cancer and drug information)"""
 
     SCRIPT = "PublishPreview.py"
+    DOCID = Controller.DOCID
     IMAGE_PATH = "/pdq/media/images"
     IMAGE_PATTERN = "pdq/media/images/([0-9-]+)\\.jpg"
     NCI_LOGO = "files/ncids_header/logos/Logo_NCI\\.svg"
@@ -324,10 +327,10 @@ class Summary:
                                 fixed = f"#{frag}"
                                 link_type = "SummaryFragRef-internal+uri"
                             else:
-                                fixed = f"{script}?{DOCID}={id:d}#{frag}"
+                                fixed = f"{script}?{self.DOCID}={id:d}#{frag}"
                                 link_type = "SummaryFragRef-external"
                         else:
-                            fixed = f"{script}?{DOCID}={id:d}"
+                            fixed = f"{script}?{self.DOCID}={id:d}"
                             link_type = "SummaryRef-external"
                     else:
                         fixed = f"{self.CANCER_GOV}{href}"
@@ -1107,7 +1110,7 @@ class GTN:
                     return self.node.get("xref", "")
                 if "Glossary" in self.node.tag:
                     href = self.node.get("href", "")
-                    return f"PublishPreview.py?{DOCID}={href}"
+                    return f"PublishPreview.py?{Controller.DOCID}={href}"
                 url = self.node.get("url", "")
                 return f"https://www.cancer.gov{url}"
 

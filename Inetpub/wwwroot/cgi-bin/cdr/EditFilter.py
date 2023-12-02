@@ -4,7 +4,7 @@
 """
 
 from cdrapi.docs import Doc
-from cdrcgi import Controller, navigateTo, DOCID
+from cdrcgi import Controller
 from difflib import Differ
 from lxml import etree
 from requests import post
@@ -42,7 +42,7 @@ class Control(Controller):
         """Override the base class version, as this isn't a standard report."""
 
         if not self.doc or self.request == self.FILTERS:
-            navigateTo("EditFilters.py", self.session.name)
+            self.navigate_to("EditFilters.py", self.session.name)
         elif not self.request or self.request in (self.VIEW, self.COMPARE):
             self.show_form()
         else:
@@ -55,7 +55,7 @@ class Control(Controller):
             page - HTMLPage object on which the form and filter are placed
         """
 
-        page.form.append(page.hidden_field(DOCID, self.doc.id))
+        page.form.append(page.hidden_field(self.DOCID, self.doc.id))
         fieldset = page.fieldset("Select Stage For Filter Comparison")
         for tier in self.TIERS:
             if tier != self.session.tier.name:
@@ -153,7 +153,7 @@ class Control(Controller):
         """`Doc` object for filter to display or compare."""
 
         if not hasattr(self, "_doc"):
-            id = self.fields.getvalue(DOCID)
+            id = self.fields.getvalue(self.DOCID)
             if not id:
                 self.bail()
             self._doc = Doc(self.session, id=id)

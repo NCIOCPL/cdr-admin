@@ -167,7 +167,7 @@ class Control(Controller):
                 page.form.append(fieldset)
                 message = "Unable to widen the form."
                 header = "Internal error"
-                a;ert = dict(header=header, message=message, type="warning")
+                alert = dict(header=header, message=message, type="warning")
                 self.alerts.append(alert)
             page.form.append(page.button(self.SAVE))
             page.form.append(self.audio_set.table)

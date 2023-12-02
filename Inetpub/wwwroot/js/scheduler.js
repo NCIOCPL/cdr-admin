@@ -67,6 +67,9 @@ function remove_option(id) {
     jQuery.each(blocks, function(i, block) {
         add_option_block(i + 1, block["name"], block["value"]);
     });
+    if (blocks.length === 0) {
+        add_option_block();
+    }
     add_buttons();
 }
 

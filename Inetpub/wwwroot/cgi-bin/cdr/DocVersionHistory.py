@@ -10,7 +10,7 @@ information about the selected document's versions and display it.
 from collections import defaultdict
 from functools import cached_property
 from cdrapi.docs import Doc
-from cdrcgi import Controller, DOCID
+from cdrcgi import Controller
 
 
 class Control(Controller):
@@ -53,12 +53,12 @@ class Control(Controller):
                     checked=checked,
                     tooltip=tooltip,
                 )
-                fieldset.append(page.radio_button(DOCID, **opts))
+                fieldset.append(page.radio_button(self.DOCID, **opts))
                 checked = False
             page.form.append(fieldset)
         else:
             fieldset = page.fieldset("Specify Document ID or Title")
-            fieldset.append(page.text_field(DOCID, label="Doc ID"))
+            fieldset.append(page.text_field(self.DOCID, label="Doc ID"))
             fieldset.append(page.text_field("DocTitle", label="Doc Title"))
             page.form.append(fieldset)
 
@@ -75,7 +75,7 @@ class Control(Controller):
     def doc_id(self):
         """Integer for CDR ID of selected document."""
 
-        doc_id = self.fields.getvalue(DOCID)
+        doc_id = self.fields.getvalue(self.DOCID)
         if doc_id:
             try:
                 return Doc.extract_id(doc_id)

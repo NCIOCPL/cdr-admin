@@ -38,7 +38,7 @@ from functools import cached_property
 from importlib import import_module
 from json import loads, dumps
 from cdrapi import db
-from cdrcgi import Controller, navigateTo
+from cdrcgi import Controller
 from cdr import ordinal
 from sys import path
 
@@ -179,7 +179,7 @@ class Control(Controller):
             elif self.request == self.RUN:
                 self.run_job()
             elif self.request == self.JOBS:
-                navigateTo(self.script, self.session.name)
+                self.navigate_to(self.script, self.session.name)
             elif self.request == self.JSON:
                 self.json()
             else:
@@ -510,7 +510,6 @@ class Job:
     def formatted_schedule(self):
         """User-friendly display of the job's schedule values."""
 
-        schedule = ""
         if len(self.schedule) == 1 and "minute" in self.schedule:
             minutes = str(self.schedule["minute"])
             if minutes.startswith("*/"):

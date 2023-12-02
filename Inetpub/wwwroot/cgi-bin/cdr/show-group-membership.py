@@ -146,7 +146,6 @@ th { white-space: nowrap; }
             """Sequence of values for the report's table."""
 
             Cell = self.control.Reporter.Cell
-            opts = dict(bold=True)
             row = [Cell(self.name, bold=True)]
             for user in self.control.users:
                 if user.id in self.members:

@@ -435,7 +435,7 @@ class AudioFile:
         media_id = self.__cell(self.MEDIA_ID)
         return int(media_id) if media_id else media_id
 
-    @cached.property
+    @cached_property
     def name(self):
         """String for the glossary term name being pronounced."""
 

@@ -57,7 +57,7 @@ class Control(Controller):
         """Handle the request and loop back to the form."""
 
         if not self.old:
-            message = f"The From field is required."
+            message = "The From field is required."
             self.alerts.append(dict(message=message, type="error"))
         else:
             old = Path(self.old)
@@ -65,7 +65,7 @@ class Control(Controller):
                 message = f"Path {old} not found"
                 self.alerts.append(dict(message=message, type="error"))
         if not self.new:
-            message = f"The To field is required."
+            message = "The To field is required."
             self.alerts.append(dict(message=message, type="error"))
         else:
             new = Path(self.new)

@@ -70,23 +70,6 @@ class Control(Controller):
         self.add_language_fieldset(page)
         self.add_audience_fieldset(page)
 
-    def show_report(self):
-        """Override base class to add second header row and custom CSS."""
-
-        page = self.report.page
-        table = page.form.find("table")
-        thead = table.find("thead")
-        tr = page.B.TR(
-            page.B.TH("Glossary Term Concept", colspan="3"),
-            page.B.TH("Glossary Term Name", colspan="3")
-        )
-        thead.insert(0, tr)
-        sibling = page.form.getparent()
-        sibling.addnext(table)
-        page.add_css(self.report_css)
-        page.add_css(self.wide_css)
-        self.report.send()
-
     @cached_property
     def audience(self):
         """Audience selected for the report."""
@@ -141,6 +124,21 @@ class Control(Controller):
         if language not in self.LANGUAGES:
             self.bail()
         return language
+
+    @cached_property
+    def report(self):
+        """Inject spanned header cells."""
+
+        report = super().report
+        thead = report.page.main.find(".//thead")
+        if thead is not None:
+            B = self.HTMLPage.B
+            tr = B.TR(
+                B.TH("Glossary Term Concept", colspan="3"),
+                B.TH("Glossary Term Name", colspan="3")
+            )
+            thead.insert(0, tr)
+        return report
 
     @cached_property
     def report_css(self):
@@ -204,13 +202,18 @@ class GlossaryTermDocument:
     @cached_property
     def doc(self):
         """`Doc` object for this CDR GlossaryConceptName document."""
-        return Doc(self.control, id=self.id) if self.id else None
+
+        doc = Doc(self.control, id=self.id) if self.id else None
+        if doc and not doc.root:
+            message = f"CDR{self.id} has no parsed XML."
+            self.control.alerts.append(dict(message=message, type="warning"))
+        return doc
 
     @cached_property
     def status(self):
         """First processing status found for the document."""
 
-        if self.doc:
+        if self.doc and self.doc.root:
             for node in self.doc.root.findall(self.STATUS_PATH):
                 status = Doc.get_text(node, "").strip()
                 if status:
@@ -238,7 +241,7 @@ class Concept(GlossaryTermDocument):
     def comment(self):
         """Comment for the definition for the selected language/audience."""
 
-        if self.doc:
+        if self.doc and self.doc.root:
             control = self.__control
             tag = "TermDefinition"
             if control.language != "English":
@@ -312,6 +315,8 @@ class Name(GlossaryTermDocument):
     def comment(self):
         """First comment found for the report's selected language."""
 
+        if not self.doc or not self.doc.root:
+            return None
         path = "TermName/Comment"
         if self.control.language != "English":
             path = "TranslatedName/Comment"
@@ -328,6 +333,8 @@ class Name(GlossaryTermDocument):
         use it. Otherwise find it using the query_term table.
         """
 
+        if not self.doc:
+            return None
         if self.__concept_id is not None:
             return self.__concept_id
         query = self.control.Query("query_term", "int_val")
@@ -365,6 +372,8 @@ class Name(GlossaryTermDocument):
     def english_name(self):
         """String for the only English name in this document."""
 
+        if not self.doc or not self.doc.root:
+            return "[NO NAME]"
         node = self.doc.root.find("TermName/TermNameString")
         return Doc.get_text(node, "").strip() or "[NO NAME]"
 
@@ -372,6 +381,8 @@ class Name(GlossaryTermDocument):
     def spanish_names(self):
         """At most one primary and other optional alternate Spanish names."""
 
+        if not self.doc or not self.doc.root:
+            return []
         spanish_names = []
         for node in self.doc.root.findall("TranslatedName"):
             spanish_name = SpanishNameString(self.control, node)

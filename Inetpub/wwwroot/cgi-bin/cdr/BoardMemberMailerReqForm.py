@@ -5,7 +5,7 @@
 
 from json import dumps, loads
 from cdr import getControlValue
-from cdrcgi import Controller, navigateTo
+from cdrcgi import Controller
 from cdrapi.docs import Doc
 from cdrapi.publishing import Job
 
@@ -16,7 +16,6 @@ class Control(Controller):
     LOGNAME = "mailer"
     SUBTITLE = "PDQ Board Member Correspondence Mailers"
     SYSTEM = "Mailers"
-    SUBMENU = "Mailers"
     SUBSYSTEM = "PDQ Board Member Correspondence Mailer"
     LETTERS = "board-member-letters"
     STATUS_PAGE = "Status Page"
@@ -67,15 +66,8 @@ class Control(Controller):
         except Exception as e:
             self.logger.exception("Mailer creation failed")
             self.bail(str(e))
-        buttons = (
-            self.HTMLPage.button("Status Page", onclick="show_status()"),
-            self.HTMLPage.button(self.SUBMENU),
-            self.HTMLPage.button(self.ADMINMENU),
-            self.HTMLPage.button(self.LOG_OUT),
-        )
         opts = dict(
             action=self.script,
-            buttons=buttons,
             subtitle=self.subtitle,
             session=self.session,
         )

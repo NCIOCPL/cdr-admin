@@ -5,7 +5,7 @@
 
 from datetime import timedelta
 from functools import cached_property
-from lxml import etree, html
+from lxml import etree
 from cdrcgi import Controller, Reporter, BasicWebPage
 from cdrapi.docs import Doc
 
@@ -606,16 +606,6 @@ class NameDoc:
         else:
             name_key = self.spanish[0].sort_key
         return name_key, self.doc.id if self.doc else 0
-
-    @cached_property
-    def english(self):
-        """`Name` object for the document's English name."""
-
-        if self.doc:
-            node = self.doc.root.find("TermName")
-            if node is not None:
-                return EnglishName(self, node)
-        return EnglishName(self)
 
     @cached_property
     def spanish(self):

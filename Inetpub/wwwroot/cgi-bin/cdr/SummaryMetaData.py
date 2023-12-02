@@ -246,7 +246,7 @@ class Control(Controller):
                         message = f"CDR{doc.id} is a {doc.doctype} document."
                         self.alerts.append(dict(essage=message, type="warning"))
                         return False
-                except Exception as e:
+                except Exception:
                     message = f"Unable to find document {self.doc_id}."
                     self.logger.exception(message)
                     self.alerts.append(dict(message=message, type="error"))

@@ -32,8 +32,6 @@ class Control(Controller):
     SORT_VALS = [s[0] for s in SORT]
     SUMMARY = "Summary"
     GLOSSARY = "Glossary"
-    REPORTS_MENU = SUBMENU = "Reports"
-    ADMINMENU = "Admin"
     TYPES = (
         ("current", "Current Jobs", True),
         ("history", "Job History", False),

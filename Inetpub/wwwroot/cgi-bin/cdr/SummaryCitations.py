@@ -115,7 +115,7 @@ class Control(Controller):
                     self.alerts.append(dict(message=message, type="warning"))
                     self.id = None
                     return None
-            except Exception as e:
+            except Exception:
                 self.logger.exception("checking doctype")
                 message = f"Document {self.id} was not found."
                 self.alerts.append(dict(message=message, type="warning"))
@@ -133,8 +133,8 @@ class Control(Controller):
                 message = f"No summaries match {self.title_fragment!r}."
                 self.alerts.append(dict(message=message, type="warning"))
             else:
-                message = "No summary selected."
-                self.alerts.append(dict(message=message, type="error"))
+                message = f"Multiple summaries match {self.title_fragment!r}."
+                self.alerts.append(dict(message=message, type="info"))
         return None
 
     @cached_property
@@ -241,7 +241,7 @@ class Summary:
                     try:
                         id = Doc.extract_id(cdr_ref)
                     except Exception:
-                        self.control.bail("bad module link %s", cdr_ref)
+                        self.control.bail(f"bad module link {cdr_ref}")
                     if id not in self.control.parsed:
                         summary = Summary(self.control, id)
                         for key in summary.citations:

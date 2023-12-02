@@ -6,7 +6,7 @@
 from functools import cached_property
 from lxml import etree
 from cdrapi.docs import Doc, FilterSet
-from cdrcgi import Controller, DOCID
+from cdrcgi import Controller
 from cdr import DEFAULT_DTD, PDQDTDPATH, expandFilterSets, getFilterSet
 
 
@@ -67,7 +67,6 @@ class Control(Controller):
             page.B.CLASS("filter-button")
         )
         legend.append(add_button)
-        default_filter = "name:Passthrough Filter"
         opts = dict(
             value="name:Passthrough Filter",
             widget_id="filter-1",
@@ -286,7 +285,7 @@ class Control(Controller):
     def doc(self):
         """`Doc` object for the CDR document to be filtered."""
 
-        id = self.fields.getvalue(DOCID)
+        id = self.fields.getvalue(self.DOCID)
         if not id:
             return None
         try:
@@ -686,7 +685,7 @@ class ResolvedFilterSet:
         control = self.__control
         B = control.HTMLPage.B
         params = {
-            DOCID: control.doc.cdr_id,
+            self.DOCID: control.doc.cdr_id,
             "DocVer": control.doc.version,
             "filter": self.filter_ids,
         }
@@ -695,15 +694,10 @@ class ResolvedFilterSet:
         filter_url = control.make_url(control.script, **params)
         params["validate"] = "Y"
         validate_url = control.make_url(control.script, **params)
-        button_classes = "usa-button margin-top-0"
-        button_attrs = {"class": "usa-button", "style": "margin-top: 0"}
         buttons = B.SPAN(
-            #B.A(B.BUTTON("Filter", button_attrs), href=filter_url),
-            #B.A(B.BUTTON("Validate", button_attrs), href=validate_url),
             B.A("Filter", B.CLASS("usa-button"), href=filter_url),
             B.A("Validate", B.CLASS("usa-button"), href=validate_url),
             B.CLASS("action-buttons"),
-            #style="text-wrap: nowrap"
         )
         members = [f"{m.id}:{m.name}" for m in self.__set.members]
         return self.name, buttons, members

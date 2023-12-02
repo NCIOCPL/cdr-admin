@@ -119,7 +119,7 @@ class Control(Controller):
         columns = []
         for header, width in column_values:
             opts = dict(width=f"{width}px") if width else {}
-            columns.append(self.Reporter.Column(label, **opts))
+            columns.append(self.Reporter.Column(header, **opts))
         return columns
 
     @cached_property
@@ -248,7 +248,7 @@ class Control(Controller):
             self.bail()
         return type
 
-    @property
+    @cached_property
     def wide_css(self):
         """Override so we can widen the report table."""
         return self.Reporter.Table.WIDE_CSS

@@ -31,7 +31,7 @@ class Control(Controller):
             path = Path(self.session.tier.etc) / "menus.json"
             with path.open(encoding="utf-8") as fp:
                 json = fp.read()
-        except Exception as e:
+        except Exception:
             self.logger.exception(f"Failed loading {path}")
             self.bail("Failed loading %s", path)
         if self.fields.getvalue("raw"):

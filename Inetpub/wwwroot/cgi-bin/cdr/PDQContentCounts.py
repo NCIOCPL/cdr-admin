@@ -10,7 +10,6 @@ from io import BytesIO
 from openpyxl import load_workbook
 from requests import get
 from cdrcgi import Controller
-from cdrapi import db
 
 class Control(Controller):
 
@@ -42,7 +41,6 @@ class Control(Controller):
         fieldset.append(page.B.P(self.INSTRUCTIONS))
         page.form.append(fieldset)
         page.add_output_options()
-        #page.add_css(self.CSS)
 
     def build_tables(self):
         """Wrap the table in a sequence."""

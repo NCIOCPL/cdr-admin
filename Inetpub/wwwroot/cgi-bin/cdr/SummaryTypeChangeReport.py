@@ -53,6 +53,7 @@ class Control(Controller):
         for table in self.tables:
             report.wrapper.append(table.node)
         report.wrapper.append(self.footer)
+        report.head.append(report.B.STYLE("table { margin-bottom: 3rem; }"))
         report.send()
 
     def populate_form(self, page):
@@ -102,7 +103,8 @@ class Control(Controller):
         opts = dict(value=self.end, label="End Date")
         fieldset.append(page.date_field("end", **opts))
         page.form.append(fieldset)
-        fieldset = page.fieldset("Report Organization")
+        fieldset = page.fieldset("Report Organization", id="rep-org")
+        fieldset.set("class", "history usa-fieldset")
         for organization in self.REPORT_ORGANIZATIONS:
             checked = organization == self.organization
             opts = dict(value=organization, checked=checked)
@@ -203,7 +205,6 @@ $(function() {
     def change_type_tables(self):
         """Report each type of change in its own table."""
 
-        opts = {"html_callback_pre": Control.table_spacer}
         tables = []
         title = "Type of Change Report"
         range = self.date_range
@@ -415,7 +416,7 @@ $(function() {
             case "id":
                 return [Summary(self, id) for id in self.cdr_ids]
             case "title":
-                return [Summary(self, titles[0].id)]
+                return [Summary(self, self.titles[0].id)]
             case _:
                 self.bail()
 
@@ -463,14 +464,6 @@ $(function() {
         if type not in self.REPORT_TYPES:
             self.bail()
         return type
-
-    @staticmethod
-    def table_spacer(table, page):
-        """
-        Put some space before the table.
-        """
-
-        page.add_css("table { margin-top: 25px; }")
 
 
 class Summary:
@@ -581,6 +574,8 @@ class Summary:
         return [c for c in self.changes if c.in_scope(change_type)]
 
     def __get_single_row(self):
+        """For the "current" report, put the latest changes in one row."""
+
         change_types = dict([(ct, None) for ct in self.control.change_types])
         for change in self.changes:
             args = self.id, change

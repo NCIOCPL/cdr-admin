@@ -4,7 +4,7 @@
 """
 
 from functools import cached_property
-from cdrcgi import Controller, navigateTo, REQUEST
+from cdrcgi import Controller
 
 
 class Control(Controller):
@@ -41,9 +41,9 @@ class Control(Controller):
 
         if self.request == self.ADD_NEW_LINK_TYPE:
             opts = dict(linkact="addlink")
-            navigateTo(self.EDIT_LINK_TYPE, self.session.name, **opts)
+            self.navigate_to(self.EDIT_LINK_TYPE, self.session.name, **opts)
         elif self.request == self.SHOW_ALL:
-            navigateTo(self.SHOW_ALL_LINK_TYPES, self.session.name)
+            self.navigate_to(self.SHOW_ALL_LINK_TYPES, self.session.name)
         else:
             Controller.run(self)
 
@@ -53,7 +53,7 @@ class Control(Controller):
         self.populate_form(self.form_page)
         B = self.form_page.B
         classes = B.CLASS("button usa-button")
-        opts = dict(type="submit", name=REQUEST)
+        opts = dict(type="submit", name=self.REQUEST)
         for button in self.buttons:
             button = B.INPUT(classes, value=button, **opts)
             self.form_page.form.append(button)

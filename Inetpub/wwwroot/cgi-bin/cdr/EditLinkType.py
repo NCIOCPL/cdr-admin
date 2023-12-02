@@ -4,7 +4,7 @@
 """
 
 from functools import cached_property
-from cdrcgi import Controller, navigateTo
+from cdrcgi import Controller
 from cdrapi.docs import Doctype, LinkType
 from lxml import html
 
@@ -24,7 +24,6 @@ class Control(Controller):
         ("V", "Any version"),
         ("C", "Current working document")
     )
-    CSS = "/stylesheets/EditLinkType.css"
     JS = "/js/EditLinkType.js"
 
     def delete(self):
@@ -304,7 +303,6 @@ class Control(Controller):
         js = f"var templates = {{'e': `{e_template}`, 'r': `{r_template}`}};"
         page.add_script(js)
         page.head.append(page.B.SCRIPT(src=self.JS))
-        # page.head.append(page.B.LINK(href=self.CSS, rel="stylesheet"))
         page.add_css("""\
 .image-button { margin-left: .5rem; }
 #target-block ul { column-width: 13rem; list-style-type: none; }

@@ -4,7 +4,7 @@
 """
 
 from cdrapi.docs import Doc
-from cdrcgi import Controller, sendPage
+from cdrcgi import Controller
 from lxml import etree
 
 
@@ -40,7 +40,7 @@ class Control(Controller):
         else:
             node = self.node
         opts = dict(encoding="unicode", pretty_print=True)
-        sendPage(etree.tostring(node, **opts), "xml")
+        self.send_page(etree.tostring(node, **opts), text_type="xml")
 
     @property
     def board(self):

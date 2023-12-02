@@ -100,7 +100,6 @@ class Control(Controller):
                 job_id = str(republisher.republish(*args))
 
                 # Tell the user that the job has been queued.
-                display = f"Export job {job_id}"
                 page = self.form_page
                 link = page.menu_link("PubStatus.py", job_id, id=job_id)
                 link.set("target", "_blank")

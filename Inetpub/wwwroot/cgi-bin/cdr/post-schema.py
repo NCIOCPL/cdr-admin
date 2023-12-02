@@ -58,11 +58,6 @@ class Control(Controller):
         """Are we replacing an existing schema or adding a new one?"""
         return self.fields.getvalue("action")
 
-    #@property
-    #def buttons(self):
-    #    """Customize the action buttons on the banner bar."""
-    #    return self.SUBMIT, self.DEVMENU, self.ADMINMENU, self.LOG_OUT
-
     @property
     def comment(self):
         """Override the default comment as appropriate."""

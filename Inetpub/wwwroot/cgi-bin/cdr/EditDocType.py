@@ -4,7 +4,7 @@
 """
 
 from functools import cached_property
-from cdrcgi import Controller, navigateTo, bail
+from cdrcgi import Controller
 from cdrapi import db
 from cdrapi.docs import Doc, Doctype
 
@@ -101,7 +101,7 @@ class Control(Controller):
         """Go back to the menu listing all the CDR document types."""
 
         opts = dict(deleted=deleted) if deleted else dict(returned="true")
-        navigateTo(self.EDIT_DOCTYPES, self.session.name, **opts)
+        self.navigate_to(self.EDIT_DOCTYPES, self.session.name, **opts)
 
     def run(self):
         """Override base class so we can handle the extra buttons."""
@@ -114,14 +114,14 @@ class Control(Controller):
             elif self.request == self.DOCTYPE_MENU:
                 return self.return_to_doctypes_menu()
         except Exception as e:
-            bail(f"Failure: {e}")
+            self.bail(f"Failure: {e}")
         Controller.run(self)
 
     def save(self):
         """Save the new or modified document type object."""
 
         if not self.name:
-            bail("Required name is missing")
+            self.bail("Required name is missing")
         opts = dict(
             active=self.active,
             comment=self.comment,

@@ -5,8 +5,6 @@
 
 from functools import cached_property
 from cdrcgi import Controller, Reporter, Excel
-from cdrapi.docs import Doc
-from cdrapi.settings import Tier
 from cdrbatch import CdrBatch
 from CdrLongReports import CitationsInSummaries
 

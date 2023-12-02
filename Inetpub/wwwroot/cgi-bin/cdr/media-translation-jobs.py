@@ -6,7 +6,7 @@ https://tracker.nci.nih.gov/browse/OCECDR-4489
 """
 
 from functools import cached_property
-from cdrcgi import Controller, navigateTo
+from cdrcgi import Controller
 
 
 class Control(Controller):
@@ -50,11 +50,11 @@ class Control(Controller):
         if not self.session.can_do("MANAGE TRANSLATION QUEUE"):
             self.bail("not authorized")
         if self.request == self.ADD:
-            navigateTo("media-translation-job.py", self.session.name)
+            self.navigate_to("media-translation-job.py", self.session.name)
         elif self.request == self.SUMMARY:
-            navigateTo("translation-jobs.py", self.session.name)
+            self.navigate_to("translation-jobs.py", self.session.name)
         elif self.request == self.GLOSSARY:
-            navigateTo("glossary-translation-jobs.py", self.session.name)
+            self.navigate_to("glossary-translation-jobs.py", self.session.name)
         elif self.request == self.PURGE:
             if not self.session.can_do("PRUNE TRANSLATION QUEUE"):
                 self.bail("not authorized")

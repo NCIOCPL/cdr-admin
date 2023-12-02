@@ -22,7 +22,9 @@ class Control(Controller):
         """Assemble the report."""
 
         if not self.terms:
-            self.bail("No search terms specified")
+            message = "At least one search term is required."
+            self.alerts.append(dict(message=message, type="warning"))
+            return self.show_form()
         return self.Reporter.Table(self.rows, columns=self.columns)
 
     def populate_form(self, page):
@@ -127,7 +129,7 @@ function add_term_field() {
 
         phrases = [GlossaryDoc.normalize(phrase) for phrase in self.terms]
         expressions = []
-        for phrase in sorted(phrases, key=len, reverse=True)
+        for phrase in sorted(phrases, key=len, reverse=True):
             expressions.append(phrase
                                .replace("\\", r"\\")
                                .replace("+",  r"\+")
@@ -165,6 +167,11 @@ function add_term_field() {
                 if term:
                     self._terms.append(term)
         return self._terms
+
+    @cached_property
+    def wide_css(self):
+        """Use the entire browser page width for the report table."""
+        return self.Reporter.Table.WIDE_CSS
 
 
 class GlossaryDoc:

@@ -239,7 +239,6 @@ h1 { text-align: center; font-size: 1.3em; }
 
                 # Show the description(s) if requested.
                 if "description" in self.display:
-                    path = ".//ContentDescription"
                     for node in media.doc.root.findall(".//ContentDescription"):
                         if node.get("audience") == audience:
                             wrapper.append(B.H3("Description"))
@@ -255,6 +254,11 @@ h1 { text-align: center; font-size: 1.3em; }
 
         # Ready for display.
         return report
+
+    @cached_property
+    def same_window(self):
+        """Don't open more than one new browser tab."""
+        return [self.SUBMIT] if self.request else []
 
     @cached_property
     def show_both_languages(self):
@@ -344,6 +348,13 @@ class Summary:
                     ids.append(Doc.extract_id(value))
                 except Exception:
                     self.control.logger.exception("Invalid ID %s", value)
+                    message = f"Invalid media link {value!r} found."
+                    alert = dict(message=message, type="warning")
+                    self.control.alerts.append(alert)
+        if not ids:
+            message = f"No valid media links found in CDR{self.id}."
+            self.control.alerts.append(dict(message=message, type="warning"))
+            self.control.show_form()
         return ids
 
     @cached_property
@@ -351,7 +362,7 @@ class Summary:
         """Media documents selected for the report."""
 
         if not self.media_link_ids:
-            message = "Summary selected does not contain images"
+            message = "Summary selected does not contain images."
             self.control.bail(f"ERROR: {message}")
         return [Media(self.control, id) for id in self.media_link_ids]
 

@@ -6,7 +6,8 @@ This gets around the length limitation on parameters in a GET URL.
 """
 
 from functools import cached_property
-from cdrcgi import Controller, sendPage, DOCID
+from json import loads
+from cdrcgi import Controller
 from cdrapi.docs import Doc
 from cdr import FILTERS
 
@@ -22,7 +23,7 @@ class Control(Controller):
             args = self.doc.cdr_id, self.filters, self.parms
             self.logger.info("%s filtered by %s with parms %s", *args)
             result = self.doc.filter(*self.filters, parms=self.parms)
-            sendPage(str(result.result_tree))
+            self.send_page(str(result.result_tree))
         except Exception as e:
             self.logger.exception("Report failure")
             self.bail(e)
@@ -31,7 +32,7 @@ class Control(Controller):
     def doc(self):
         """Document to be filtered and displayed."""
 
-        id = self.fields.getvalue(DOCID)
+        id = self.fields.getvalue(self.DOCID)
         if not id:
             self.bail("Missing document ID")
         version = self.fields.getvalue("DocVersion")
@@ -68,7 +69,7 @@ class Control(Controller):
         query = self.Query("url_parm_set", "longURL")
         query.where(query.Condition("id", id))
         rows = query.execute(self.cursor).fetchall()
-        return dict(eval(rows[0].longURL))
+        return dict(loads(rows[0].longURL))
 
 
 if __name__ == "__main__":

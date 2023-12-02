@@ -163,7 +163,6 @@ class Control(Controller):
     def report(self):
         """Add buttons and alerts as appropriate."""
 
-        tables = self.build_tables()
         opts = dict(
             control=self,
             footer=self.footer,
@@ -180,7 +179,6 @@ class Control(Controller):
             report.page.add_alert(self.alert, type="success")
         if self.show_summary:
             report.page.form.insert(0, report.page.button(self.DETAILS))
-            css = "#primary-form .usa-button { margin: 1rem 0; }"
             report.page.add_css(self.CSS)
         report.page.form.append(report.page.hidden_field("id", self.id))
         return report

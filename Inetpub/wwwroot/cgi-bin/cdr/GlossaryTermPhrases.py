@@ -196,7 +196,7 @@ class Control(Controller):
                 names.append((id, f"CDR{id:010d}: {title}"))
             if not names:
                 self.alerts.append(dict(
-                    message=f"No names found starging with {fragment!r}.",
+                    message=f"No names found starging with {self.name!r}.",
                     type="warning",
                 ))
         return names

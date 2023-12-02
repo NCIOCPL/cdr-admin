@@ -139,7 +139,7 @@ class Control(Controller):
             return None
         boards = []
         values = self.fields.getlist("board")
-        if "all" not in values:
+        if "all" in values:
             return []
         for id in values:
             if not id.isdigit():
@@ -468,7 +468,12 @@ class Control(Controller):
         return method
 
     @cached_property
-    def wide_css(self):
+    def use_basic_web_page(self):
+        """Use the sinpler layout for the report."""
+        return True
+
+    @cached_property
+    def xxxwide_css(self):
         """The report needs more horizontal space."""
         return self.Reporter.Table.WIDE_CSS
 

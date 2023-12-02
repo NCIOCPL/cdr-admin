@@ -71,7 +71,7 @@ class Control(Controller):
 
         value = self.fields.getvalue(self.FIELD_NAME)
         if value:
-            return True if value == "True" else False
+            return "long" if value == "True" else "short"
         return self.fields.getvalue("flavor")
 
     @property

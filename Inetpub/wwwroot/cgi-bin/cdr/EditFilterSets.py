@@ -4,7 +4,7 @@
 """
 
 from functools import cached_property
-from cdrcgi import Controller, navigateTo
+from cdrcgi import Controller
 from cdrapi.docs import FilterSet
 
 
@@ -45,11 +45,11 @@ class Control(Controller):
         """Override base class to add action for new button."""
 
         if self.request == self.ADD:
-            navigateTo(self.EDIT_FILTER_SET, self.session.name)
+            self.navigate_to(self.EDIT_FILTER_SET, self.session.name)
         elif self.request == self.DEEP:
-            navigateTo(self.SHOW_SETS, self.session.name)
+            self.navigate_to(self.SHOW_SETS, self.session.name)
         elif self.request == self.REPORT:
-            navigateTo(self.SHOW_SETS, self.session.name, depth="shallow")
+            self.navigate_to(self.SHOW_SETS, self.session.name, depth="shallow")
         else:
             Controller.run(self)
 

@@ -9,7 +9,7 @@ clearing out jobs which have run the complete processing course.
 """
 
 from functools import cached_property
-from cdrcgi import Controller, navigateTo
+from cdrcgi import Controller
 
 
 class Control(Controller):
@@ -47,11 +47,11 @@ class Control(Controller):
         if not self.session.can_do("MANAGE TRANSLATION QUEUE"):
             self.bail("not authorized")
         if self.request == self.ADD:
-            navigateTo("translation-job.py", self.session.name)
+            self.navigate_to("translation-job.py", self.session.name)
         elif self.request == self.GLOSSARY:
-            navigateTo("glossary-translation-jobs.py", self.session.name)
+            self.navigate_to("glossary-translation-jobs.py", self.session.name)
         elif self.request == self.MEDIA:
-            navigateTo("media-translation-jobs.py", self.session.name)
+            self.navigate_to("media-translation-jobs.py", self.session.name)
         if self.request == self.PURGE:
             if not self.session.can_do("PRUNE TRANSLATION QUEUE"):
                 self.bail("not authorized")

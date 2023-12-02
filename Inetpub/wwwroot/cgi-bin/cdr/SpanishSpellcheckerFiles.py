@@ -7,7 +7,6 @@
 
 import sys
 from cdrcgi import Controller
-from functools import cached_property
 from pathlib import Path
 from CreateDictionary import CreateDictionary
 
@@ -74,12 +73,6 @@ Content-length: {len(dict_bytes)}
 """.encode("utf-8"))
         sys.stdout.buffer.write(dict_bytes)
         sys.exit(0)
-
-
-    @cached_property
-    def buttons(self):
-        """Customize the action buttons on the banner bar."""
-        return self.SUBMIT, self.REPORTS_MENU, self.ADMINMENU, self.LOG_OUT
 
 
 if __name__ == "__main__":

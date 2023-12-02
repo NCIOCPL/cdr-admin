@@ -4,7 +4,7 @@
 """
 
 from functools import cached_property
-from cdrcgi import Controller, navigateTo
+from cdrcgi import Controller
 from cdr import PDQDTDPATH, PUBTYPES
 from cdrapi import db
 from cdrapi.docs import Doc
@@ -167,16 +167,7 @@ class Control(Controller):
             ))
             self.show_form()
             details = self.HTMLPage.B.P(str(e), self.HTMLPage.B.CLASS("error"))
-        buttons = (
-            self.HTMLPage.button(self.DEVMENU),
-            self.HTMLPage.button(self.ADMINMENU),
-            self.HTMLPage.button(self.LOG_OUT),
-        )
-        opts = dict(
-            buttons=buttons,
-            subtitle=self.subset.name,
-        )
-        page = self.HTMLPage(self.TITLE, **opts)
+        page = self.HTMLPage(self.TITLE, subtitle=self.subset.name)
         fieldset = page.fieldset(legend)
         fieldset.append(details)
         page.body.append(fieldset)
@@ -188,7 +179,7 @@ class Control(Controller):
         if not self.session.can_do("USE PUBLISHING SYSTEM"):
             self.bail("You are not authorized to use the publishing system")
         elif self.request == self.MANAGE_STATUSES:
-            navigateTo("ManagePubStatus.py", self.session.name)
+            self.navigate_to("ManagePubStatus.py", self.session.name)
         elif self.request == self.PUBLISH:
             self.publish()
         elif self.request == self.SUBMIT:

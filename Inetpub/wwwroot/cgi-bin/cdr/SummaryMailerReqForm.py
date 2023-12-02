@@ -160,11 +160,13 @@ class Control(Controller):
         page.form.append(page.hidden_field(*args))
         page.form.append(page.hidden_field("board", self.board.id))
         fieldset = page.fieldset(self.board.name)
-        div = page.B.DIV(id="extra-buttons")
-        opts = dict(type="button", onclick="check_all()")
-        div.append(page.B.BUTTON("Check All", **opts))
-        opts["onclick"] = "clear_all()"
-        div.append(page.B.BUTTON("Clear All", **opts))
+        div = page.B.DIV(page.B.CLASS("margin-bottom-3"), id="extra-buttons")
+        div.append(page.button("Submit"))
+        classes = "button usa-button margin-right-1"
+        opts = dict(type="button", onclick="check_all();")
+        div.append(page.B.BUTTON("Check All", page.B.CLASS(classes), **opts))
+        opts["onclick"] = "clear_all();"
+        div.append(page.B.BUTTON("Clear All", page.B.CLASS(classes), **opts))
         fieldset.append(div)
         self.board.show_choices(page, fieldset)
         page.form.append(fieldset)
@@ -189,13 +191,10 @@ function outer_clicked(id) {
     else
         jQuery(".inner-" + id).prop("checked", false);
 }""")
-
-        page.add_css("""\
-fieldset { width: 750px; padding-bottom: 25px; }
-.outer-cb { margin-top: 15px; }
-.inner-cb { margin-left: 15px; }
-#extra-buttons { margin: 15px 0 5px 25px; }
-#extra-buttons button { margin-right: 5px; }""")
+        page.add_css(
+            ".outer-cb { margin-top: 2rem; }\n"
+            ".inner-cb { margin-left: 1rem; }\n"
+        )
         page.send()
 
     def add_instructions(self, page):
@@ -408,7 +407,7 @@ var boards = {{
         query.where("a.value = 'Health professionals'")
         query.group("d.id", "d.title", "b.int_val")
         rows = query.execute(self.cursor).fetchall()
-        for doc_id, doc_version, board_id, doc_title in rows:
+        for doc_id, _, board_id, doc_title in rows:
             board = boards.get(board_id)
             if not board:
                 board = boards[board_id] = Board(self, board_id)
@@ -624,7 +623,7 @@ class Board:
         if summaries:
             summaries = glue.join([s.script for s in sorted(summaries)])
             summaries = "\n        %s" % summaries
-        return """\
+        return f"""\
     '{self.id}': new Board('{self.id}', '{self.type}', [{members}
     ], [{summaries}
     ])"""
@@ -752,7 +751,7 @@ class Tracker:
 
         self.session = session
         self.summary_id = summary_id
-        self.reviewer = reviewer_id
+        self.reviewer_id = reviewer_id
 
     @cached_property
     def summary(self):
@@ -768,10 +767,10 @@ class Tracker:
     def reviewer(self):
         """CDR API `Doc` object for the tracker's board member."""
 
-        reviewer = Tracker.reviewers.get(self.reviewer)
+        reviewer = Tracker.reviewers.get(self.reviewer_id)
         if not reviewer:
-            doc = Doc(self.session, id=self.reviewer)
-            reviewer = Tracker.reviewers[self.reviewer] = doc
+            doc = Doc(self.session, id=self.reviewer_id)
+            reviewer = Tracker.reviewers[self.reviewer_id] = doc
         return reviewer
 
     @cached_property

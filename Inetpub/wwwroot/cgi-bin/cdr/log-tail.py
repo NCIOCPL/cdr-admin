@@ -194,7 +194,7 @@ Content-type: text/plain; charset=utf-8
                             line = fp.readline()
                             self.encoding = encoding
                             break
-                        except UnicodeDecodeError as e:
+                        except UnicodeDecodeError:
                             offset += 1
                             if offset > 3:
                                 raise

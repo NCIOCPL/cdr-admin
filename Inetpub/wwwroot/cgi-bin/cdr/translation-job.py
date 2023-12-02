@@ -13,7 +13,7 @@ from datetime import date
 from operator import itemgetter
 from lxml import etree
 from cdr import EmailMessage, EmailAttachment, isProdHost, getEmailList
-from cdrcgi import Controller, navigateTo
+from cdrcgi import Controller
 from cdrapi import db
 
 
@@ -187,13 +187,13 @@ jQuery(function() {{
         if not self.session or not self.session.can_do(self.ACTION):
             self.bail("not authorized")
         if self.request == self.JOBS:
-            navigateTo("translation-jobs.py", self.session.name)
+            self.navigate_to("translation-jobs.py", self.session.name)
         elif self.request == self.DELETE:
             self.delete_job()
         elif self.request == self.GLOSSARY:
-            navigateTo("glossary-translation-jobs.py", self.session.name)
+            self.navigate_to("glossary-translation-jobs.py", self.session.name)
         elif self.request == self.MEDIA:
-            navigateTo("media-translation-jobs.py", self.session.name)
+            self.navigate_to("media-translation-jobs.py", self.session.name)
         Controller.run(self)
 
     def show_report(self):

@@ -3,15 +3,13 @@
 """Display a table containing information about all link types.
 """
 
-from cdrcgi import Controller, navigateTo
+from cdrcgi import Controller
 
 
 class Control(Controller):
 
     SUBTITLE = "Show All Link Types"
     SUBMIT = None
-    SUBMENU = "Link Menu"
-    LINK_URL = "EditLinkControl.py"
     CAPTION = "All Available Linking Element Combinations"
     COLUMNS = (
         "Link Type",
@@ -31,16 +29,11 @@ class Control(Controller):
     def run(self):
         """Override to provide custom routing, bypassing forms."""
 
-        if self.request == self.SUBMENU:
-            navigateTo(self.LINK_URL, self.session.name)
-        elif not self.request:
-            try:
-                self.show_report()
-            except Exception as e:
-                self.logger.exception("Report failure")
-                self.bail(e)
-        else:
-            Controller.run(self)
+        try:
+            self.show_report()
+        except Exception as e:
+            self.logger.exception("Report failure")
+            self.bail(e)
 
     def build_tables(self):
         """This report has only a single table."""

@@ -23,7 +23,7 @@ of the document's anomaly.
 from datetime import datetime
 from functools import cached_property
 from cdrapi.docs import Doc
-from cdrcgi import Controller, BasicWebPage, SESSION
+from cdrcgi import Controller, BasicWebPage
 from cdrcgi import FormFieldFactory as Factory
 from nci_thesaurus import EVS, Normalizer, Term
 
@@ -125,7 +125,7 @@ class Control(Controller):
         # Start building the form.
         form = page.B.FORM(method="POST", action=self.script)
         page.wrapper.append(form)
-        form.append(Factory.hidden_field(SESSION, self.session))
+        form.append(Factory.hidden_field(self.SESSION, self.session))
         form.append(Factory.hidden_field("concepts", self.concepts_path))
         form.append(Factory.button(self.SUBMIT))
 

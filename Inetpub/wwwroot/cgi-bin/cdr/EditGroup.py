@@ -4,7 +4,7 @@
 """
 
 from functools import cached_property
-from cdrcgi import Controller, navigateTo, bail
+from cdrcgi import Controller
 from cdrapi.docs import Doctype
 
 
@@ -92,7 +92,7 @@ class Control(Controller):
         """Go back to the menu listing all the CDR groups."""
 
         opts = dict(deleted=deleted) if deleted else dict(returned="true")
-        navigateTo(self.EDIT_GROUPS, self.session.name, **opts)
+        self.navigate_to(self.EDIT_GROUPS, self.session.name, **opts)
 
     def run(self):
         """Override base class so we can handle the extra buttons."""
@@ -105,7 +105,7 @@ class Control(Controller):
             elif self.request == self.GROUP_MENU:
                 return self.return_to_groups_menu()
         except Exception as e:
-            bail(f"Failure: {e}")
+            self.bail(f"Failure: {e}")
         Controller.run(self)
 
     def save(self):

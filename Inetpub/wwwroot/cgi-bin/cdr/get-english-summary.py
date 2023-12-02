@@ -97,16 +97,10 @@ class Control(Controller):
             subtitle = f"CDR Document {self.doc.cdr_id}"
             if self.doc.version:
                 subtitle += f" (version {self.doc.version})"
-            buttons = (
-                HTMLPage.button(self.SUBMENU),
-                HTMLPage.button(self.ADMINMENU),
-                HTMLPage.button(self.LOG_OUT),
-            )
             opts = dict(
                 subtitle=subtitle,
                 session=self.session,
                 action=self.script,
-                buttons=buttons,
             )
 
             class Page(HTMLPage):

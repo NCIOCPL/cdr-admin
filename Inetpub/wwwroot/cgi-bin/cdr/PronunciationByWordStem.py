@@ -36,7 +36,6 @@ class Control(Controller):
         """Return the single row for this report."""
         """Overridden because the table is too wide for the standard layout."""
 
-        opts = dict(caption=self.caption, columns=self.columns)
         report = BasicWebPage()
         report.wrapper.append(report.B.H1(self.subtitle))
         report.wrapper.append(self.table.node)

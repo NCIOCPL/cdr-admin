@@ -17,7 +17,6 @@ class Control(Controller):
     """Access to the database and report-building tools."""
 
     LOGNAME = "SummaryMailerReport"
-    SUBMENU = "Mailer Menu"
     MEMBER_SORT = "member"
     SUMMARY_SORT = "summary"
     CDR_REF = f"{{{Doc.NS}}}ref"

@@ -59,7 +59,7 @@ function check_board(val) {
 
         ids = self.fields.getlist("board")
         if not ids or "all" in ids:
-            return list(self.boards)
+            return ["all"]
         else:
             boards = []
             for id in ids:
@@ -154,7 +154,7 @@ function check_board(val) {
         else:
             query.where("c.value NOT LIKE 'Journal%'")
             query.where("c.value NOT LIKE 'Proceeding%'")
-        if not self.board:
+        if not self.board or "all" in self.board:
             query.join("query_term_pub l", "l.doc_id = s.doc_id")
             query.where(f"l.path = '{self.LANGUAGE_PATH}'")
             query.where(query.Condition("l.value", self.language))

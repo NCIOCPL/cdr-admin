@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+7#!/usr/bin/env python
 
 """Report on comments in summaries.
 """
@@ -26,9 +26,9 @@ class Control(Controller):
         R="Responses to Comments",
     )
     SELECTION_METHODS = (
-        ("board", "By PDQ Board", True),
-        ("id", "By CDR ID", False),
-        ("title", "By Summary Title", False),
+        ("board", "By PDQ Board"),
+        ("id", "By CDR ID"),
+        ("title", "By Summary Title"),
     )
     BLANK = "blank"
     USER_AND_DATE = "user-and-date"
@@ -57,31 +57,35 @@ class Control(Controller):
                 fieldset.append(page.radio_button("id", **opts))
             page.form.append(fieldset)
             page.add_css("fieldset { width: 600px; }")
-            self.new_tab_on_submit(page)
+            self.same_window = []
         else:
             if not default_extras:
                 default_extras = [self.BLANK]
             fieldset = page.fieldset("Selection Method")
-            for value, label, checked in self.SELECTION_METHODS:
+            for value, label in self.SELECTION_METHODS:
+                checked = value == self.selection_method
                 opts = dict(value=value, label=label, checked=checked)
                 fieldset.append(page.radio_button("selection_method", **opts))
             page.form.append(fieldset)
             fieldset = page.fieldset("Board")
             fieldset.set("class", "by-board-block usa-fieldset")
             for id, name in self.boards.items():
-                opts = dict(value=id, label=name)
+                checked = id == self.board
+                opts = dict(value=id, label=name, checked=checked)
                 fieldset.append(page.radio_button("board", **opts))
             page.form.append(fieldset)
             self.add_audience_fieldset(page)
             self.add_language_fieldset(page)
             fieldset = page.fieldset("Summary Document ID")
             fieldset.set("class", "by-id-block usa-fieldset")
-            fieldset.append(page.text_field("id", label="CDR ID"))
+            opts = dict(label="CDR ID", value=self.id)
+            fieldset.append(page.text_field("id", **opts))
             page.form.append(fieldset)
             fieldset = page.fieldset("Summary Title")
             fieldset.set("class", "by-title-block usa-fieldset")
             tooltip = "Use wildcard (%) as appropriate."
-            fieldset.append(page.text_field("title", tooltip=tooltip))
+            opts = dict(tooltip=tooltip, value=self.fragment)
+            fieldset.append(page.text_field("title", **opts))
             page.form.append(fieldset)
         fieldset = page.fieldset("Comment Types", id="types-block")
         for key, label in self.TYPES.items():
@@ -137,7 +141,7 @@ class Control(Controller):
         if board:
             try:
                 board = int(board)
-            except Exception as e:
+            except Exception:
                 self.bail()
             if board not in self.boards:
                 self.bail()
@@ -223,7 +227,7 @@ class Control(Controller):
                         return True
                     message = f"Document {doc.id} is a {doc.doctype} document."
                     self.alerts.append(dict(message=message, type="warning"))
-                except Exception as e:
+                except Exception:
                     message = f"Document {self.id} not found."
                     self.logger.exception(message)
                     self.alerts.append(dict(message=message, type="warning"))
@@ -275,15 +279,10 @@ class Control(Controller):
 
     @cached_property
     def summaries(self):
-        """Collect the summaries using the user's selected method.
+        """Collect the summaries using the user's selected method."""
 
-        If the user chooses the "by summary title" method for
-        selecting which summary to use for the report, and the
-        fragment supplied matches more than one summary document,
-        display the form a second time so the user can pick the
-        summary.
-        """
-
+        if not self.ready:
+            return []
         match self.selection_method:
             case "title":
                 return [Summary(self, self.titles[0].id)]

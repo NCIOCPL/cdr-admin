@@ -6,7 +6,7 @@
 
 from sys import stdout
 from cdrapi import db
-from cdrcgi import bail, FieldStorage
+from cdrcgi import Controller, FieldStorage
 
 # ---------------------------------------------------------------------
 # Get the parameters from the request.
@@ -26,7 +26,7 @@ SELECT xml
    AND num = ?""", (docId, ver))
 row = cursor.fetchone()
 if not row:
-    bail("Version %s of document %s not found" % (ver, docId))
+    Controller.bail(f"Version {ver} of document {docId} not found")
 
 # ---------------------------------------------------------------------
 # Send it.

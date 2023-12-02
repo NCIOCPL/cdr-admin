@@ -359,7 +359,7 @@ jQuery(function() {
                         self.id = None
                         return False
                     self.id = doc.id
-                except Exception as e:
+                except Exception:
                     message = f"Document {self.id} was not found."
                     self.logger.exception("ready check: %s", message)
                     self.alerts.append(dict(message=message, type="error"))

@@ -6,6 +6,7 @@
 from cdrcgi import Controller
 from cdrapi.docs import Doc
 from datetime import date
+from dateutil.relativedelta import relativedelta
 from functools import cached_property
 import lxml.html
 
@@ -15,7 +16,7 @@ class Control(Controller):
 
     SUBTITLE = "History of Changes to Summary"
     METHOD = "get"
-    SCOPES = "all", "range"
+    SCOPES = dict(all="Complete History", range="Date Range")
     FILTER = "name:Summary Changes Report"
     CSS = (
         "#summary-title, #wrapper h2 { text-align: center; }",
@@ -38,11 +39,12 @@ class Control(Controller):
             page - HTMLPage object
         """
 
+        # Don't need a form if we already have a document.
+        if self.doc:
+            return self.show_report()
+
+        # If we have more than one match for the title fragment, pick one.
         if self.summaries:
-            page.form.attrib.pop("target", None)
-            page.form.append(page.hidden_field("start", self.start))
-            page.form.append(page.hidden_field("end", self.end))
-            page.form.append(page.hidden_field("scope", self.scope))
             fieldset = page.fieldset("Select Summary")
             checked = True
             for id, title in self.summaries:
@@ -50,42 +52,46 @@ class Control(Controller):
                 opts = dict(label=label, value=id, checked=checked)
                 fieldset.append(page.radio_button("DocId", **opts))
                 checked = False
+            page.form.append(fieldset)
+
+        # Otherwise, show the title and ID fields.
         else:
-            if self.fragment:
-                fieldset = page.fieldset("Error")
-                message = page.B.P(f"No matches for {self.fragment!r}")
-                message.set("class", "error")
-                fieldset.append(message)
-                page.form.append(fieldset)
             fieldset = page.fieldset("Term ID or Title for Summary")
-            fieldset.append(page.text_field("DocId", label="CDR ID"))
-            fieldset.append(page.text_field("title", label="Doc Title"))
+            opts = dict(label="CDR ID", value=self.id)
+            fieldset.append(page.text_field("DocId", **opts))
+            opts = dict(label="Doc Title", value=self.fragment)
+            fieldset.append(page.text_field("title", **opts))
             page.form.append(fieldset)
-            fieldset = page.fieldset("Report Options")
-            opts = dict(value="range", label="Date Range", checked=True)
+
+        # These fields are common to both forms.
+        fieldset = page.fieldset("Report Options")
+        default = self.scope or "range"
+        for value in reversed(sorted(self.SCOPES)):
+            opts = dict(
+                value=value,
+                label=self.SCOPES[value],
+                checked=value==default,
+            )
             fieldset.append(page.radio_button("scope", **opts))
-            opts = dict(value="all", label="Complete History")
-            fieldset.append(page.radio_button("scope", **opts))
-            page.form.append(fieldset)
+        page.form.append(fieldset)
+        if self.request:
+            start, end = self.start, self.end
+        else:
             end = date.today()
-            year = end.year - 2
-            day = end.day
-            if day == 29 and end.month == 2:
-                day = 28
-            start = date(year, end.month, day)
-            fieldset = page.fieldset("Date Range Of Report")
-            fieldset.set("id", "date-range")
-            fieldset.append(page.date_field("start", value=start))
-            fieldset.append(page.date_field("end", value=end))
-            page.form.append(fieldset)
-            page.add_script("\n".join(self.SCRIPT))
+            start = end - relativedelta(years=2)
+        fieldset = page.fieldset("Date Range Of Report")
+        fieldset.set("id", "date-range")
+        fieldset.append(page.date_field("start", value=start))
+        fieldset.append(page.date_field("end", value=end))
+        page.form.append(fieldset)
+        page.add_script("\n".join(self.SCRIPT))
         page.form.append(fieldset)
 
     def show_report(self):
         """Override, because this is not a tabular report."""
 
         B = lxml.html.builder
-        if not self.id:
+        if not self.doc:
             self.show_form()
         title = self.doc.title.split(";")[0]
         if self.all:
@@ -120,12 +126,42 @@ class Control(Controller):
 
     @cached_property
     def doc(self):
-        """The summary document for the report."""
+        """The summary document for the report.
 
-        doc = Doc(self.session, id=self.id)
-        if not doc.title:
-            self.bail(f"CDR{self.id} not found")
-        return doc
+        As a side effect, alerts are registered here to show the user
+        useful information.
+        """
+
+        id = self.id
+        if not id:
+            if not self.fragment:
+                if self.request:
+                    message = "CDR ID or title is required."
+                    self.alerts.append(dict(message=message, type="error"))
+                return None
+            elif not self.summaries:
+                message = f"No summaries found for {self.fragment!r}."
+                self.alerts.append(dict(message=message, type="warning"))
+                return None
+            elif len(self.summaries) > 1:
+                message = f"Multiple matches found for {self.fragment!r}."
+                self.alerts.append(dict(message=message, type="info"))
+                return None
+            self.logger.info("summmaries=%r", self.summaries)
+            id = self.summaries[0][0]
+        doc = Doc(self.session, id=id)
+        try:
+            doctype = doc.doctype.name
+            if doctype != "Summary":
+                message = f"CDR{doc.id} is a {doctype} document."
+                self.alerts.append(dict(message=message, type="warning"))
+                return None
+            return doc
+        except Exception:
+            message = f"Document {id} not found."
+            self.logger.exception(message)
+            self.alerts.append(dict(message=message, type="error"))
+            return None
 
     @cached_property
     def end(self):
@@ -140,16 +176,7 @@ class Control(Controller):
     @cached_property
     def id(self):
         """Document ID for the report."""
-
-        id = self.fields.getvalue("DocId", "").strip()
-        if id:
-            try:
-                return Doc.extract_id(id)
-            except Exception:
-                self.bail("Invalid ID")
-        elif self.summaries and len(self.summaries) == 1:
-            return self.summaries[0][0]
-        return None
+        return self.fields.getvalue("DocId", "").strip()
 
     @cached_property
     def no_results(self):
@@ -161,7 +188,7 @@ class Control(Controller):
         """How is the user deciding which versions to report on?"""
 
         scope = self.fields.getvalue("scope")
-        if scope not in self.SCOPES:
+        if scope and scope not in self.SCOPES:
             self.bail()
         return scope
 
@@ -190,7 +217,7 @@ class Control(Controller):
     @cached_property
     def same_window(self):
         """Decide when to avoid opening a new browser tab."""
-        return [self.SUBMIT] if self.fragment or self.id else []
+        return [self.SUBMIT] if self.request else []
 
     @cached_property
     def suppress_sidenav(self):
@@ -201,13 +228,12 @@ class Control(Controller):
     def summaries(self):
         """Sequence of ID/title tuples for the summary picklist."""
 
-        if self.fragment:
+        if not self.fragment:
             return None
-        fragment = f"{self.fragment}%"
         query = self.Query("document d", "d.id", "d.title").order(2)
         query.join("doc_type t", "t.id = d.doc_type")
         query.where("t.name = 'Summary'")
-        query.where(query.Condition("d.title", fragment, "LIKE"))
+        query.where(query.Condition("d.title", f"{self.fragment}%", "LIKE"))
         rows = query.execute(self.cursor).fetchall()
         return [tuple(row) for row in rows]
 

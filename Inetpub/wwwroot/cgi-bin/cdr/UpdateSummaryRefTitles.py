@@ -103,7 +103,7 @@ class Control(Controller):
                 self.show_report()
         except Exception as e:
             self.logger.exception("Control.run() failure")
-            bail(e)
+            self.bail(e)
         Controller.run(self)
 
     @cached_property

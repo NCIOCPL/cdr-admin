@@ -14,8 +14,7 @@ from cdrcgi import Controller, Reporter
 
 
 class Control(Controller):
-    SUBTITLE = f"Python Upgrade Information ({str(sys.version)})"
-    SUBTITLE = f"Python Upgrade Information"
+    SUBTITLE = "Python Upgrade Information"
     SUBMIT = None
     MODULES = (
         ("apscheduler", "Required by cdr_scheduler"),
@@ -55,18 +54,7 @@ class Control(Controller):
     def report(self):
         """Overridden so we can add system information for the server."""
 
-        page_opts = dict(
-            session=self.session,
-            action=self.script or None,
-            control=self,
-        )
-        opts = dict(
-            #footer=self.footer,
-            subtitle=self.subtitle,
-            #banner=self.title or "",
-            #page_opts=page_opts,
-        )
-        report = Reporter(self.title, self.tables, **opts)
+        report = Reporter(self.title, self.tables, subtitle=self.subtitle)
         page = report.page
         B = page.B
         table = page.main.find(".//table")

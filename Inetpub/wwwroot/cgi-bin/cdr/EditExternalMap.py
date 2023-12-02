@@ -4,7 +4,7 @@
 """
 
 from functools import cached_property
-from cdrcgi import Controller, SESSION
+from cdrcgi import Controller
 from cdrapi.docs import Doc
 from datetime import datetime
 import json
@@ -90,12 +90,13 @@ class Control(Controller):
             "#tabular-form .usa-checkbox__label { margin-top: 0; }\n"
             "tfoot td { color: green; font-size: .9em; font-style: italic; }\n"
             ".usa-table tfoot td { text-align: center; border-bottom: none; }\n"
+            ".usa-form td a:visited { color: white; }\n"
         )
         opts = dict(action=self.script, method="POST", id="tabular-form")
         form = B.FORM(B.CLASS("usa-form"), **opts)
         form.append(table)
         form.append(page.hidden_field(self.FILTER_OPTS, filter_opts))
-        form.append(page.hidden_field(SESSION, self.session))
+        form.append(page.hidden_field(self.SESSION, self.session))
         form.append(page.button(self.SAVE))
         page.main.append(form)
         page.send()

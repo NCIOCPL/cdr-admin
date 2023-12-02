@@ -1,0 +1,11 @@
+*.comgroup {
+  background: #f8f8f8;
+  margin-bottom: 8px;
+  margin-left: -.5rem;
+  padding: .5rem .5rem .5rem .5rem;
+}
+.comgroup:first-of-type { margin-top: .75rem; }
+.comgroup div { background: #f8f8f8; }
+.comgroup div:first-child .usa-checkbox__label { margin-top: .1rem; }
+#alternate-comment-options .subheading { font-weight: bold; }
+#alternate-comment-options p { font-style: italic; }

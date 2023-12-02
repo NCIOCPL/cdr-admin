@@ -148,7 +148,7 @@ class Control(Controller):
                     query.where("t.path = '/Media/TranslationOf/@cdr:ref'")
             if self.type != "Any":
                 pt = self.type
-                path = "/Media/PhysicalMedia/{pt}Data/{pt}Encoding"
+                path = f"/Media/PhysicalMedia/{pt}Data/{pt}Encoding"
                 query.join(f"{table} p", "p.doc_id = m.doc_id")
                 query.where(f"p.path = '{path}'")
             rows = query.execute(self.cursor).fetchall()
@@ -162,7 +162,7 @@ class Control(Controller):
 
         if not self.category:
             return "All Categories"
-        return ", ".join(sorted(self.category)) 
+        return ", ".join(sorted(self.category))
 
     @cached_property
     def columns(self):

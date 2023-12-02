@@ -18,7 +18,7 @@
     name of the table to the Control.TABLES tuple immediately below.
 """
 
-from cdrcgi import Controller, navigateTo
+from cdrcgi import Controller
 
 
 class Control(Controller):
@@ -51,7 +51,7 @@ class Control(Controller):
         elif self.request == self.SAVE:
             self.save()
         elif self.request == self.CANCEL:
-            navigateTo(self.script, self.session.name, table=self.table)
+            self.navigate_to(self.script, self.session.name, table=self.table)
         else:
             Controller.run(self)
 
@@ -106,7 +106,7 @@ class Control(Controller):
             query = f"UPDATE {self.table} SET {sets} WHERE value_id = ?"
         self.cursor.execute(query, args)
         self.conn.commit()
-        navigateTo(self.script, self.session.name, table=self.table)
+        self.navigate_to(self.script, self.session.name, table=self.table)
 
     def drop(self):
         """Remove a value from the table.
@@ -121,7 +121,7 @@ class Control(Controller):
         try:
             self.cursor.execute(query, self.id)
             self.conn.commit()
-            navigateTo(self.script, self.session, table=self.table)
+            self.navigate_to(self.script, self.session, table=self.table)
         except Exception as e:
             args = self.id, self.table
             self.logger.exception("failure dropping row %s from %s", *args)
@@ -131,14 +131,13 @@ class Control(Controller):
     def buttons(self):
         """Customize the button list, depending on what's going on."""
 
-        buttons = [self.DEVMENU, self.ADMINMENU, self.LOG_OUT]
         if self.table:
             if self.id or self.request == self.ADD:
                 if self.id:
-                    return [self.SAVE, self.CANCEL, self.DROP] + buttons
-                return [self.SAVE, self.CANCEL] + buttons
-            return [self.ADD] + buttons
-        return [self.SUBMIT] + buttons
+                    return [self.SAVE, self.CANCEL, self.DROP]
+                return [self.SAVE, self.CANCEL]
+            return [self.ADD]
+        return [self.SUBMIT]
 
     @property
     def id(self):

@@ -30,6 +30,8 @@ class Control(Controller):
                 return self.add()
             elif self.request == self.REMOVE:
                 return self.remove()
+            elif self.request == self.MANAGE:
+                return self.show_form()
         except Exception as e:
             self.logger.exception("Failure of %s command", self.request)
             self.bail(e)
@@ -143,7 +145,7 @@ xxfieldset { width: 1024px; }
                     definition = label.text
                     if definition:
                         definitions.append(definition.strip())
-        except Exceptiona as e:
+        except Exception as e:
             self.logger.exception("failure parsing definitions")
             self.bail(f"Failure parsing definitions: {e}")
         return set(definitions)

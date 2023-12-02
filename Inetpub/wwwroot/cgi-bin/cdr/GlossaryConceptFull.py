@@ -55,7 +55,7 @@ class Control(Controller):
         """Provide custom routing for the multiple forms."""
 
         if not self.concept:
-            if self.fragment:
+            if self.fragment and not self.names:
                 warning = f"No documents found matching {self.fragment!r}."
                 self.alerts.append(dict(message=warning, type="warning"))
             self.show_form()
@@ -107,7 +107,10 @@ class Control(Controller):
         """CDR ID for a GlossaryTermName document."""
 
         name_id = self.fields.getvalue("name_id")
-        return Doc.extract_id(name_id) if name_id else None
+        try:
+            return Doc.extract_id(name_id) if name_id else None
+        except Exception:
+            self.bail(f"Invalid Name ID {name_id!r}")
 
     @cached_property
     def names(self):

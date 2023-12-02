@@ -5,7 +5,7 @@
 
 from datetime import date, timedelta
 from cdrapi.docs import Doc
-from cdrcgi import Controller, WEBSERVER, BASE
+from cdrcgi import Controller
 
 
 class Control(Controller):
@@ -152,7 +152,7 @@ class Control(Controller):
 class Drug:
     """Drug Information Summary information needed for the report."""
 
-    BASE = f"https://{WEBSERVER}{BASE}"
+    BASE = f"https://{Controller.WEBSERVER}{Controller.BASE}"
     URL = BASE + "/DocVersionHistory.py?Session=guest&DocId={:d}"
 
     def __init__(self, control, row):

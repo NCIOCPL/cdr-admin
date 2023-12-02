@@ -6,20 +6,20 @@
 # ----------------------------------------------------------------------
 import sys
 import cdr
-import cdrcgi
 from io import BytesIO
 from PIL import Image, ImageEnhance
 from cdrapi import db
+from cdrcgi import Controller, FieldStorage
 
 message = "GetCdrImage: No doc ID found"
-fields = cdrcgi.FieldStorage()
+fields = FieldStorage()
 width = fields.getvalue("width")
 res = fields.getvalue("res")
 fname = fields.getvalue("fname")
 quality = fields.getvalue("quality") or "85"
 sharpen = fields.getvalue("sharpen")
 pp = fields.getvalue("pp") or ""
-cdrId = fields.getvalue("id") or cdrcgi.bail(message)
+cdrId = fields.getvalue("id") or Controller.bail(message)
 
 conn = db.connect()
 cursor = conn.cursor()
@@ -49,7 +49,7 @@ def widthFromRes(size, res):
             return None
         return int(round(width * (120.0 / height)))
     else:
-        cdrcgi.bail("invalid res value '%s'" % res)
+        Controller.bail("invalid res value '%s'" % res)
 
 
 # If the docId comes in in the format 'CDR99999-111.jpg' it is coming
@@ -95,7 +95,7 @@ cursor.execute(query)
 
 rows = cursor.fetchall()
 if not rows:
-    cdrcgi.bail("%s not found" % docId)
+    Controller.bail("%s not found" % docId)
 image_bytes = rows[0][0]
 iFile = BytesIO(image_bytes)
 image = Image.open(iFile)
@@ -116,7 +116,7 @@ if width:
             height = int(round(width * ratio))
             image = image.resize((width, height), Image.ANTIALIAS)
     except Exception as e:
-        cdrcgi.bail("Failure resizing %s: %s" % (docId, str(e)))
+        Controller.bail(f"Failure resizing {docId}: {e}")
 newImageFile = BytesIO()
 if sharpen:
     try:

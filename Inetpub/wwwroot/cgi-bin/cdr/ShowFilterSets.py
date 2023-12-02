@@ -5,7 +5,7 @@
 
 from copy import deepcopy
 from functools import cached_property
-from cdrcgi import Controller, navigateTo
+from cdrcgi import Controller
 from cdrapi.docs import Filter as APIFilter, FilterSet as APIFilterSet
 
 
@@ -21,11 +21,11 @@ class Control(Controller):
         """Provide routing to our custom commands."""
 
         if self.request == self.DEEP:
-            navigateTo(self.script, self.session.name)
+            self.navigate_to(self.script, self.session.name)
         elif self.request == self.SHALLOW:
-            navigateTo(self.script, self.session.name, depth="shallow")
+            self.navigate_to(self.script, self.session.name, depth="shallow")
         elif self.request == self.FILTER_SETS:
-            navigateTo(self.EDIT_FILTER_SETS, self.session.name)
+            self.navigate_to(self.EDIT_FILTER_SETS, self.session.name)
         else:
             Controller.run(self)
 

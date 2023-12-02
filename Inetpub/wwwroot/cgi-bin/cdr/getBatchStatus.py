@@ -21,7 +21,7 @@ both to display a form and to read its contents.
 """
 
 from cdrbatch import getJobStatus, STATUSES
-from cdrcgi import Controller, navigateTo
+from cdrcgi import Controller
 from lxml import html
 
 
@@ -55,7 +55,7 @@ class Control(Controller):
             if self.id or self.name or self.age or self.status:
                 self.request = self.SUBMIT
         elif self.request == self.BACK:
-            return navigateTo(self.script, self.session.name)
+            return self.navigate_to(self.script, self.session.name)
         elif self.request == self.REFRESH:
             self.request = self.SUBMIT
         Controller.run(self)

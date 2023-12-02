@@ -2,7 +2,7 @@
 
 from copy import deepcopy
 from urllib.parse import urlencode
-from cdrcgi import Controller, Reporter, navigateTo, DOCID, SESSION, REQUEST
+from cdrcgi import Controller, Reporter
 from cdrapi.docs import FilterSet
 
 
@@ -32,11 +32,15 @@ class Control(Controller):
           page - object to be populated
         """
 
-        parms = {SESSION: self.session, REQUEST: "View", "full": "full"}
+        parms = {
+            self.SESSION: self.session,
+            self.REQUEST: "View",
+            "full": "full",
+        }
         ids = []
         rows = []
         for doc in FilterSet.get_filters(self.session):
-            parms[DOCID] = doc.cdr_id
+            parms[self.DOCID] = doc.cdr_id
             url = f"EditFilter.py?{urlencode(parms)}"
             id_cell = Reporter.Cell(doc.cdr_id, href=url, target="_blank")
             ids.append((doc.id, id_cell, doc.title))
@@ -79,9 +83,9 @@ jQuery(function() {
         """Support our custom commands and bypass a form."""
 
         if self.request == self.COMPARE:
-            navigateTo("FilterDiffs.py", self.session.name)
+            self.navigate_to("FilterDiffs.py", self.session.name)
         elif self.request == self.PARAMS:
-            navigateTo("GetXsltParams.py", self.session.name)
+            self.navigate_to("GetXsltParams.py", self.session.name)
         else:
             Controller.run(self)
 

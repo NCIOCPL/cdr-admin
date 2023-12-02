@@ -6,7 +6,7 @@
 from datetime import date, timedelta
 from json import dumps, loads
 from lxml import html
-from cdrcgi import Controller, DATETIMELEN
+from cdrcgi import Controller
 from cdrapi.docs import Doc
 
 
@@ -125,14 +125,7 @@ class Control(Controller):
     def show_report(self):
         """Override base table because this report doesn't fit the mold."""
 
-        buttons = (
-            self.HTMLPage.button("Back"),
-            self.HTMLPage.button(self.SUBMENU),
-            self.HTMLPage.button(self.ADMINMENU),
-            self.HTMLPage.button(self.LOG_OUT),
-        )
         opts = dict(
-            buttons=buttons,
             action=self.script,
             subtitle=self.subtitle,
             session=self.session,
@@ -140,7 +133,7 @@ class Control(Controller):
         )
         page = self.HTMLPage(self.PAGE_TITLE, **opts)
         page.form.append(page.hidden_field("vals", self.current_values))
-        now = str(self.started)[:DATETIMELEN]
+        now = str(self.started)[:self.DATETIMELEN]
         count = f"{len(self.summaries):d} documents found"
         if self.criteria:
             count = f"{count} {self.criteria}"

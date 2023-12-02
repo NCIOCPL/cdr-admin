@@ -5,7 +5,7 @@
 
 from functools import cached_property
 from collections import defaultdict
-from cdrcgi import Controller, WEBSERVER, BASE, BasicWebPage
+from cdrcgi import Controller, BasicWebPage
 from cdrapi.docs import Doc, Doctype
 
 
@@ -162,6 +162,8 @@ class Control(Controller):
 class MediaDoc:
     """Media document to be considered for the report."""
 
+    WEBSERVER = Control.WEBSERVER
+    BASE = Control.BASE
     URL = f"https://{WEBSERVER}{BASE}/QcReport.py?DocVersion=-1&DocId={{}}"
 
     def __init__(self, control, id):

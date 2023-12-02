@@ -4,7 +4,7 @@
 """
 
 from datetime import date
-from cdrcgi import Controller, Reporter, bail
+from cdrcgi import Controller, Reporter
 from cdrapi import db
 from cdrapi.docs import Doc
 
@@ -61,7 +61,7 @@ class Control(Controller):
             types = self.fields.getlist("type")
             for markup_type in types:
                 if markup_type not in self.TYPES:
-                    bail()
+                    self.bail()
             self._types = [t for t in self.TYPES if t in types]
         return self._types
 

@@ -95,23 +95,24 @@ class Control(Controller):
         #for paragraph in self.INSTRUCTIONS:
         #    fieldset.append(page.B.P(paragraph))
         #page.form.append(fieldset)
-        button = page.B.BUTTON(
-            "Instructions",
-            page.B.CLASS("usa-accordion__button"),
-            type="button",
-        )
-        button.set("aria-expanded", "false")
-        button.set("aria-controls", "instructions")
-        payload = page.B.DIV(id="instructions")
-        header = page.B.H4(button)
-        header.set("class", "usa-accordion__heading")
-        payload.set("class", "usa-accordion__content usa-prose")
-        accordion = page.B.DIV(header, payload)
+        #button = page.B.BUTTON(
+        #    "Instructions",
+        #    page.B.CLASS("usa-accordion__button"),
+        #    type="button",
+        #)
+        #button.set("aria-expanded", "false")
+        #button.set("aria-controls", "instructions")
+        #payload = page.B.DIV(id="instructions")
+        #header = page.B.H4(button)
+        #header.set("class", "usa-accordion__heading")
+        #payload.set("class", "usa-accordion__content usa-prose")
+        #accordion = page.B.DIV(header, payload)
         # accordion.set("class", "usa-accordion usa-accordion--bordered")
-        accordion.set("class", "usa-accordion")
+        #accordion.set("class", "usa-accordion")
+        accordion = page.accordion("instructions")
         for paragraph in self.INSTRUCTIONS:
-            payload.append(page.B.P(paragraph))
-        page.form.append(accordion)
+            accordion.payload.append(page.B.P(paragraph))
+        page.form.append(accordion.wrapper)
         fieldset = page.fieldset("Choose EVS Utility")
         utilities = page.B.UL(id="utilities")
         for label, script in self.UTILITIES:

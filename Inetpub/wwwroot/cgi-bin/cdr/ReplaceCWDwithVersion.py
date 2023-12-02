@@ -250,10 +250,8 @@ class Control(Controller):
             else:
                 self.version = self.versions[self.version]
         elif self.version not in self.versions:
-            self.alerts.append(dict(
-                message=f"Version {self.version} not found for  {cdr_id}.",
-                type="warning",
-            ))
+            message = f"{cdr_id} has only {len(self.versions)} versions."
+            self.alerts.append(dict(message=message, type="warning"))
         return not self.alerts
 
     @cached_property

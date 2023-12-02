@@ -3,7 +3,7 @@
 """Display a submenu for the CDR translation job queues.
 """
 
-from cdrcgi import Controller, navigateTo
+from cdrcgi import Controller
 
 
 class Control(Controller):

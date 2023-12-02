@@ -38,7 +38,7 @@ class Control(Controller):
 
         try:
             return self.doc.xml
-        except Exception as e:
+        except Exception:
             self.logger.exception("Fetching document XML")
             self.bail(f"Failure fetching XML for {self.doc.cdr_id}.")
 

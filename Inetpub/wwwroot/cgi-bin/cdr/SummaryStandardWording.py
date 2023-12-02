@@ -5,7 +5,7 @@
 JIRA::OCECDR-4568
 """
 
-from datetime import date, datetime
+from datetime import datetime
 from functools import cached_property
 from io import BytesIO
 from re import compile, UNICODE, IGNORECASE
@@ -207,7 +207,7 @@ Content-length: {len(book_bytes)}
         query.join("query_term_pub l", "l.doc_id = d.id")
         query.where("l.path = '/Summary/SummaryMetaData/SummaryLanguage'")
         query.where(query.Condition("l.value", self.language))
-        if "all" not in self.board:
+        if self.board and "all" not in self.board:
             if self.language == "English":
                 query.join("query_term_pub b", "b.doc_id = d.id")
             else:
@@ -401,6 +401,11 @@ Content-length: {len(book_bytes)}
         return rows
 
     @cached_property
+    def same_window(self):
+        """Reduce the number of new browser tabs opened."""
+        return [self.SUBMIT] if self.request else []
+
+    @cached_property
     def summaries(self):
         """PDQ Summaries included in the report."""
 
@@ -559,53 +564,49 @@ class Summary:
         """Support sorting of the `Summary` objects."""
         return self.title < other.title
 
-    @property
+    @cached_property
     def root(self):
         """Fetch and parse xml and clean up unwanted elements/markup"""
-        if not hasattr(self, "_root"):
-            query = db.Query("document", "xml")
-            query.where(query.Condition("id", self.cdr_id))
-            xml = query.execute(self.control.cursor).fetchone().xml
-            self._root = etree.fromstring(xml.encode("utf-8"))
-            etree.strip_elements(self._root, *self.DROP, with_tail=False)
-            etree.strip_tags(self._root, *self.STRIP)
-        return self._root
 
-    @property
+        query = db.Query("document", "xml")
+        query.where(query.Condition("id", self.cdr_id))
+        xml = query.execute(self.control.cursor).fetchone().xml
+        root = etree.fromstring(xml.encode("utf-8"))
+        etree.strip_elements(root, *self.DROP, with_tail=False)
+        etree.strip_tags(root, *self.STRIP)
+        return root
+
+    @cached_property
     def title(self):
         """Extract the summary title from the document"""
-        if not hasattr(self, "_title"):
-            self._title = Doc.get_text(self.root.find("SummaryTitle"))
-        return self._title
+        return Doc.get_text(self.root.find("SummaryTitle"))
 
-    @property
+    @cached_property
     def matches(self):
         """Assemble the sequence of matches for the caller's phrases."""
 
-        if not hasattr(self, "_matches"):
-            matches = []
-            regex = self.control.regex
-            for section in self.root.findall("SummarySection"):
-                title = Doc.get_text(section.find("Title"))
-                for node in section.iter():
+        matches = []
+        regex = self.control.regex
+        for section in self.root.findall("SummarySection"):
+            title = Doc.get_text(section.find("Title"))
+            for node in section.iter():
 
-                    # Look for matches in the node's text property.
-                    if node.text is not None and node.text.strip():
-                        normalized = self.normalize(node.text)
-                        context = self.Context(node)
-                        if context.wrapper is not None:
-                            args = title, regex, normalized, context, matches
-                            self.scan_string(*args)
+                # Look for matches in the node's text property.
+                if node.text is not None and node.text.strip():
+                    normalized = self.normalize(node.text)
+                    context = self.Context(node)
+                    if context.wrapper is not None:
+                        args = title, regex, normalized, context, matches
+                        self.scan_string(*args)
 
-                    # Do a second pass looking for matches in the node's tail.
-                    if node.tail is not None and node.tail.strip():
-                        normalized = self.normalize(node.tail)
-                        context = self.Context(node, using_tail=True)
-                        if context.wrapper is not None:
-                            args = title, regex, normalized, context, matches
-                            self.scan_string(*args)
-            self._matches = matches
-        return self._matches
+                # Do a second pass looking for matches in the node's tail.
+                if node.tail is not None and node.tail.strip():
+                    normalized = self.normalize(node.tail)
+                    context = self.Context(node, using_tail=True)
+                    if context.wrapper is not None:
+                        args = title, regex, normalized, context, matches
+                        self.scan_string(*args)
+        return matches
 
     @classmethod
     def scan_string(cls, section, regex, string, context, matches):

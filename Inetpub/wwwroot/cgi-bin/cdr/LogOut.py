@@ -9,7 +9,6 @@ from cdrcgi import Controller
 class Control(Controller):
     """Log out and reroute."""
 
-
     def run(self):
         """Customized processing."""
 

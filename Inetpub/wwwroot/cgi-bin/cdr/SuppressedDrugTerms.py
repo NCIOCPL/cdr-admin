@@ -3,9 +3,8 @@
 """Show drug terms which have been removed from the refresh interface.
 """
 
-from collections import defaultdict
 from functools import cached_property
-from cdrcgi import Controller, SESSION
+from cdrcgi import Controller
 from nci_thesaurus import EVS
 
 
@@ -16,7 +15,7 @@ class Control(Controller):
     LOGNAME = "suppressed-drug-terms"
     SUPPRESSED = "unrefreshable_drug_term"
     DELETE = f"DELETE FROM {SUPPRESSED} WHERE id = ?"
-    SUBMENU = SUBMIT = None
+    SUBMIT = None
 
     def populate_form(self, page):
         """Show terms suppressed from the refresh interface.
@@ -67,7 +66,6 @@ class Control(Controller):
         query.where("c.path = '/Term/NCIThesaurusConcept'")
         terms = []
         B = self.HTMLPage.B
-        script = self.script
         rows = []
         codes = []
         for row in query.execute(self.cursor).fetchall():
@@ -81,7 +79,8 @@ class Control(Controller):
                 name = concepts[code].name or "** unknown **"
             else:
                 name = "** concept missing **"
-            url = f"{self.script}?{SESSION}={self.session}&id={row.doc_id}"
+            session = f"{self.SESSION}={self.session}"
+            url = f"{self.script}?{session}&id={row.doc_id}"
             display = f"CDR{row.doc_id}: {row.name} (EVS name: {name})"
             terms.append(B.LI(B.A(display, href=url)))
         return terms

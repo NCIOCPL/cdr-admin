@@ -6,7 +6,7 @@ https://tracker.nci.nih.gov/browse/OCECDR-4489
 """
 
 from functools import cached_property
-from cdrcgi import Controller, navigateTo
+from cdrcgi import Controller
 
 
 class Control(Controller):

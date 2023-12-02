@@ -4,7 +4,6 @@
 """
 
 from cdrcgi import Controller
-from cdr import exNormalize
 from cdrapi.docs import Doc
 from cdrapi.users import Session
 from functools import cached_property
@@ -55,7 +54,7 @@ class Control(Controller):
         # Find English document when given the Spanish version.
         query = self.Query("query_term", "doc_id", "int_val")
         query.where(query.Condition("path", self.TRANSLATION_OF))
-        query.where(query.Condition("doc_id", _id))
+        query.where(query.Condition("doc_id", doc_id))
         rows = query.execute(self.cursor).fetchall()
         if not rows:
             message = "No Spanish translation found for image document"
@@ -71,7 +70,6 @@ class Media:
     MEDIA_ELEMENTS = "ContentDescription", "MediaCaption"
     GUEST = Session("guest")
     LANGUAGES = dict(en="English", es="Spanish")
-    # AUDIENCES = "Patients", "Health_professionals"
     AUDIENCES = "Patients",
     FILTER = "set:QC Media Set"
     EN_INGLES = " (en ingl\xe9s)"

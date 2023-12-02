@@ -57,7 +57,6 @@ class Control(Controller):
                 fieldset.append(page.radio_button("doc-id", **opts))
             page.form.append(fieldset)
             page.add_css("fieldset { width: 1024px; }")
-            self.new_tab_on_submit(page)
         else:
             fieldset = page.fieldset("Selection Method")
             for value, label in self.SELECTION_METHODS:
@@ -237,7 +236,7 @@ class Control(Controller):
                 version = int(version)
             except Exception:
                 self.alerts.append(dict(
-                    message=f"Version must be a (possibly positive) integer.",
+                    message="Version must be a (possibly positive) integer.",
                     type="error",
                 ))
                 return None
@@ -274,7 +273,7 @@ class Control(Controller):
 
         if not self.id:
             return None
-        xml = what = None
+        what = None
         if self.version_type == "exported":
             query = self.Query("pub_proc_cg", "xml")
             query.where(query.Condition("id", self.id))
