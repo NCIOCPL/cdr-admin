@@ -35,9 +35,13 @@ class Control(Controller):
         )
         rows.append(row)
         columns = "Document Type", "Count"
-        caption = f"Documents Exported By Job {self.job}"
+        caption = f"Exported By The Latest Weekly Export Job (#{self.job})"
         table = self.Reporter.Table(rows, columns=columns, caption=caption)
         page.form.append(table.node)
+        page.add_css(
+            "form table { width: 60%; }\n"
+            "th:last-child { text-align: right; }\n"
+        )
 
     @property
     def buttons(self):
