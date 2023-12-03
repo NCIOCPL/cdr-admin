@@ -3,6 +3,7 @@
 """Show the tables of contents for one or more Cancer Information Summaries.
 """
 
+from collections import defaultdict
 from functools import cached_property
 from cdrcgi import Controller, BasicWebPage
 from cdrapi.docs import Doc
@@ -179,7 +180,11 @@ jQuery(function() {
 
         fieldset = page.fieldset("Options")
         checked = self.include_id if self.request else True
-        opts = dict(value="include_id", label="Include CDR ID", checked=checked)
+        opts = dict(
+            value="include_id",
+            label="Include CDR ID",
+            checked=checked,
+        )
         fieldset.append(page.checkbox("include_id", **opts))
         page.form.append(fieldset)
 
@@ -192,8 +197,7 @@ jQuery(function() {
 
         fieldset = page.fieldset("Summary Title")
         fieldset.set("id", "title-fieldset")
-        opts = dict(label="Title", value=self.fragment)
-        fieldset.append(page.text_field("title", **opts))
+        fieldset.append(page.text_field("title", value=self.fragment))
         page.form.append(fieldset)
 
     def populate_form(self, page):
@@ -207,7 +211,7 @@ jQuery(function() {
             page - HTMLPage object to be filled with field sets.
         """
 
-        # If the URL has the required values in query parameters. show the report.
+        # If the URL has the required values already show the report.
         if self.ready:
             return self.report.send()
 
@@ -338,15 +342,16 @@ jQuery(function() {
                 if not self.fragment:
                     message = "No title fragment provided."
                     self.alerts.append(dict(message=message, type="error"))
-                if not self.titles:
+                elif not self.titles:
                     message = f"No summaries match {self.fragment!r}."
                     self.logger.error("ready check: %s", message)
                     self.alerts.append(dict(message=message, type="warning"))
                 return False
             case "id":
                 if not self.id:
-                    verb = "selected" if self.fragment else "provided"
-                    message = f"No document ID {verb}."
+                    message = "No document ID provided."
+                    if self.fragment:
+                        message = "No summary selected."
                     self.logger.error("ready check: %s", message)
                     self.alerts.append(dict(message=message, type="error"))
                     return False
@@ -380,14 +385,20 @@ jQuery(function() {
         self.logger.info("processing %d summaries", len(self.summaries))
         report = BasicWebPage()
         report.wrapper.append(report.B.H1(self.report_title))
-        board = None
+        boards = defaultdict(list)
         for summary in sorted(self.summaries):
             self.logger.debug("processing %s", summary.title)
-            if self.selection_method == "board" and summary.board != board:
-                report.wrapper.append(report.B.H2(summary.board))
-                board = summary.board
-            for node in summary.nodes:
-                report.wrapper.append(node)
+            if self.selection_method != "board" or not summary.boards:
+                boards[""].append(summary)
+            else:
+                for board in summary.boards:
+                    boards[board].append(summary)
+        for board in sorted(boards):
+            if board:
+                report.wrapper.append(report.B.H2(board))
+            for summary in boards[board]:
+                for node in summary.nodes:
+                    report.wrapper.append(node)
         report.wrapper.append(self.footer)
         report.page.head.append(report.B.STYLE(self.CSS))
         return report
@@ -533,13 +544,10 @@ class Summary:
 
     def __lt__(self, other):
         """Support sorting a sequence of `Summary` objects."""
-
-        title = self.title.lower()
-        other_title = other.title.lower()
-        return (self.board, title) < (other.board, other_title)
+        return self.title.lower() < other.title.lower()
 
     @cached_property
-    def board(self):
+    def boards(self):
         """String for the summary's PDQ Editorial board.
 
         A summary typically has multiple board links. Only one will
@@ -547,6 +555,10 @@ class Summary:
         picklist. For a Spanish summary, we have to find the English
         summary of which it is a translation, as that is the document
         which will have the link to the editorial board we need.
+
+        2023-11-29: Requirements have changed, and now a summary can
+        have more than one PDQ editorial board. Only include the ones
+        which match the user's selection(s). See OCECDR-5298.
         """
 
         b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
@@ -559,11 +571,23 @@ class Summary:
             query.join("query_term_pub t", "t.int_val = b.doc_id")
             query.where(query.Condition("t.path", t_path))
             query.where(query.Condition("t.doc_id", self.id))
+        if self.control.board and "all" not in self.control.board:
+            query.where(query.Condition("b.int_val", self.control.board, "IN"))
+        boards = []
         for row in query.execute(self.control.cursor).fetchall():
             board = self.control.boards.get(row.int_val)
             if board:
-                return str(board)
-        return "Board not found"
+                boards.append(str(board))
+        return boards
+
+    @cached_property
+    def html(self):
+        """Filtered HTML for the report."""
+
+        opts = dict(id=self.id, version=self.version)
+        doc = Doc(self.control.session, **opts)
+        result = doc.filter(*self.FILTERS, parms=self.parms)
+        return str(result.result_tree).strip()
 
     @cached_property
     def id(self):
@@ -577,13 +601,13 @@ class Summary:
         We use XSL/T filtering to generate the HTML fragments
         for the report for this summary, which we then parse
         so they can be added to the page object.
+
+        Don't cache these, as they might need to appear in more
+        than one place in the report. We do cache the filtered
+        HTML string, though.
         """
 
-        opts = dict(id=self.id, version=self.version)
-        doc = Doc(self.control.session, **opts)
-        result = doc.filter(*self.FILTERS, parms=self.parms)
-        html = str(result.result_tree).strip()
-        return self.H.fragments_fromstring(html)
+        return self.H.fragments_fromstring(self.html)
 
     @cached_property
     def parms(self):
