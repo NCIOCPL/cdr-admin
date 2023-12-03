@@ -60,7 +60,7 @@ class Control(Controller):
                 for member in self.members:
                     rows.append(member.row)
                 opts["caption"] = self.caption
-                return self.Reporter.Table(rows, **opts)
+                return [self.Reporter.Table(rows, **opts)]
             tables = []
             for board in self.boards:
                 rows = []
