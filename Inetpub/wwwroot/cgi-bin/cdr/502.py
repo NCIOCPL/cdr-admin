@@ -27,7 +27,11 @@ class Control(Controller):
              page.B.P(
                 "If the problem persists, please create a ",
                 self.jira,
-                " ticket in the OCECDR project."
+                " ticket in the OCECDR project. If the problem is "
+                "obviously a network or other infrastructure failure, "
+                "it may be appropriate to also file a ticket with ",
+                self.service_now,
+                "."
             )
         )
         if self.fields.getvalue("clean"):
@@ -60,7 +64,7 @@ class Control(Controller):
     def jira(self):
         """Link for creating a new CDR ticket in JIRA (if we have the URL)."""
 
-        args = "jira", "create-cdr-ticket"
+        args = "trackers", "create-cdr-ticket"
         self.logger.info(dir(self.session.tier))
         url = self.session.tier.get_control_value(self.session, *args)
         if not url:
@@ -114,6 +118,18 @@ class Control(Controller):
             message = "Failure parsing URL for original request."
             self.alerts.append(dict(message=message, type="error"))
             return None
+
+    @cached_property
+    def service_now(self):
+        """Link for creating a Service Now ticket (if we have the URL)."""
+
+        label = "NCI at Your Service"
+        args = "trackers", "create-sn-ticket"
+        self.logger.info(dir(self.session.tier))
+        url = self.session.tier.get_control_value(self.session, *args)
+        if not url:
+            return label
+        return self.HTMLPage.B.A(label, href=url, target="_blank")
 
     @cached_property
     def session(self):
