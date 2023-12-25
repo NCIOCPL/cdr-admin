@@ -57,6 +57,10 @@ class Control(Controller):
         for button in self.buttons:
             button = B.INPUT(classes, value=button, **opts)
             self.form_page.form.append(button)
+        for alert in self.alerts:
+            message = alert["message"]
+            del alert["message"]
+            self.form_page.add_alert(message, **alert)
         self.form_page.send()
 
     @cached_property
@@ -64,7 +68,7 @@ class Control(Controller):
         """Show a message indicating successful deletion."""
 
         if self.deleted:
-            message = "Successfully deleted link type {self.deleted!r}."
+            message = f"Successfully deleted link type {self.deleted!r}."
             return [dict(message=message, type="success")]
         return []
 
@@ -95,6 +99,7 @@ class Control(Controller):
     def same_window(self):
         """If this browser tab was created automatically, don't open more."""
         return self.buttons if self.deleted or self.returned else []
+
 
 if __name__ == "__main__":
     """Don't execute the script if loaded as a module."""

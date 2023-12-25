@@ -14,7 +14,6 @@ class Control(Controller):
     SUBTITLE = "Term Hierarchy Tree"
     LOGNAME = "TermHierarchyTree"
     CSS = "../../stylesheets/TermHierarchyTree.css"
-    JQUERY = "https://code.jquery.com/jquery-3.6.0.min.js"
     SCRIPT = "../../js/TermHierarchyTree.js"
     PARENT_PATH = "/Term/TermRelationship/ParentTerm/TermId/@cdr:ref"
     INSTRUCTIONS = (
@@ -44,7 +43,7 @@ class Control(Controller):
 
         report = BasicWebPage()
         report.wrapper.append(report.B.H1(self.SUBTITLE))
-        report.head.append(report.B.SCRIPT(src=self.JQUERY))
+        report.head.append(report.B.SCRIPT(src=self.HTMLPage.JQUERY))
         report.head.append(report.B.SCRIPT(src=self.SCRIPT))
         report.head.append(report.B.LINK(href=self.CSS, rel="stylesheet"))
         report.body.append(self.tree)

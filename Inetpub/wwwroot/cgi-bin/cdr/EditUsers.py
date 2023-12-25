@@ -11,7 +11,7 @@ class Control(Controller):
     """Encapsulates processing logic for building the menu page."""
 
     SUBTITLE = "Manage Users"
-    LOGFILE = "ManageUsers"
+    LOGNAME = "ManageUsers"
     ADD_NEW_USER = "Add New User"
     EDIT_USER = "EditUser.py"
 
@@ -51,7 +51,7 @@ class Control(Controller):
         """Let the user know if we successfully inactivated a user account."""
 
         if self.deleted:
-            message = f"Successfully retired account for user {self.deleted!r}."
+            message = f"Successfully retired account for user {self.deleted}."
             return [dict(message=message, type="success")]
         return []
 
@@ -67,7 +67,7 @@ class Control(Controller):
 
     @cached_property
     def returned(self):
-        """True if the user clicked the User Menu button on the editing form."""
+        """True if the clicked the User Menu button on the editing form."""
         return True if self.fields.getvalue("returned") else False
 
     @cached_property

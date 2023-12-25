@@ -195,10 +195,8 @@ class Control(Controller):
             for id, title in rows:
                 names.append((id, f"CDR{id:010d}: {title}"))
             if not names:
-                self.alerts.append(dict(
-                    message=f"No names found starging with {self.name!r}.",
-                    type="warning",
-                ))
+                message = f"No names found starting with {self.name!r}."
+                self.alerts.append(dict(message=message, types="warning"))
         return names
 
     @cached_property

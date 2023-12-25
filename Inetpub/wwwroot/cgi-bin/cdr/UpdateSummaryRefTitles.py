@@ -171,7 +171,6 @@ class Control(Controller):
         except Exception:
             self.bail()
 
-
     class Summary:
 
         TITLE = "/Summary/SummaryTitle"
@@ -232,6 +231,7 @@ class Control(Controller):
             query.where("c.dt_in IS NULL")
             rows = query.execute(self.control.cursor).fetchall()
             return rows[0][0] if rows else None
+
 
 class Updater(Job):
     """Global change job used to update SummaryRef titles."""

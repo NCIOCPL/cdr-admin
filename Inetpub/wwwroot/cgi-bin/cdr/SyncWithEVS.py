@@ -24,8 +24,8 @@ class Control(Controller):
         "which are linked unambiguously to a single EVS concept, and which "
         "differ in the names and/or the definitions used by the "
         "two systems. For each such term the differences are displayed "
-        "side-by-side with highlighting. Each term has a checkbox which can be "
-        "used to mark the CDR Term document to be refreshed from the "
+        "side-by-side with highlighting. Each term has a checkbox which can "
+        "be used to mark the CDR Term document to be refreshed from the "
         "values in the EVS. A second checkbox is available for each term "
         "to suppress its appearance on this report. When you have finished "
         "queueing up the actions which should be performed you can click "
@@ -91,24 +91,6 @@ class Control(Controller):
           page - instance of the cdrcgi.HTMLPage class
         """
 
-        #fieldset = page.fieldset("Instructions")
-        #for paragraph in self.INSTRUCTIONS:
-        #    fieldset.append(page.B.P(paragraph))
-        #page.form.append(fieldset)
-        #button = page.B.BUTTON(
-        #    "Instructions",
-        #    page.B.CLASS("usa-accordion__button"),
-        #    type="button",
-        #)
-        #button.set("aria-expanded", "false")
-        #button.set("aria-controls", "instructions")
-        #payload = page.B.DIV(id="instructions")
-        #header = page.B.H4(button)
-        #header.set("class", "usa-accordion__heading")
-        #payload.set("class", "usa-accordion__content usa-prose")
-        #accordion = page.B.DIV(header, payload)
-        # accordion.set("class", "usa-accordion usa-accordion--bordered")
-        #accordion.set("class", "usa-accordion")
         accordion = page.accordion("instructions")
         for paragraph in self.INSTRUCTIONS:
             accordion.payload.append(page.B.P(paragraph))

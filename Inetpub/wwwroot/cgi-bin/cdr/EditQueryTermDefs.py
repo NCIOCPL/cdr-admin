@@ -10,6 +10,7 @@ from cdrcgi import Controller
 from cdrapi.searches import QueryTermDef
 from cdrapi.settings import Tier
 
+
 class Control(Controller):
 
     SUBTITLE = "Manage Query Term Definitions"
@@ -63,13 +64,17 @@ class Control(Controller):
         legend = "Select Definitions to Delete and Click 'Remove'"
         fieldset = page.fieldset(legend)
         for definition in self.definitions:
-            opts = dict(value=definition.path, label=definition.path)
+            path = definition.path
+            id = path.lower().replace("/", "SLASH").replace("@", "AT")
+            id = id.replace(":", "COLON")
+            opts = dict(value=path, label=path, widget_id=f"path-{id}")
             fieldset.append(page.checkbox("path", **opts))
         page.form.append(fieldset)
-        page.add_css("""\
-#submit-button-compare, #submit-button-add { margin: 1rem 0 3rem; }
-xxfieldset { width: 1024px; }
-.xxlabeled-field select, #xxnew-dev input { width: 874px; }""")
+        page.add_css(
+            "#submit-button-compare, #submit-button-add {\n"
+            "  margin: 1rem 0 3rem;\n"
+            "}\n"
+        )
 
     def add(self):
         """Add a new definition and re-display the form."""
@@ -166,7 +171,7 @@ xxfieldset { width: 1024px; }
     @cached_property
     def buttons(self):
         """Customize form buttons."""
-        return [self.REMOVE] # self.ADD, self.REMOVE, self.COMPARE
+        return [self.REMOVE]
 
     @cached_property
     def definitions(self):

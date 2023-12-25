@@ -101,7 +101,5 @@ function check_submit_button() {
 jQuery(function() {
     jQuery("#boards input").click(function() { check_board(); });
     check_board();
-    // let submit = jQuery("#header-buttons input[value='Submit']");
-    // submit.attr("id", "submit-button-submit");
     check_submit_button();
 });

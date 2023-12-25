@@ -11,7 +11,7 @@ class Control(Controller):
     """Encapsulates processing logic for building the menu page."""
 
     SUBTITLE = "Manage Actions"
-    LOGFILE = "ManageActions"
+    LOGNAME = "ManageActions"
     ADD_NEW_ACTION = "Add New Action"
     EDIT_ACTION = "EditAction.py"
     WARNING = (
@@ -81,7 +81,7 @@ p.text-red code strong { color: blue; }
 
     @cached_property
     def returned(self):
-        """True if the user clicked the Action Menu button on the editing form."""
+        """True if user clicked the Action Menu button on the editing form."""
         return True if self.fields.getvalue("returned") else False
 
     @cached_property

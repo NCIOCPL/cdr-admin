@@ -71,6 +71,7 @@ class Control(Controller):
         """Don't multiply browser tabs recursively."""
         return self.buttons if self.deleted or self.returned else []
 
+
 if __name__ == "__main__":
     """Don't execute the script if we're loaded as a module."""
     Control().run()

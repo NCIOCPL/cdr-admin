@@ -11,7 +11,7 @@ import datetime
 class Control(Controller):
     """Access to database, session, and report/form building."""
 
-    SUBTITLE = "Glossary Term Name Documents Modified Report"
+    SUBTITLE = "GTN Documents Modified Report"
     NAME_LABELS = {"en": "Term Name", "es": "Translated Term Name"}
     LANGUAGES = (("en", "English"), ("es", "Spanish"))
     STATUS_PATHS = dict(

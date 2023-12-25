@@ -26,6 +26,7 @@ class PersonSearch(AdvancedSearch):
 .person-addresses td { border-top: none; }
 td ul { margin-top: 0; margin-bottom: 0; }
 """
+
     def __init__(self):
         """Add the fields for this search type."""
 

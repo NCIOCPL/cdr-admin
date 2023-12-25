@@ -155,7 +155,8 @@ function check_board(val) {
             prev = meeting.date.year, meeting.date.month
             classes = ["strikethrough"] if meeting.canceled else []
             center = classes + ["center"]
-            meeting_date = str(meeting.date).replace("-", self.NONBREAKING_HYPHEN)
+            args = "-", self.NONBREAKING_HYPHEN
+            meeting_date = str(meeting.date).replace(*args)
             row = (
                 Reporter.Cell(meeting_date, classes=center),
                 Reporter.Cell(meeting.day, classes=center),

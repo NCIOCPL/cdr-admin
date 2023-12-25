@@ -130,7 +130,9 @@ class Control(Controller):
     @cached_property
     def same_window(self):
         """Only open a new browser tab from the initial menu page."""
-        return [] if self.fields.getvalue("initial-menu-page") else [self.SUBMIT]
+
+        initial_menu_page = self.fields.getvalue("initial-menu-page")
+        return [] if initial_menu_page else [self.SUBMIT]
 
 
 class Concept:
@@ -425,17 +427,23 @@ jQuery(function() {
         @cached_property
         def last_modified(self):
             """Date the definition was last modified."""
-            return Doc.get_text(self.node.find("DateLastModified"), "").strip() or None
+
+            child = self.node.find("DateLastModified")
+            return Doc.get_text(child, "").strip() or None
 
         @cached_property
         def last_reviewed(self):
             """Date the definition was last reviewed."""
-            return Doc.get_text(self.node.find("DateLastReviewed"), "").strip() or None
+
+            child = self.node.find("DateLastReviewed")
+            return Doc.get_text(child, "").strip() or None
 
         @cached_property
         def media_links(self):
             """Links to images for the definition."""
-            return [Concept.MediaLink(node) for node in self.node.findall("MediaLink")]
+
+            children = self.node.findall("MediaLink")
+            return [Concept.MediaLink(child) for child in children]
 
         @cached_property
         def node(self):
@@ -848,7 +856,10 @@ jQuery(function() {
 
         @property
         def spanish_name(self):
-            """Primary (non-"alternate") Spanish name for the term (manual caching)."""
+            """Primary (non-"alternate") Spanish name for the term.
+
+            Manual caching is intentional.
+            """
 
             if not hasattr(self, "_spanish_name"):
                 self._spanish_name = None

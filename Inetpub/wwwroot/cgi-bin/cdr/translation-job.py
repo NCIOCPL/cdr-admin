@@ -53,8 +53,13 @@ class Control(Controller):
         self.cursor.execute(query, self.english_id)
         self.conn.commit()
         self.logger.info("removed translation job for CDR%d", self.english_id)
-        message = f"Translation job for CDR{self.english_id} successfully removed."
-        self.redirect("translation-jobs.py", message=message)
+        message = (
+            f"Translation job for CDR{self.english_id} successfully removed."
+        )
+        params = dict(message=message)
+        if self.testing:
+            params["testing"] = True
+        self.redirect("translation-jobs.py", **params)
 
     def populate_form(self, page):
         """
@@ -64,6 +69,8 @@ class Control(Controller):
             page - object used to collect the form fields
         """
 
+        if self.testing:
+            page.form.append(page.hidden_field("testing", "True"))
         if self.english_id:
             self.populate_editing_form(page)
         else:
@@ -187,13 +194,14 @@ jQuery(function() {{
         if not self.session or not self.session.can_do(self.ACTION):
             self.bail("not authorized")
         if self.request == self.JOBS:
-            self.navigate_to("translation-jobs.py", self.session.name)
+            params = dict(testing=True) if self.testing else {}
+            self.redirect("translation-jobs.py", **params)
         elif self.request == self.DELETE:
             self.delete_job()
         elif self.request == self.GLOSSARY:
-            self.navigate_to("glossary-translation-jobs.py", self.session.name)
+            self.redirect("glossary-translation-jobs.py")
         elif self.request == self.MEDIA:
-            self.navigate_to("media-translation-jobs.py", self.session.name)
+            self.redirect("media-translation-jobs.py")
         Controller.run(self)
 
     def show_report(self):
@@ -237,10 +245,13 @@ jQuery(function() {{
                 if self.alert_needed(job):
                     self.alert(job)
                 message = "Translation job state stored successfully."
-                self.redirect("translation-jobs.py", message=message)
+                params = dict(message=message)
             else:
                 message = "No changes found to store."
-                self.redirect("translation-jobs.py", warning=message)
+                params = dict(warning=message)
+            if self.testing:
+                params["testing"] = True
+            self.redirect("translation-jobs.py", **params)
         else:
             self.show_form()
 
@@ -382,6 +393,11 @@ jQuery(function() {{
         return self.load_values("summary_translation_state")
 
     @cached_property
+    def testing(self):
+        """Used by automated tests to avoid spamming the users."""
+        return self.fields.getvalue("testing")
+
+    @cached_property
     def translators(self):
         """Users who are authorized to translate PDQ summaries."""
         return self.load_group("Spanish Translators")
@@ -411,6 +427,12 @@ jQuery(function() {{
         """
         Send an email alert to the user to whom the translation job
         is currently assigned.
+
+        Note that the `testing` property is set by the automated
+        test suite, in which the account to which the job is
+        assigned is a test account, so it's OK to use the recipient
+        address instead of the Test Translation Queue Recips group
+        addresses.
         """
 
         recip = self.UserInfo(self, job.assigned_to)
@@ -424,12 +446,16 @@ jQuery(function() {{
         subject = f"[{self.session.tier}] Translation Queue Notification"
         log_message = f"mailed translation job state alert to {recip}"
         if not isProdHost():
-            recips = getEmailList("Test Translation Queue Recips")
-            body.append(
-                f"[*** THIS IS A TEST MESSAGE ON THE {self.session.tier} TIER."
-                f" ON PRODUCTION IT WOULD HAVE GONE TO {recip}. ***]\n"
-            )
-            log_message = f"test alert for {recip} sent to {recips}"
+            if not self.testing:
+                recips = getEmailList("Test Translation Queue Recips")
+                body.append(
+                    "[*** THIS IS A TEST MESSAGE ON THE "
+                    f"{self.session.tier} TIER. "
+                    f"ON PRODUCTION IT WOULD HAVE GONE TO {recip}. ***]\n"
+                )
+                log_message = f"test alert for {recip} sent to {recips}"
+            else:
+                self.logger.info("sending mail to the regression tester email")
         if self.job.new:
             body.append("A new translation job has been assigned to you.")
         else:

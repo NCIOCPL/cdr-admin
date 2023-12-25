@@ -13,7 +13,8 @@ class Control(Controller):
 
     EDIT_GROUPS = "EditGroups.py"
     GROUP_MENU = "Group Menu"
-    SAVE = "Save Changes"
+    SAVE_CHANGES = "Save Changes"
+    SAVE_NEW = "Save New Group"
     DELETE = "Delete Group"
 
     def delete(self):
@@ -79,9 +80,10 @@ class Control(Controller):
                 page.form.append(fieldset)
 
         # Don't know why the first column in the list is positioned lower than
-        # the subsequent columns. Doesn't work that way for other links in columns.
-        # May have something to do with the tricky positioning of checkboxes used
-        # by USWDS. Solution is to raise the DIV for the first checkbox by .75rem.
+        # the subsequent columns. Doesn't work that way for other links in
+        # columns. May have something to do with the tricky positioning of
+        # checkboxes used by USWDS. Solution is to raise the DIV for the first
+        # checkbox by .75rem.
         page.add_css("""\
 .checkboxes ul { column-width: 13rem; list-style-type: none; }
 .checkboxes ul li:first-child div { margin-top: -.75rem; }
@@ -100,7 +102,7 @@ class Control(Controller):
         try:
             if self.request == self.DELETE:
                 return self.delete()
-            elif self.request == self.SAVE:
+            elif self.request in (self.SAVE_CHANGES, self.SAVE_NEW):
                 return self.save()
             elif self.request == self.GROUP_MENU:
                 return self.return_to_groups_menu()
@@ -155,8 +157,8 @@ class Control(Controller):
         """Add our custom navigation buttons."""
 
         if self.group.id:
-            return self.SAVE, self.DELETE, self.GROUP_MENU
-        return self.SAVE, self.GROUP_MENU
+            return self.SAVE_CHANGES, self.DELETE, self.GROUP_MENU
+        return self.SAVE_NEW, self.GROUP_MENU
 
     @cached_property
     def comment(self):
@@ -172,18 +174,15 @@ class Control(Controller):
     def group(self):
         """Object for the CDR group being edited/created."""
 
-        if not hasattr(self, "_xxxgroup"):
-            name = self.fields.getvalue("grp")
-            if name:
-                self._group = self.session.get_group(name)
-            else:
-                opts = dict(
-                    name=self.name,
-                    comment=self.comment,
-                    session=self.session
-                )
-                self._group = self.session.Group(**opts)
-        return self._group
+        name = self.fields.getvalue("grp")
+        if name:
+            return self.session.get_group(name)
+        opts = dict(
+            name=self.name,
+            comment=self.comment,
+            session=self.session
+        )
+        return self.session.Group(**opts)
 
     @cached_property
     def members(self):

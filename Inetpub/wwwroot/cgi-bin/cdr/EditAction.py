@@ -111,7 +111,10 @@ class Control(Controller):
     @cached_property
     def doctype_specific(self):
         """True if permissions for this action are doctype-specific."""
-        return True if "doctype-specific" in self.fields.getlist("options") else False
+
+        if "doctype-specific" in self.fields.getlist("options"):
+            return True
+        return False
 
     @cached_property
     def name(self):

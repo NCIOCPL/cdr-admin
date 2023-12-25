@@ -131,8 +131,9 @@ $(function() { chk_cdrid(); chk_pmid(); });
         page.form.append(page.button("Search PubMed", onclick=pubmed))
         if self.session.can_do("ADD DOCUMENT", "Citation"):
             button = self.button("Import")
+            onclick = "jQuery('#primary-form').attr('target', '');"
+            button.set("onclick", onclick)
             button.set("disabled")
-            button.set("onclick", "jQuery('#primary-form').attr('target', '');")
             page.form.append(button)
         if message:
             type = "warning" if "validation errors" in message else "success"

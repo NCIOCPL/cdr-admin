@@ -44,7 +44,7 @@ class Control(Controller):
                     " WHERE id = ?"
                     "   AND status NOT IN ('Success', 'Failure')", values)
                 self.conn.commit()
-                message=f"Set the status for job {self.id} to {self.status}."
+                message = f"Set the status for job {self.id} to {self.status}."
                 self.alerts.append(dict(message=message, type="success"))
             self.show_form()
 

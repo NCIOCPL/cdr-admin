@@ -85,7 +85,8 @@ class Control(Controller):
         boards = [("all", "All Boards")] + self.boards
         board = self.board or "all"
         for id, name in boards:
-            opts = dict(value=id, label=name, checked=id==board)
+            checked = id == board
+            opts = dict(value=id, label=name, checked=checked)
             fieldset.append(page.radio_button("board", **opts))
         page.form.append(fieldset)
         fieldset = page.fieldset("Exclusions")

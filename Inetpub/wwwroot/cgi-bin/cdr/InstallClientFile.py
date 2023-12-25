@@ -40,12 +40,6 @@ class Control(Controller):
         fieldset.append(page.file_field("file"))
         fieldset.append(page.text_field("location"))
         page.form.append(fieldset)
-        #if self.logs is not None:
-        #    fieldset = page.fieldset("Processing Logs")
-        #    fieldset.append(self.logs)
-        #    page.form.append(fieldset)
-        #    page.add_css("fieldset { width: 600px } #comment { width: 450px }")
-        #    page.add_css("pre { color: green }")
         page.form.set("enctype", "multipart/form-data")
 
     def show_report(self):
@@ -103,10 +97,8 @@ class Control(Controller):
 
         if self.file_bytes and self.location:
             if not self.session.can_do("MANAGE CLIENT FILES"):
-                return [dict(
-                    message="Account not authorized for managing client files.",
-                    type="warning",
-                )]
+                message = "Account not authorized for managing client files."
+                return [dict(message=message, type="warning")]
             path = self.client_files / self.location
             try:
                 path.parent.mkdir(parents=True, exist_ok=True)

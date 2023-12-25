@@ -87,7 +87,7 @@ h1 { text-align: center; font-size: 1.3em; }
         )
         for value, label in display_options:
             checked = not self.request or value in self.display
-            opts = dict(value=value, label=label, checked=checked, onclick=None)
+            opts = dict(value=value, label=label, checked=checked, onclick="")
             fieldset.append(page.checkbox("show", **opts))
         page.form.append(page.hidden_field("debug", self.debug or ""))
         page.form.append(fieldset)
@@ -239,7 +239,8 @@ h1 { text-align: center; font-size: 1.3em; }
 
                 # Show the description(s) if requested.
                 if "description" in self.display:
-                    for node in media.doc.root.findall(".//ContentDescription"):
+                    path = ".//ContentDescription"
+                    for node in media.doc.root.findall(path):
                         if node.get("audience") == audience:
                             wrapper.append(B.H3("Description"))
                             wrapper.append(B.P(Doc.get_text(node)))
@@ -271,6 +272,7 @@ h1 { text-align: center; font-size: 1.3em; }
 
         if self.selection_method != "title" or not self.fragment:
             return []
+
         class SummaryTitle:
             def __init__(self, doc_id, display, tooltip=None):
                 self.id = doc_id

@@ -238,6 +238,7 @@ class Summary:
             self.control.show_progress("received response from Drupal...")
             return etree.fromstring(response.content, parser=parser)
         except Exception as e:
+            self.control.logger.exception("Failure create publish preview")
             self.control.bail(f"Failure generating preview: {e}")
         finally:
             if nid is not None:
@@ -280,7 +281,7 @@ class Summary:
                 link.set("href", href)
         replacement = f"{self.CANCER_GOV}{self.IMAGE_PATH}"
 
-        # The NCI Logo sits within a picture element.  It's display
+        # The NCI Logo sits within a picture element.  Its display
         # needs to be handled differently from the img elements.
         for source in page.iter("source"):
             self.control.show_progress("fixing NCI Logo link...")
@@ -488,9 +489,11 @@ class GTN:
             rel="stylesheet",
         ),
     )
-    STYLE = """
-        div.results { clear: both; }
-        dl dt { font-size: 1.75em; } """
+    STYLE = """\
+dl.dictionary-list figure.image-left-medium { float: none; }
+div.results { clear: both; }
+dl dt { font-size: 1.75em; }
+"""
     NAV = "LEFT NAV GOES HERE"
     JSFUNC = """
         function play_en() {
@@ -627,7 +630,7 @@ class GTN:
                 self.B.DIV(
                     self.B.DIV(
                         self.B.DIV(
-                            *self.results,  # What does '*' do here???
+                            *self.results,
                             self.B.CLASS("slot-item last-SI"),
                         ),
                         id="cgvBody",
@@ -680,7 +683,6 @@ class GTN:
         """String for the head's title element."""
         return f"Publish Preview: CDR{self.doc.id}"
 
-
     class Result:
         """Portion of the display specific to one language."""
 
@@ -698,7 +700,9 @@ class GTN:
         @cached_property
         def audio(self):
             """Media link for the term's pronunciation in this language.
-               This needs to be an audio tag combined with a button to press"""
+
+            This needs to be an audio tag combined with a button to press.
+            """
 
             if self.audio_url:
                 B = self.term.B
@@ -1065,7 +1069,6 @@ class GTN:
                     if suffix in mime_type:
                         return suffix
                 return "jpg"
-
 
         class Ref:
             """Link to a related resource."""

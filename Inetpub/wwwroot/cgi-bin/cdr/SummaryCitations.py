@@ -154,6 +154,7 @@ class Control(Controller):
         query.where("t.name = 'Summary'")
         query.where(query.Condition("d.title", fragment, "LIKE"))
         rows = query.order("d.id").execute(self.cursor).fetchall()
+
         class Doc:
             def __init__(self, row):
                 self.id = row.id

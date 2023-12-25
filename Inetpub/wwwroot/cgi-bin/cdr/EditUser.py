@@ -78,7 +78,7 @@ class Control(Controller):
         ul = page.B.UL()
         fieldset.append(ul)
         for group in self.groups:
-            opts = dict(value=group)
+            opts = dict(value=group, label=group)
             if self.user.groups and group in self.user.groups:
                 opts["checked"] = True
             ul.append(page.B.LI(page.checkbox("group", **opts)))
@@ -159,6 +159,7 @@ jQuery(function() {
         self.user = self.session.User(self.session, **opts)
         self.user.save(password)
         self.alerts.append(dict(message=alert, type="success"))
+        del self.subtitle
         self.show_form()
 
     @cached_property

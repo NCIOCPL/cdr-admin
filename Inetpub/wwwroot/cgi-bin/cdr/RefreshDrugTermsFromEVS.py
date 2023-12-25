@@ -78,15 +78,15 @@ class Control(Controller):
         if self.sort == "name":
             concepts = sorted(self.concepts.values())
         else:
-            doc_ids = defaultdict(list)
+            doc_ids = {}
             for concept in self.concepts.values():
-                doc_id = self.codes.get(concept.code)
-                if doc_id:
-                    doc_ids[doc_id].append(concept)
+                if concept.code not in self.ambiguous:
+                    doc_id = self.codes.get(concept.code)
+                    if doc_id:
+                        doc_ids[doc_id] = concept
             concepts = []
             for doc_id in sorted(doc_ids):
-                if len(doc_ids[doc_id]) == 1:
-                    concepts.append(doc_ids[doc_id][0])
+                concepts.append(doc_ids[doc_id])
 
         # Start building the form.
         form = page.B.FORM(method="POST", action=self.script)
@@ -101,10 +101,18 @@ class Control(Controller):
         terms = 0
         tbody = page.B.TBODY()
         for concept in concepts:
+            if concept.code in self.ambiguous:
+                self.logger.info("skipping ambiguous %s", concept.code)
+                continue
             doc = self.__doc_for_code(concept.code)
             if not doc or doc.cdr_id in self.suppressed:
+                if doc:
+                    self.logger.info("skipping suppressed %s", concept.code)
+                else:
+                    self.logger.info("skipping unmatched %s", concept.code)
                 continue
             if not concept.differs_from(doc):
+                self.logger.info("skipping unchanged %s", concept.code)
                 continue
             terms += 1
             code = concept.code
@@ -199,13 +207,30 @@ class Control(Controller):
         if self.request == self.SORT_BY_ID:
             self.redirect(self.script, sort="id", concepts=self.concepts_path)
         elif self.request == self.SORT_BY_NAME:
-            self.redirect(self.script, sort="name", concepts=self.concepts_path)
+            opts = dict(sort="name", concepts=self.concepts_path)
+            self.redirect(self.script, **opts)
         else:
             Controller.run(self)
 
     def show_report(self):
         """Everything is shown on the form page."""
         self.show_form()
+
+    @cached_property
+    def ambiguous(self):
+        """Concept IDs found in docs with more than one concept link."""
+
+        doc_ids = defaultdict(list)
+        for concept in self.concepts.values():
+            doc_id = self.codes.get(concept.code)
+            if doc_id:
+                doc_ids[doc_id].append(concept.code)
+        ambiguous = set()
+        for doc_id in doc_ids:
+            if len(doc_ids[doc_id]) > 1:
+                for code in doc_ids[doc_id]:
+                    ambiguous.add(code)
+        return ambiguous
 
     @cached_property
     def buttons(self):

@@ -74,6 +74,7 @@ class Control(Controller):
         """Suppress warning that we have no tables. We know."""
         return None
 
+
 if __name__ == "__main__":
     """Don't execute the script if loaded as a module."""
     Control().run()

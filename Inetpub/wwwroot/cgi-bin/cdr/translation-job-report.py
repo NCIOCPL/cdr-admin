@@ -102,15 +102,6 @@ class Control(Controller):
         else:
             Controller.run(self)
 
-    def xxshow_report(self):
-        """Override the base class version so we can add extra buttons."""
-
-        page = self.report.page
-        buttons = page.body.find("form/header/h1/span")
-        buttons.insert(0, page.button(self.MEDIA))
-        buttons.insert(0, page.button(self.GLOSSARY))
-        self.report.send(self.format)
-
     @cached_property
     def buttons(self):
         """Customize the form's buttons."""

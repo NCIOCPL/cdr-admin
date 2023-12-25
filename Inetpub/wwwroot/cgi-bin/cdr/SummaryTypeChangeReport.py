@@ -360,8 +360,9 @@ $(function() {
                         doc = Doc(self.session, id=id)
                         doctype = doc.doctype.name
                         if doctype != "Summary":
-                            msg = f"CDR{doc.id} is a {doctype} document."
-                            self.alerts.append(dict(essage=msg, type="warning"))
+                            message = f"CDR{doc.id} is a {doctype} document."
+                            alert = dict(message=message, type="warning")
+                            self.alerts.append(alert)
                         else:
                             self.cdr_ids.add(doc.id)
                     except Exception:
@@ -600,7 +601,6 @@ class Summary:
         if nchanges > 0:
             return [tuple(row)]
         return []
-
 
     class Change:
         """

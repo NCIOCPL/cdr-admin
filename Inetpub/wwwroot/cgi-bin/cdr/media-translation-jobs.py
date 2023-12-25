@@ -69,6 +69,7 @@ class Control(Controller):
             self.conn.commit()
             message = f"Purged jobs for {count:d} published translations."
             self.alerts.append(dict(message=message, type="success"))
+            return self.show_form()
         elif self.request == self.ASSIGN:
             count = 0
             fields = "state_id", "comments", "assigned_to"
@@ -99,6 +100,7 @@ class Control(Controller):
                 count += 1
             message = f"Re-assigned {count:d} jobs."
             self.alerts.append(dict(message=message, type="success"))
+            return self.show_form()
         Controller.run(self)
 
     def show_form(self):
@@ -207,7 +209,9 @@ form { width: 90%; margin: 0 auto; }
     @cached_property
     def table(self):
         """Table of queued glossary translation jobs."""
-        return self.Reporter.Table(self.rows, cols=self.COLUMNS, caption="Jobs")
+
+        opts = dict(cols=self.COLUMNS, caption="Jobs")
+        return self.Reporter.Table(self.rows, **opts)
 
     @cached_property
     def translators(self):
@@ -248,7 +252,7 @@ class Job:
         """Notes on the translation job."""
 
         comments = self.__row.comments or ""
-        return comments[:40] + "..."  if len(comments) > 40 else comments
+        return comments[:40] + "..." if len(comments) > 40 else comments
 
     @cached_property
     def date(self):

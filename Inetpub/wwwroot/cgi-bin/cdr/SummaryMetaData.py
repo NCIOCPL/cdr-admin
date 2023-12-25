@@ -244,7 +244,8 @@ class Control(Controller):
                     doc = Doc(self.session, id=self.doc_id)
                     if doc.doctype.name != "Summary":
                         message = f"CDR{doc.id} is a {doc.doctype} document."
-                        self.alerts.append(dict(essage=message, type="warning"))
+                        alert = dict(message=message, type="warning")
+                        self.alerts.append(alert)
                         return False
                 except Exception:
                     message = f"Unable to find document {self.doc_id}."
@@ -527,7 +528,7 @@ class Summary:
             return None
         rows = [section.row for section in self.sections if section.row]
         opts = dict(columns=self.COLUMNS)
-        return  Reporter.Table(rows, **opts)
+        return Reporter.Table(rows, **opts)
 
     @cached_property
     def sections(self):

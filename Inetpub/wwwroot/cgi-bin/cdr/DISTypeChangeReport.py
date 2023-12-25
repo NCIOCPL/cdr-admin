@@ -33,7 +33,8 @@ class Control(Controller):
         "drug information summaries, refer to the ad-hoc query "
         "'DIS CDR IDs for Type of Change Report' on the ",
         "CDR Stored Database Queries",
-        "/cgi-bin/cdr/CdrQueries.py?query=DIS CDR IDs for Type of Change Report",
+        "/cgi-bin/cdr/CdrQueries.py?query=DIS CDR IDs for "
+        "Type of Change Report",
         " page. Copy and paste the complete set of CDR IDs into the "
         "CDR ID field."
     )
@@ -132,7 +133,7 @@ class Control(Controller):
         fieldset = page.fieldset("Types of Change")
         for ct in self.all_dis_types:
             checked = ct in self.change_types
-            opts = dict(value=ct, checked=checked)
+            opts = dict(label=ct, value=ct, checked=checked)
             fieldset.append(page.checkbox("change-type", **opts))
         page.form.append(fieldset)
 
@@ -607,7 +608,6 @@ class Summary:
         if nchanges > 0:
             return [tuple(row)]
         return []
-
 
     class Change:
         """

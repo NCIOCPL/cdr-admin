@@ -466,7 +466,8 @@ jQuery(function() {
 
                 # Show the description(s) if requested.
                 if "description" in self.display:
-                    for node in media.doc.root.findall(".//ContentDescription"):
+                    path = ".//ContentDescription"
+                    for node in media.doc.root.findall(path):
                         audience = node.get("audience")
                         if audience in self.audiences:
                             audience = self.AUDIENCES[audience]
@@ -555,6 +556,7 @@ jQuery(function() {
 
         if self.selection_method != "title" or not self.fragment:
             return []
+
         class MediaTitle:
             def __init__(self, doc_id, display, tooltip=None):
                 self.id = doc_id

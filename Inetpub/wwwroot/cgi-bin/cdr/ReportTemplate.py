@@ -89,7 +89,7 @@ class Control(Controller):
     @cached_property
     def ready(self):
         """True if we have everything needed for the report.
-        
+
         For this example, we'll allow a request to include the
         required start and end dates in the URL's parameters.
         So we can be ready even if the user hasn't clicked the

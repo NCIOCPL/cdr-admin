@@ -25,79 +25,37 @@ class Control(Controller):
     DELETION_BLOCKED = "Deletion request blocked because the value is mapped"
     DELETE = "DELETE FROM external_map WHERE id = ?"
     TYPE_NOT_MAPPABLE = "{} mappings can't link to {} document CDR{:d}"
+    CSS = """\
+.mapped-to { width: 5rem; margin-top: 0; }
+#tabular-form { width: 80%; margin: 5rem auto 1rem; }
+#tabular-form caption { text-align: center; font-size: 1.2rem; }
+#tabular-form th { text-align: center; font-weight: bold; }
+#tabular-form.usa-form .usa-button { margin-top: 0; }
+#tabular-form .usa-checkbox__label { margin-top: 0; }
+tfoot td { color: green; font-size: .9em; font-style: italic; }
+.usa-table tfoot td { text-align: center; border-bottom: none; }
+.usa-form td a:visited { color: white; }
+"""
 
     def build_tables(self):
-        """Create and show the selected mapping, as well as the filter form."""
+        """Show the selected mappings (if any) under the filter form."""
 
-        B = self.HTMLPage.B
-        rows = []
-        url = f"QcReport.py?Session={self.session}&DocVersion=-1"
-        for mapping in self.mappings:
-            mid = str(mapping.id)
-            doc_id = str(mapping.doc_id or "")
-            id_field = B.INPUT(name=f"cdrid-{mapping.id}", value=doc_id)
-            id_field.set("class", "usa-input mapped-to")
-            if doc_id:
-                opts = dict(href=f"{url}&DocId={doc_id}", target="_blank")
-                view_button = B.A("View", B.CLASS("usa-button"), **opts)
-            else:
-                view_button = ""
-            delete = self.HTMLPage.checkbox("delete", label="Delete?", value=mid)
-            bogus = self.HTMLPage.checkbox("bogus", label="Bogus?", value=mid)
-            mappable = self.HTMLPage.checkbox("mappable", label="Mappable?", value=mid)
-            if mapping.bogus:
-                bogus.find("input").set("checked")
-            if mapping.mappable:
-                mappable.find("input").set("checked")
-            cols = [
-                B.TD(mapping.value),
-                B.TD(id_field),
-                B.TD(view_button),
-                B.TD(delete),
-                B.TD(bogus),
-                B.TD(mappable)
-            ]
-            if not self.usage:
-                cols.insert(0, B.TD(mapping.usage))
-            rows.append(B.TR(*cols))
-        headers = [
-            B.TH("Variant String"),
-            B.TH("Mapped To", colspan="2"),
-            B.TH("Flags", colspan="3"),
-        ]
-        if not self.usage:
-            headers.insert(0, B.TH("Usage"))
-        elapsed = datetime.now() - self.started
-        footnote = f"Fetched {len(rows):d} mapping(s) in {elapsed}"
-        table = B.TABLE(
-            B.CAPTION("Mappings"),
-            B.E("header", B.TR(*headers)),
-            B.TBODY(*rows),
-            B.TFOOT(B.TR(B.TD(footnote, colspan=str(len(cols))))),
-            B.CLASS("usa-table usa-table--borderless")
-        )
         page = self.form_page
         filter_opts = json.dumps(self.filter_opts)
         self.populate_form(page)
         page.form.append(page.button(self.FILTER))
         page.form.set("target", "")
-        page.add_css(
-            ".mapped-to { width: 5rem; margin-top: 0; }\n"
-            "#tabular-form { width: 80%; margin: 5rem auto 1rem; }\n"
-            "#tabular-form caption { text-align: center; font-size: 1.2rem; }\n"
-            "#tabular-form th { text-align: center; font-weight: bold; }\n"
-            "#tabular-form.usa-form .usa-button { margin-top: 0; }\n"
-            "#tabular-form .usa-checkbox__label { margin-top: 0; }\n"
-            "tfoot td { color: green; font-size: .9em; font-style: italic; }\n"
-            ".usa-table tfoot td { text-align: center; border-bottom: none; }\n"
-            ".usa-form td a:visited { color: white; }\n"
-        )
         opts = dict(action=self.script, method="POST", id="tabular-form")
-        form = B.FORM(B.CLASS("usa-form"), **opts)
-        form.append(table)
+        form = page.B.FORM(page.B.CLASS("usa-form"), **opts)
+        if self.table is not None:
+            form.append(self.table)
+            page.add_css(self.CSS)
+            form.append(page.button(self.SAVE))
+        else:
+            message = "No mappings found matching the filtering criteria."
+            page.add_alert(message, type="warning")
         form.append(page.hidden_field(self.FILTER_OPTS, filter_opts))
         form.append(page.hidden_field(self.SESSION, self.session))
-        form.append(page.button(self.SAVE))
         page.main.append(form)
         page.send()
 
@@ -283,7 +241,8 @@ class Control(Controller):
                 page.add_alert(message, type=alert_type)
             else:
                 items = [page.B.LI(item) for item in items]
-                page.add_alert(f"{mapping}:", type=alert_type, extra=page.B.UL(*items))
+                opts = dict(type=alert_type, extra=page.B.UL(*items))
+                page.add_alert(f"{mapping}:", **opts)
 
     @cached_property
     def buttons(self):
@@ -352,13 +311,73 @@ class Control(Controller):
 
     @property
     def pattern(self):
-        """Optional string for filtering by mapped values (probably with wildcards)."""
+        """Optional string for filtering by mapped values.
+
+        Usually includes wildcards.
+        """
         return self.filter_opts.get("pattern")
 
     @property
     def same_window(self):
         """Avoid opening new browser tabs."""
         return self.buttons
+
+    @cached_property
+    def table(self):
+        """Table showing the mapping matching the user's selections."""
+
+        if not self.mappings:
+            return None
+        B = self.HTMLPage.B
+        rows = []
+        url = f"QcReport.py?Session={self.session}&DocVersion=-1"
+        headers = [
+            B.TH("Variant String"),
+            B.TH("Mapped To", colspan="2"),
+            B.TH("Flags", colspan="3"),
+        ]
+        if not self.usage:
+            headers.insert(0, B.TH("Usage"))
+        for mapping in self.mappings:
+            mid = str(mapping.id)
+            doc_id = str(mapping.doc_id or "")
+            id_field_id = f"cdrid-{mapping.id}"
+            id_field = B.INPUT(name=id_field_id, id=id_field_id, value=doc_id)
+            id_field.set("class", "usa-input mapped-to")
+            if doc_id:
+                opts = dict(href=f"{url}&DocId={doc_id}", target="_blank")
+                view_button = B.A("View", B.CLASS("usa-button"), **opts)
+            else:
+                view_button = ""
+            opts = dict(label="Delete?", value=mid)
+            delete = self.HTMLPage.checkbox("delete", **opts)
+            bogus = self.HTMLPage.checkbox("bogus", label="Bogus?", value=mid)
+            opts = dict(label="Mappable?", value=mid)
+            mappable = self.HTMLPage.checkbox("mappable", **opts)
+            if mapping.bogus:
+                bogus.find("input").set("checked")
+            if mapping.mappable:
+                mappable.find("input").set("checked")
+            cols = [
+                B.TD(mapping.value),
+                B.TD(id_field),
+                B.TD(view_button),
+                B.TD(delete),
+                B.TD(bogus),
+                B.TD(mappable)
+            ]
+            if not self.usage:
+                cols.insert(0, B.TD(mapping.usage))
+            rows.append(B.TR(*cols))
+        elapsed = datetime.now() - self.started
+        footnote = f"Fetched {len(rows):d} mapping(s) in {elapsed}"
+        return B.TABLE(
+            B.CAPTION("Mappings"),
+            B.THEAD(B.TR(*headers)),
+            B.TBODY(*rows),
+            B.TFOOT(B.TR(B.TD(footnote, colspan=str(len(cols))))),
+            B.CLASS("usa-table usa-table--borderless")
+        )
 
     @cached_property
     def usage(self):

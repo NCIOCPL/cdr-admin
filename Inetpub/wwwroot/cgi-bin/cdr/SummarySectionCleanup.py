@@ -24,7 +24,7 @@ class Control(Controller):
         "found outside of section elements, so that they can be moved "
         "to an appropriate location. The report is intended to be run "
         "on an onoing basis (or at least until all the misplaced elements "
-        "have been fixed."
+        "have been fixed)."
     )
 
     def populate_form(self, page, titles=None):

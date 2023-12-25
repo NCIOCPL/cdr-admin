@@ -112,6 +112,7 @@ class Doctype:
         Reporter.Column("Pub?", width="50px"),
         Reporter.Column("Earlier Pub Ver?", width="50px"),
     )
+    # COLUMNS = [column.name for column in COLUMNS]
 
     def __init__(self, control, name):
         """Capture the caller's values.
@@ -175,16 +176,15 @@ class Doc:
 
         ver_date = str(self.ver_date)[:10] if self.ver_date else ""
         return (
-            Reporter.Cell(self.doc_id, center=True),
+            self.doc_id,
             self.doc_title,
-            Reporter.Cell(self.cre_user, center=True),
-            Reporter.Cell(str(self.cre_date)[:10], center=True),
-            Reporter.Cell(ver_date, center=True),
-            Reporter.Cell(self.ver_user, center=True),
-            Reporter.Cell(self.pv, center=True),
-            Reporter.Cell("Y" if self.epv else "N", center=True),
+            self.cre_user,
+            Reporter.Cell(str(self.cre_date)[:10], classes="nowrap"),
+            Reporter.Cell(ver_date, classes="nowrap"),
+            self.ver_user,
+            self.pv,
+            "Y" if self.epv else "N",
         )
-        return self._row
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@
 """Display a submenu for the CDR translation job queues.
 """
 
+from functools import cached_property
 from cdrcgi import Controller
 
 
@@ -11,7 +12,7 @@ class Control(Controller):
 
     SUBTITLE = "Translation Job Queues"
     INSTRUCTIONS = (
-        "There are multiple translation job quues for the CDR, "
+        "There are multiple translation job queues for the CDR, "
         "each tracking active translation jobs and their statuses "
         "for one or more related document types. Tools are available "
         "for managing the status of each job, as well as for performing "
@@ -36,8 +37,11 @@ class Control(Controller):
         page.form.append(fieldset)
         fieldset = page.fieldset("Available Queues")
         ul = page.B.UL(page.B.CLASS("usa-list usa-list--unstyled"))
+        params = {}
+        if self.testing:
+            params["testing"] = True
         for label, url in self.QUEUES:
-            link = page.menu_link(url, label)
+            link = page.menu_link(url, label, **params)
             link.set("target", "_blank")
             ul.append(page.B.LI(link))
         fieldset.append(ul)
@@ -49,10 +53,15 @@ class Control(Controller):
             f".usa-form a:visited {{ color: {page.LINK_COLOR}; }}\n"
         )
 
-    @property
+    @cached_property
     def buttons(self):
         """No buttons needed for this page."""
         return []
+
+    @cached_property
+    def testing(self):
+        """Used by automated tests to avoid spamming the users."""
+        return self.fields.getvalue("testing")
 
 
 if __name__ == "__main__":

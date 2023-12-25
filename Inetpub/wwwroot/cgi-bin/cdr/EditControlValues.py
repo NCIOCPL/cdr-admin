@@ -128,11 +128,12 @@ function check_name() {{
         lines = 50;
     jQuery("#value").attr("rows", lines);
 }}
+/*
 jQuery(function() {{
     jQuery("input[value='{self.SHOW}']").click(function() {{
         window.open("{self.URL}", "_blank");
     }});
-}});""")
+}}); */""")
 
         # Customize the fonts.
         page.add_css("#value { font-family: Courier; }")
@@ -143,6 +144,9 @@ jQuery(function() {{
         if not self.session.can_do("SET_SYS_VALUE"):
             self.bail("Not authorized to manage control values")
         try:
+            if self.request == self.SHOW:
+                params = dict(query="Active Control Values", Request="Run")
+                self.redirect("CdrQueries.py", **params)
             if self.request == self.SAVE:
                 return self.save()
             elif self.request == self.DELETE:

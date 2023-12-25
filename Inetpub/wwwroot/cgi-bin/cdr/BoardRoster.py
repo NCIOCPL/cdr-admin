@@ -323,7 +323,7 @@ class Control(Controller):
             query.join("query_term p", "p.doc_id = m.doc_id")
             query.join("active_doc d", "d.id = p.int_val")
             query.join("query_term c", "c.doc_id = m.doc_id",
-                        "LEFT(c.node_loc, 4) = LEFT(m.node_loc, 4)")
+                       "LEFT(c.node_loc, 4) = LEFT(m.node_loc, 4)")
             query.outer("query_term t", "t.doc_id = m.doc_id",
                         "LEFT(t.node_loc, 4) = LEFT(m.node_loc, 4)",
                         f"t.path = '{self.TERM_START_PATH}'")

@@ -155,7 +155,6 @@ class Control(Controller):
                 boards[id].append(language)
         return [Board(self, id, boards[id]) for id in boards]
 
-
     @cached_property
     def boards(self):
         """Index of PDQ Editorial boards by CDR Organization document ID."""

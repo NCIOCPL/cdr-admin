@@ -11,6 +11,7 @@ from openpyxl import load_workbook
 from requests import get
 from cdrcgi import Controller
 
+
 class Control(Controller):
 
     SUBTITLE = "PDQ Content Counts"

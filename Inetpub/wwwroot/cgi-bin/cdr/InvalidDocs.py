@@ -85,6 +85,7 @@ class Control(Controller):
         """Don't open more than one new browser tab."""
         return [self.SUBMIT] if self.request else []
 
+
 if __name__ == "__main__":
     """Don't execute the script if loaded as a module."""
     Control().run()

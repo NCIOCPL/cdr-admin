@@ -414,7 +414,6 @@ class PublishingSystem:
             subsets.append(self.Subset(self, node))
         return subsets
 
-
     class Subset:
         """Publishing job type available from this system."""
 
@@ -440,7 +439,9 @@ class PublishingSystem:
         @cached_property
         def description(self):
             """String explaining how this subset is to be used."""
-            return Doc.get_text(self.node.find("SubsetDescription"), "").strip()
+
+            description = Doc.get_text(self.node.find("SubsetDescription"), "")
+            return description.strip()
 
         @cached_property
         def name(self):
@@ -500,7 +501,6 @@ class PublishingSystem:
             def name(self):
                 """String for the parameter value's name."""
                 return Doc.get_text(self.node.find("ParmName"))
-
 
     class ParamInfo:
         """Metadata about publishing job parameters.

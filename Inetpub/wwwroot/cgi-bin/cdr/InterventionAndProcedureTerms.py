@@ -56,7 +56,6 @@ class Control(Controller):
         )
         page = self.HTMLPage(self.title, **opts)
         fieldset = page.fieldset("Tree Hierarchy")
-        #top = self.patriarch
         tree = page.B.UL(self.patriarch.node, page.B.CLASS("usa-list t"))
         fieldset.append(tree)
         fieldset.append(self.footer)
@@ -170,7 +169,6 @@ class Control(Controller):
         for row in query.execute(self.cursor).fetchall():
             if row.pid in self.terms:
                 self.terms[row.pid].children.add(row.tid)
-                #self._terms[row.tid].parents.add(row.pid)
                 self.terms[row.tid].parents.add(row.pid)
 
         # Finally, collect the term name aliases.
@@ -179,7 +177,6 @@ class Control(Controller):
             query.join("#terms t", "t.tid = o.doc_id")
             query.where("o.path = '/Term/OtherName/OtherTermName'")
             for row in query.execute(self.cursor).fetchall():
-                #self._terms[row.doc_id].aliases.add(row.name)
                 self.terms[row.doc_id].aliases.add(row.name)
 
 

@@ -282,7 +282,8 @@ function board_change() {
         return;
     }
     jQuery('#method-block').show();
-    check_selection_method(jQuery('input[name=selection_method]:checked').val());
+    var method = jQuery('input[name=selection_method]:checked').val();
+    check_selection_method(method);
     var board = boards[board_id];
     var members = jQuery('#members');
     var summaries = jQuery('#summaries');

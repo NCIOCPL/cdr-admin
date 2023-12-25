@@ -126,6 +126,7 @@ class Control(Controller):
         """Don't show the left navigation column on followup pages."""
         return True if self.doc_id or self.fragment else False
 
+
 class Document:
     "CDR document which will be the subject of the requested report"
 

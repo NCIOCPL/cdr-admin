@@ -49,7 +49,8 @@ class Control(Controller):
         elif self.request == self.DEEP:
             self.navigate_to(self.SHOW_SETS, self.session.name)
         elif self.request == self.REPORT:
-            self.navigate_to(self.SHOW_SETS, self.session.name, depth="shallow")
+            opts = dict(depth="shallow")
+            self.navigate_to(self.SHOW_SETS, self.session.name, **opts)
         else:
             Controller.run(self)
 

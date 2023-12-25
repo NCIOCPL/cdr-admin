@@ -319,7 +319,7 @@ class Board:
         if "Complementary" in self.name:
             opts["sheet_name"] = "IACT"  # Name is too big.
         elif "Supportive" in self.name:
-            opts["sheet_name"] = "Supportive Care" # Same problem.
+            opts["sheet_name"] = "Supportive Care"  # Same problem.
         if modules:
             opts["sheet_name"] += " (m)"
         rows = []

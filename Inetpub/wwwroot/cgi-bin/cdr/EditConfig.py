@@ -33,8 +33,9 @@ class Control(Controller):
         textarea.set("spellcheck", "false")
         fieldset.append(textarea)
         page.form.append(fieldset)
-        page.add_css(".usa-textarea { font-family: monospace; font-size: .9rem; }")
-        page.add_css(".usa-textarea { height: 32rem; }")
+        page.add_css("""\
+.usa-textarea { font-family: monospace; font-size: .9rem; height: 32rem; }
+""")
         page.add_script(f"""\
 function change_file() {{
     var url = "{self.script}?Session={self.session.name}&filename=";

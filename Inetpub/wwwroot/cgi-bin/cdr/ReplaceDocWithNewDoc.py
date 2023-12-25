@@ -441,7 +441,7 @@ class Control(Controller):
     @cached_property
     def same_window(self):
         """Don't open multiple new browser tabs."""
-        return [self.SUBMIT] if self.request else []
+        return [self.SUBMIT, self.CONFIRM] if self.request else []
 
     @cached_property
     def validation_errors(self):

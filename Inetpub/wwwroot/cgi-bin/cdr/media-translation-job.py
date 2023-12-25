@@ -31,9 +31,10 @@ class Control(Controller):
         self.cursor.execute(query, self.english_id)
         self.conn.commit()
         self.logger.info("removed translation job for CDR%d", self.english_id)
-        message = f"Translation job for CDR{self.english_id} successfully removed."
-        parms = dict(message=message)
-        self.redirect("media-translation-jobs.py", **parms)
+        message = (
+            f"Translation job for CDR{self.english_id} successfully removed."
+        )
+        self.redirect("media-translation-jobs.py", message=message)
 
     def populate_form(self, page):
         """Show the form for editing/creating a transation job.

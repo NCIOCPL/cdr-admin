@@ -195,16 +195,19 @@ class Control(Controller):
         version = self.fields.getvalue("version", "").strip()
         if not version:
             return ""
-        try:
-            version = int(version)
-        except Exception:
-            self.bail("version must be an integer")
-        if version < 0:
+        if version not in ("pub", "last"):
             try:
-                doc = Doc(self.session, id=self.id, version="last")
-                version = doc.version + version + 1
+                version = int(version)
             except Exception:
-                self.bail(f"CDR{self.id} not versioned")
+                self.bail("version must be an integer")
+            if version < 0:
+                try:
+                    doc = Doc(self.session, id=self.id, version="last")
+                    version = doc.version + version + 1
+                except Exception:
+                    self.bail(f"CDR{self.id} not versioned")
+        elif version == "pub":
+            version = "lastp"
         try:
             doc = Doc(self.session, id=self.id, version=version)
             if doc.doctype.name == "Summary":

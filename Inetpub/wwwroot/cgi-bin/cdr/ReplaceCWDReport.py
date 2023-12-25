@@ -16,7 +16,7 @@ class Control(Controller):
         ("Date/time", "When did the replacement occur?"),
         ("DocID", "CDR ID of the affected document"),
         ("Doc type", "Document type for the affected document"),
-        ("User", "User ID of the user promoting the version"),
+        ("User", "ID of the user promoting the version"),
         ("LV", "Version number of last version after promotion"),
         ("PV",
          "Version number of last publishable version at that time, -1 = None"),
@@ -24,7 +24,7 @@ class Control(Controller):
         ("V#", "Version number promoted to become CWD"),
         ("V", "Was new CWD also versioned? (Y/N)"),
         ("P", "Was new CWD also versioned as publishable? (Y/N)"),
-        ("Comment", "System generated comment ':' user entered comment"),
+        ("Comment", "System-generated comment ':' user-entered comment"),
     )
     INSTRUCTIONS = (
         "Retrieve information on documents for which someone has replaced "

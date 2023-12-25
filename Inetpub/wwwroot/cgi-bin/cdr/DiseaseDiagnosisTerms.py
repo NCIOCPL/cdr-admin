@@ -28,9 +28,10 @@ class Control(Controller):
     )
     INSTRUCTIONS = (
         "This report represents the hierarchy for the cancer diagnosis terms "
-        "as nested lists, using color and indentation to indicate characteristics "
-        "of the various terms. Terms at the top of the hierarchy (those which "
-        "have no parent) and their direct descendants are displayed in ",
+        "as nested lists, using color and indentation to indicate "
+        "characteristics of the various terms. Terms at the top of the "
+        "hierarchy (those which have no parent) and their direct descendants "
+        "are displayed in ",
         HTMLPage.B.SPAN("green", HTMLPage.B.CLASS("green")),
         ", while terms lower in the hierarchy are shown in ",
         HTMLPage.B.SPAN("blue", HTMLPage.B.CLASS("blue")),

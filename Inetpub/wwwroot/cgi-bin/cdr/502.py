@@ -7,6 +7,7 @@ from urllib.parse import parse_qs, urlparse
 from cdrapi.users import Session
 from cdrcgi import Controller
 
+
 class Control(Controller):
     """Create a 502 (bad gateway) page.
 
@@ -24,7 +25,7 @@ class Control(Controller):
         opts = dict(subtitle=self.subtitle, session=self.session)
         page = self.HTMLPage("CDR Administration", **opts)
         page.form.append(
-             page.B.P(
+            page.B.P(
                 "If the problem persists, please create a ",
                 self.jira,
                 " ticket in the OCECDR project. If the problem is "
@@ -42,12 +43,6 @@ class Control(Controller):
                     parent.remove(nav)
             page.body.remove(page.footer)
         page.add_alert(self.alert, type="error")
-        page.add_alert(
-            "By the way, IIS is giving us a 502 error instead of a 404. "
-            "We figured out the real problem without any help from IIS. 😎",
-            title="502 Error",
-            type="warning"
-        )
         page.add_uswds_script()
         page.send()
 
@@ -65,7 +60,6 @@ class Control(Controller):
         """Link for creating a new CDR ticket in JIRA (if we have the URL)."""
 
         args = "trackers", "create-cdr-ticket"
-        self.logger.info(dir(self.session.tier))
         url = self.session.tier.get_control_value(self.session, *args)
         if not url:
             return "JIRA"
@@ -75,11 +69,10 @@ class Control(Controller):
     def missing(self):
         """Should this really be a 404 page?"""
 
-        if not self.original_script:
+        if not self.path:
             return False
-        path = self.www_root / self.original_script.strip("/")
-        if not path.exists():
-            self.logger.warning("unable to find %s", path)
+        if not self.path.exists():
+            self.logger.warning("unable to find %s", self.path)
             return True
         return False
 
@@ -115,9 +108,49 @@ class Control(Controller):
             return parsed
         except Exception:
             self.logger.exception("failure parsing %s", self.original_url)
-            message = "Failure parsing URL for original request."
-            self.alerts.append(dict(message=message, type="error"))
+            self.alert = "Failure parsing URL for original request."
             return None
+
+    @cached_property
+    def path(self):
+        """Path object for the location of the CGI script."""
+        return self.www_root / self.original_script.strip("/")
+
+    @cached_property
+    def script_text(self):
+        """The contents of the script file."""
+
+        if self.missing:
+            return None
+        try:
+            return self.path.read_text(encoding="utf-8")
+        except Exception:
+            self.logger.exception("reading %s", self.path)
+            self.alert = (
+                "The web server does not have permission "
+                f"to read the script {self.original_script}."
+            )
+            return None
+
+    @cached_property
+    def script_valid(self):
+        """True if the script can be successfully compiled.
+
+        Doesn't detect problems with the included libraries.
+        """
+
+        if self.script_text is None:
+            return False
+        if not self.script_text.strip():
+            self.alert = f"Script {self.original_script} is empty."
+            return False
+        try:
+            compile(self.script_text + "\n", "<string>", "exec")
+            return True
+        except Exception:
+            self.logger.exception("compiling %s", self.original_script)
+            self.alert = f"Script {self.original_script} has syntax errors."
+            return False
 
     @cached_property
     def service_now(self):
@@ -125,7 +158,6 @@ class Control(Controller):
 
         label = "NCI at Your Service"
         args = "trackers", "create-sn-ticket"
-        self.logger.info(dir(self.session.tier))
         url = self.session.tier.get_control_value(self.session, *args)
         if not url:
             return label
@@ -139,16 +171,25 @@ class Control(Controller):
             query_string = parse_qs(self.parsed_url.query)
             self.logger.info("query_string=%s", query_string)
             if self.SESSION in query_string:
-                session = Session(query_string[self.SESSION][0])
-                self.logger.info("Session=%s", session)
-                return session
+                try:
+                    session = Session(query_string[self.SESSION][0])
+                    self.logger.info("Session=%s", session)
+                    return session
+                except Exception:
+                    self.logger.exception(query_string[self.SESSION])
         return Session("guest")
-
 
     @cached_property
     def subtitle(self):
         """What we want shown at the top of the page."""
-        return "Not Found" if self.missing else "Server Error"
+
+        if self.missing:
+            return "Script Not Found"
+        if self.script_text is None:
+            return "Permissions Error"
+        if not self.script_valid:
+            return "Program Error"
+        return "Server Error"
 
     @cached_property
     def www_root(self):
@@ -157,4 +198,8 @@ class Control(Controller):
 
 
 if __name__ == "__main__":
-    Control().run()
+    control = Control()
+    try:
+        control.run()
+    except Exception as e:
+        control.bail(e)

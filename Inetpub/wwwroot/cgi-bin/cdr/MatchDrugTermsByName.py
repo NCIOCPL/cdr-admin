@@ -129,7 +129,6 @@ class Control(Controller):
         form.append(Factory.hidden_field("concepts", self.concepts_path))
         form.append(Factory.button(self.SUBMIT))
 
-
         # Create a table showing matches we have found.
         tbody = page.B.TBODY()
         for code, doc_id in matched:

@@ -248,7 +248,7 @@ class Control(Controller):
         value = self.fields.getvalue("exp_end")
         try:
             end = self.parse_date(value)
-            return  f"{end} 23:59:59" if end else None
+            return f"{end} 23:59:59" if end else None
         except Exception:
             self.logger.exception("parsing exp_end")
             self.bail("Invalid expiration end date")
@@ -472,10 +472,6 @@ class Control(Controller):
         """Use the sinpler layout for the report."""
         return True
 
-    @cached_property
-    def xxxwide_css(self):
-        """The report needs more horizontal space."""
-        return self.Reporter.Table.WIDE_CSS
 
 class Media:
     """Media document proposed for inclusion on the report."""
@@ -622,7 +618,6 @@ class Media:
     def sort_key(self):
         """Sort by normalized title."""
         return self.title.lower()
-
 
     class Approval:
         """Identification of a document for which use is authorized."""

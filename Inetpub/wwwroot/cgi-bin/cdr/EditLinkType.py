@@ -130,17 +130,6 @@ class Control(Controller):
         opts = dict(tooltip=help_text, value=value, label="Rule Text")
         opts["widget_id"] = name
         return self.HTMLPage.textarea(name, **opts)
-        opts = dict(id=name, name=name, title=help_text)
-        textarea_class = self.HTMLPage.B.CLASS("usa-textarea")
-        return self.HTMLPage.B.DIV(
-            self.HTMLPage.B.LABEL(
-                self.HTMLPage.B.FOR(name),
-                "Rule Text",
-                self.HTMLPage.B.CLASS("clickable usa-label")
-            ),
-            self.HTMLPage.B.TEXTAREA(value or "", textarea_class, **opts),
-            self.HTMLPage.B.CLASS("labeled-field")
-        )
 
     def make_ruletype_field(self, counter, ruletype=""):
         """Create the picklist for the custom rule type.
@@ -161,34 +150,6 @@ class Control(Controller):
         options = [("", "Select Rule Type")] + sorted(self.ruletypes)
         opts = dict(label="Rule Type", default=ruletype, options=options)
         return self.HTMLPage.select(name, **opts)
-        select = self.HTMLPage.B.SELECT(name=name, id=name)
-        select.set("class", "usa-select")
-        option = self.HTMLPage.B.OPTION("Select Rule Type", value="")
-        if not ruletype:
-            option.set("selected")
-        select.append(option)
-        for t in sorted(self.ruletypes):
-            option = self.HTMLPage.B.OPTION(t, value=t)
-            if t == ruletype:
-                option.set("selected")
-            select.append(option)
-        return self.HTMLPage.B.DIV(
-            self.HTMLPage.B.LABEL(self.HTMLPage.B.FOR(name), "Rule Type"),
-            select,
-            self.HTMLPage.B.IMG(
-                src="/images/add.gif",
-                onclick=f"add_block({counter}, 'r')",
-                alt="add rule block",
-                title="Add another custom rule block"
-            ),
-            self.HTMLPage.B.IMG(
-                src="/images/del.gif",
-                onclick=f"del_block({counter}, 'r')",
-                alt="drop rule block",
-                title="Remove this custom rule block"
-            ),
-            self.HTMLPage.B.CLASS("labeled-field")
-        )
 
     def make_source_block(self, counter, doctype="", element=""):
         """Create a fieldset with fields for a source doctype/element combo.
@@ -359,9 +320,9 @@ class Control(Controller):
             self.show_form()
         if self.linktype:
             opts["id"] = self.linktype.id
-            message = f"Saved changes to link type {self.name}"
+            message = f"Saved changes to link type {self.name}."
         else:
-            message = f"added new link type {self.name}"
+            message = f"Added new link type {self.name}."
         linktype = LinkType(self.session, **opts)
         try:
             linktype.save()

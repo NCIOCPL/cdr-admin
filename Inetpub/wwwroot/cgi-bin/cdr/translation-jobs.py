@@ -47,11 +47,12 @@ class Control(Controller):
         if not self.session.can_do("MANAGE TRANSLATION QUEUE"):
             self.bail("not authorized")
         if self.request == self.ADD:
-            self.navigate_to("translation-job.py", self.session.name)
+            params = dict(testing=True) if self.testing else {}
+            self.redirect("translation-job.py", **params)
         elif self.request == self.GLOSSARY:
-            self.navigate_to("glossary-translation-jobs.py", self.session.name)
+            self.redirect("glossary-translation-jobs.py")
         elif self.request == self.MEDIA:
-            self.navigate_to("media-translation-jobs.py", self.session.name)
+            self.redirect("media-translation-jobs.py")
         if self.request == self.PURGE:
             if not self.session.can_do("PRUNE TRANSLATION QUEUE"):
                 self.bail("not authorized")
@@ -66,6 +67,7 @@ class Control(Controller):
             self.conn.commit()
             message = f"Purged jobs for {count:d} published translations."
             self.alerts.append(dict(message=message, type="success"))
+            return self.show_form()
         Controller.run(self)
 
     def show_form(self):
@@ -104,6 +106,8 @@ class Control(Controller):
             page.add_alert(message, **alert)
         page.form.append(container)
         page.form.append(self.table.node)
+        if self.testing:
+            page.form.append(page.hidden_field("testing", "True"))
         page.add_css("""\
 form { width: 90%; margin: 0 auto; }
 .usa-table { margin-top: 3rem; }
@@ -146,7 +150,8 @@ td.svpc, td.svpc a, td.svpc a:visited { color: green; }
         query.join("summary_change_type c", "c.value_id = j.change_type")
         query.outer("query_term q",
                     "q.doc_id = d.id AND q.path = '/Summary/@SVPC'")
-        query.order("q.value DESC", "s.value_pos", "u.fullname", "j.state_date")
+        query.order("q.value DESC", "s.value_pos", "u.fullname",
+                    "j.state_date")
         rows = query.execute(self.cursor).fetchall()
         return [Job(self, row).row for row in rows]
 
@@ -158,7 +163,14 @@ td.svpc, td.svpc a, td.svpc a:visited { color: green; }
     @cached_property
     def table(self):
         """Table of queued glossary translation jobs."""
-        return self.Reporter.Table(self.rows, cols=self.COLUMNS, caption="Jobs")
+
+        opts = dict(cols=self.COLUMNS, caption="Jobs")
+        return self.Reporter.Table(self.rows, **opts)
+
+    @cached_property
+    def testing(self):
+        """Used by automated tests to avoid spamming the users."""
+        return self.fields.getvalue("testing")
 
     @cached_property
     def warning(self):
@@ -217,6 +229,8 @@ class Job:
         Cell = self.__control.Reporter.Cell
         doc_id = str(self.__row.id)
         url = self.URL.format(self.__control.session, doc_id)
+        if self.__control.testing:
+            url += "&testing=True"
         classes = "svpc" if self.__row.svpc else "pdq"
         return (
             Cell(f"CDR{doc_id}", href=url, title="edit job", classes=classes),

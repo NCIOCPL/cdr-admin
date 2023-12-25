@@ -15,7 +15,7 @@ class Control(Controller):
     """Top-level logic controller for the tool."""
 
     SUBTITLE = "Replace CWD With Older Version"
-    LOGFILE = "ReplaceCWD"
+    LOGNAME = "ReplaceCWD"
     INSTRUCTIONS = (
         ("This program will replace the current working version of "
          "a document with the XML text of an earlier version. It "
@@ -302,7 +302,10 @@ class Control(Controller):
     @cached_property
     def same_window(self):
         """Only create a new browser tab once."""
-        return self.SUBMIT, self.CANCEL, self.CONFIRM if self.request else []
+
+        if self.request:
+            return self.SUBMIT, self.CANCEL, self.CONFIRM
+        return []
 
     @cached_property
     def version(self):

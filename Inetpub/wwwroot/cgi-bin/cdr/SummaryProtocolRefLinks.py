@@ -51,6 +51,7 @@ class Control(Controller):
         "manually adding a 'limit' parameter to the URL. For example:",
         lxml.html.builder.A(EXAMPLE, href=EXAMPLE, target="_blank"),
     )
+
     def populate_form(self, page):
         """Bypass the form, which this report doesn't use.
 

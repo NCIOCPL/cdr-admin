@@ -36,7 +36,9 @@ class Control(Controller):
 
     def build_tables(self):
         """Assemble the report's table."""
-        return [self.Reporter.Table(self.rows, columns=self.columns, fixed=True)]
+
+        opts = dict(columns=self.columns, fixed=True)
+        return [self.Reporter.Table(self.rows, **opts)]
 
     def show_report(self):
         """Override so we can widen the report table."""

@@ -11,7 +11,7 @@ class Control(Controller):
     """Encapsulates processing logic for building the menu page."""
 
     SUBTITLE = "Manage Groups"
-    LOGFILE = "ManageGroups"
+    LOGNAME = "ManageGroups"
     ADD_NEW_GROUP = "Add New Group"
     EDIT_GROUP = "EditGroup.py"
 
@@ -62,7 +62,7 @@ class Control(Controller):
 
     @cached_property
     def returned(self):
-        """True if the user clicked the Group Menu button on the editing form."""
+        """True if user clicked the Group Menu button on the editing form."""
         return True if self.fields.getvalue("returned") else False
 
     @cached_property

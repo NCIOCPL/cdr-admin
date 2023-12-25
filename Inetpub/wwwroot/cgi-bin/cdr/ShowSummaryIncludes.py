@@ -33,7 +33,6 @@ class Control(Controller):
         Comment="comment",
     )
     CSS = (
-        #"#report-elements  { width: 40rem; margin: 0 auto; }",
         ".summary          { color: blue; font-weight: normal; }",
         ".module-link      { color: red; }",
         ".misc-doc-link    { color: brown; }",

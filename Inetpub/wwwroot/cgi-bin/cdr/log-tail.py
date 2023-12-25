@@ -12,6 +12,7 @@ import cdr
 from cdrcgi import Controller
 from functools import cached_property
 
+
 class Control(Controller):
     """Script master."""
 
@@ -255,9 +256,10 @@ Content-type: text/plain; charset=utf-8
             """Let the @properties do the heavy lifting."""
             self.__control = control
 
-        @property
+        @cached_property
         def count(self):
             """How many lines to display."""
+
             if not hasattr(self, "_count"):
                 # Make sure the count is not negative.
                 self._count = int(self.__control.count or self.DEFAULT_COUNT)
@@ -265,12 +267,13 @@ Content-type: text/plain; charset=utf-8
                     self._count = 0
                 # We have to force calculation of self.start to make any
                 # adjustments to the count.
-                assert(self.start is not None)
+                assert self.start is not None
             return self._count
 
         @property
         def start(self):
             """How many lines to skip before we start displaying lines."""
+
             if not hasattr(self, "_start"):
 
                 # How many lines total in the file?

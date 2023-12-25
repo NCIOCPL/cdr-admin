@@ -99,10 +99,10 @@ jQuery(function() {
         """
 
         B = self.report.page.B
-        div = B.DIV() #style="margin: 10px auto; width: 600px")
+        div = B.DIV()
         self.report.page.form.append(div)
         div.append(B.H3(self.caption))
-        dl = B.DL() #style="margin: 5px auto; width: 1000px")
+        dl = B.DL()
         div.append(dl)
         for indication in sorted(self.indications, key=str.lower):
             dl.append(B.DT(indication))
@@ -277,7 +277,7 @@ class Drug:
 
         if not hasattr(self, "_brand_span"):
             brands = ", ".join(self.brands)
-            self._brand_span = Reporter.Table.B.SPAN(f"({brands})")
+            self._brand_span = Reporter.Table.B.SPAN(f" ({brands})")
             self._brand_span.set("class", "emphasis")
         return self._brand_span
 

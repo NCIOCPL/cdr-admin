@@ -31,9 +31,6 @@ th { white-space: nowrap; }
         """Bypass the form, which is not needed for this report."""
         self.show_report()
 
-    def build_tables(self):
-        return self.table
-
     def show_report(self):
         """Override to accommodate the report's wide table."""
 

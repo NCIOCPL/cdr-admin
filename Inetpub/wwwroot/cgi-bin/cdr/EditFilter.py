@@ -23,11 +23,6 @@ class Control(Controller):
         "of one of the documents has been seriously mangled.",
     )
     CSS = (
-        #"pre {"
-        #"    border: solid #936 2px; font-size: 12px; padding: 12px; ",
-        #"    width: 700px; margin: 25px auto; ",
-        #"}",
-        #"fieldset { width: 700px; }",
         ".del { background-color: #fafad2; } /* light goldenrod yellow */",
         ".add { background-color: #f0e68c; } /* khaki */",
         ".pnt { background-color: #87cefa; } /* light sky blue */",

@@ -67,10 +67,11 @@ class Control(Controller):
         fieldset = page.fieldset("Report Options")
         default = self.scope or "range"
         for value in reversed(sorted(self.SCOPES)):
+            checked = value == default
             opts = dict(
                 value=value,
                 label=self.SCOPES[value],
-                checked=value==default,
+                checked=checked,
             )
             fieldset.append(page.radio_button("scope", **opts))
         page.form.append(fieldset)

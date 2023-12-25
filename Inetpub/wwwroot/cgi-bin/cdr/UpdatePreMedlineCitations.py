@@ -39,6 +39,7 @@ class Control(Controller):
         "valid, so you should refresh this form at that point in order to "
         "view an accurate list of what is available to be refreshed."
     )
+
     def build_tables(self):
         """Assemble the table showing what we did and return it."""
 
@@ -107,6 +108,7 @@ class Control(Controller):
     def citations(self):
         """Dictionary (by PMID) of citations with non-terminal statuses."""
 
+        # Find the Citation documents with the target statuses.
         start = datetime.now()
         fields = "p.doc_id", "p.value AS pmid", "s.value AS status"
         query = self.Query("query_term p", *fields).order("p.doc_id")
@@ -114,8 +116,33 @@ class Control(Controller):
         query.where(query.Condition("p.path", self.PMID_PATH))
         query.where(query.Condition("s.path", self.STATUS_PATH))
         query.where(query.Condition("s.value", self.STATUSES, "IN"))
+        rows = query.unique().execute(self.cursor).fetchall()
+
+        # Do a preliminary pass to find docs which show up more than once.
+        citations = defaultdict(list)
+        for row in rows:
+            citations[row.doc_id].append((row.pmid, row.status))
+        for doc_id in citations:
+            if len(citations[doc_id]) > 1:
+                pmids = set()
+                statuses = set()
+                for pmid, status in citations[doc_id]:
+                    pmids.add(pmid)
+                    statuses.add(status)
+                for pmid in pmids:
+                    self.skipped.add(pmid)
+                pmids = "; ".join(sorted(pmids))
+                statuses = "; ".join(sorted(statuses))
+                message = (
+                    f"CDR{doc_id} found multiple times with PMID(s) "
+                    f"{pmids} and status(es) {statuses}. Skipping check."
+                )
+                self.logger.warning(message)
+                self.alerts.append(dict(message=message, type="warning"))
+
+        # Now do the real pass to pack up the citations for checking.
         citations = {}
-        for row in query.execute(self.cursor).fetchall():
+        for row in rows:
             pmid = row.pmid.strip().upper()
             if pmid in self.skipped:
                 self.logger.info("skipping %s", pmid)
@@ -320,7 +347,6 @@ class PubmedArticle:
 
         node = self.__node.find("MedlineCitation")
         return node.get("Status") if node is not None else None
-
 
     class PMID:
         """PubMed ID with version number (who knew they had more than one?)."""

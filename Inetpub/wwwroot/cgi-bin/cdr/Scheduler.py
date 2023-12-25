@@ -172,18 +172,22 @@ class Control(Controller):
         except Exception as e:
             self.bail(e)
         try:
-            if self.request == self.SAVE:
-                self.save_job()
-            elif self.request == self.DELETE:
-                self.delete_job()
-            elif self.request == self.RUN:
-                self.run_job()
-            elif self.request == self.JOBS:
-                self.navigate_to(self.script, self.session.name)
-            elif self.request == self.JSON:
-                self.json()
-            else:
-                Controller.run(self)
+            match self.request:
+                case self.ADD:
+                    return self.show_form()
+                case self.SAVE:
+                    return self.save_job()
+                case self.DELETE:
+                    return self.delete_job()
+                case self.RUN:
+                    return self.run_job()
+                case self.JOBS:
+                    self.job = None
+                    return self.show_form()
+                case self.JSON:
+                    return self.json()
+                case _:
+                    Controller.run(self)
         except Exception as e:
             self.bail(e)
 
@@ -201,7 +205,7 @@ class Control(Controller):
             ))
         if not self.job_class:
             self.alerts.append(dict(
-                message="Class name for is required.",
+                message="Class name for job is required.",
                 type="error",
             ))
         if not self.alerts:
@@ -223,9 +227,17 @@ class Control(Controller):
                 self.logger.info("saved job %s", self.name)
                 enabled = "Enabled" if self.job.enabled else "Disabled"
                 message = f"{enabled} job {self.name!r} saved."
-                if self.job.enabled and self.job.formatted_schedule:
-                    when = self.job.formatted_schedule
-                    message = f"{message} Job will run {when}."
+                if self.job.enabled:
+                    if self.job.formatted_schedule:
+                        when = self.job.formatted_schedule
+                        message = f"{message} Job will run {when}."
+                    else:
+                        message = (
+                            f"Enabled job {self.name!r} will be run but not "
+                            "retained since it has no schedule. In order to "
+                            "have the job retained for future use, save it "
+                            "with a schedule."
+                        )
                 self.alerts.append(dict(message=message, type="success"))
             except Exception as e:
                 self.logger.exception("save failed")
@@ -298,7 +310,7 @@ class Control(Controller):
     def json(self):
         """Send the serialized jobs to the client."""
 
-        rows = self.cursor.execute("SELECT * FROM scheduled_job ORDER BY name")
+        rows = self.query.execute(self.cursor)
         json = dumps([tuple(row[1:]) for row in rows], indent=2)
         self.send_page(json, "json")
 
@@ -337,6 +349,9 @@ class Control(Controller):
             if row:
                 self.logger.info("returning Job(self, row)")
                 return Job(self, row)
+        elif self.request == self.SAVE:
+            self.logger.info("returning Job(self) after rejected SAVE")
+            return Job(self)
         return None
 
     @cached_property
@@ -359,9 +374,7 @@ class Control(Controller):
         Skip over the rows which are created for manual job execution.
         """
 
-        query = self.Query("scheduled_job", "*").order("name")
-        query.where("schedule IS NOT NULL OR enabled = 0")
-        rows = query.execute(self.cursor).fetchall()
+        rows = self.query.execute(self.cursor).fetchall()
         return [Job(self, row) for row in rows]
 
     @cached_property
@@ -407,6 +420,16 @@ class Control(Controller):
                 opts[name] = value
             i += 1
         return opts
+
+    @cached_property
+    def query(self):
+        """How we find the jobs which are not ephemeral."""
+
+        scheduled = "schedule IS NOT NULL AND schedule <> '{}'"
+        disabled = "enabled = 0"
+        query = self.Query("scheduled_job", "*").order("name")
+        query.where(f"{scheduled} OR {disabled}")
+        return query
 
     @cached_property
     def same_window(self):

@@ -29,9 +29,10 @@ class Control(Controller):
         "available in the thesaurus (by NCI Thesaurus staff) During this "
         "period, the link doesn't work from the Drug Dictionary on Cancer.gov "
         "to the NCI Thesaurus. This report shows concepts in the NCI "
-        "Thesaurus whose corresponding CDR Term documents have not been marked "
-        "as 'Public'. The report contains the following columns."
+        "Thesaurus whose corresponding CDR Term documents have not been "
+        "marked as 'Public'. The report contains the following columns."
     )
+
     def populate_form(self, page):
         """Explain the report.
 

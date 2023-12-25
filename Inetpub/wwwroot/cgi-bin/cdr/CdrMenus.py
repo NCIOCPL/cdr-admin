@@ -15,7 +15,7 @@ class Control(Controller):
 
     SUBTITLE = "CDR Admin Menu Hierarchy"
     LOGNAME = "CdrMenus"
-    FONTS = "Source Sans Pro Web,Helvetica Neue,Helvetica,Roboto,Arial,sans-serif"
+    FONTS = "Source Sans Pro Web,Helvetica Neue,Helvetica,Arial,sans-serif"
     CSS = (
         f"body {{ font-family: {FONTS}; }}",
         "h1 { font-size: 1.4em; }",
@@ -54,7 +54,11 @@ class Control(Controller):
                 menus
             )
         )
-        opts = dict(pretty_print=True, doctype="<!DOCTYPE html>", encoding="unicode")
+        opts = dict(
+            pretty_print=True,
+            doctype="<!DOCTYPE html>",
+            encoding="unicode",
+        )
         self.send_page(tostring(page, **opts))
 
     def show_menu(self, menu):

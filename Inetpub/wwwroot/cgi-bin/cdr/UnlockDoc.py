@@ -34,7 +34,7 @@ class Control(Controller):
         page.form.append(fieldset)
 
     def show_report(self):
-        """Handle the request and cirle back to the form."""
+        """Handle the request and circle back to the form."""
 
         if not self.ids:
             message = "At least one document ID is required."

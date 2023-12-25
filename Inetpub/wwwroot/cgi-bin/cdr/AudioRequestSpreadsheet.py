@@ -20,7 +20,7 @@ class Control(Controller):
         ("CDR ID", 10, "unique ID for the GlossaryTermName document"),
         ("Term Name", 30, "string for the name needing pronunciation"),
         ("Language", 10, "English or Spanish"),
-        ("Pronunciation", 30, "string representation of the name's pronunciation"),
+        ("Pronunciation", 30, "representation of the name's pronunciation"),
         ("Filename", 30, "relative path where the audio file will be stored"),
         ("Notes (Vanessa)", 20, "column where contractor can enter notes"),
         ("Notes (NCI)", 30, "for instructions provided to the contractor"),
@@ -35,8 +35,8 @@ class Control(Controller):
         "pronunciation files created. This workbook can be edited, as "
         "appropriate, to reduce the amount of work requested, or to add "
         "instructions for the contractor who created the pronunciation "
-        "files. The generation of the workbook may take up to a minute or two. "
-        "The Term Names sheet (the only sheet in the workbook) contains "
+        "files. The generation of the workbook may take up to a minute or "
+        "two. The Term Names sheet (the only sheet in the workbook) contains "
         "the following columns:"
     )
     MORE_INSTRUCTIONS = (
@@ -58,11 +58,13 @@ class Control(Controller):
             fieldset.append(page.B.P(self.INSTRUCTIONS))
             columns = page.B.UL(page.B.CLASS("usa-list"))
             for label, _, description in self.COLUMNS:
-                columns.append(page.B.LI(page.B.STRONG(label), f" ({description})"))
+                extra = f" ({description})"
+                columns.append(page.B.LI(page.B.STRONG(label), extra))
             fieldset.append(columns)
             fieldset.append(page.B.P(self.MORE_INSTRUCTIONS))
         else:
-            fieldset = page.fieldset("Glossary Term Names Without Pronunciation")
+            legend = "Glossary Term Names Without Pronunciation"
+            fieldset = page.fieldset(legend)
             if self.count:
                 para = page.B.P(
                     f"Pronunciation files are needed for {self.count} "

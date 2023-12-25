@@ -285,7 +285,7 @@ class JobDetails:
         if self.is_push:
             columns += [
                 self.control.Reporter.Column("Added", classes="text-right"),
-                self.control.Reporter.Column("Removed", classes="text-right"),
+                self.control.Reporter.Column("Updated", classes="text-right"),
             ]
         columns += [
             self.control.Reporter.Column("Removed", classes="text-right"),
@@ -583,7 +583,6 @@ class JobDetails:
         except Exception:
             pass
         return str(messages)
-
 
     class Doc:
         """Document from a publishing job."""

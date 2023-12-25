@@ -129,11 +129,8 @@ class Control(Controller):
             page - HTMLPage object on which we draw the form
         """
 
-        # Set the table background to match the rest of the form page.
-        rules = ["td, th { background:#e8e8e8; }"]
-        rules = []
-
         # Show the review form for an audio file set if one has been picked.
+        rules = []
         if self.audio_set:
 
             # Assemble the instructions for using the form.
@@ -173,11 +170,6 @@ class Control(Controller):
             page.form.append(self.audio_set.table)
             page.form.set("target", "_self")
             rules += (
-                #"td, th { border-color:#888; }",
-                #"fieldset{ width: 900px; }",
-                #".status-buttons { width: 86px; white-space: nowrap; }",
-                #".status-buttons input { padding-left: 10px; }",
-                #"td:last-child: padding: 0 2px; }",
                 "#primary-form table { width: 100%; }",
                 ".usa-table td.status-buttons { padding: 0 1rem .8rem; }",
                 "#primary-form { width: 90%; margin: 2rem; }",
@@ -453,8 +445,6 @@ class Control(Controller):
                     return self.row.complete == "Y"
 
         zipfiles = {}
-        #self.__zipfiles = ZipFiles(self)
-        #for zipfile in self.__zipfiles.files:
         for zipfile in ZipFiles(self).files:
             zipfiles[zipfile.filename.lower()] = zipfile
         return zipfiles

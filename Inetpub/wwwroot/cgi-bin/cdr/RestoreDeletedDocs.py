@@ -30,7 +30,7 @@ class Control(Controller):
         fieldset.append(page.B.P(self.INSTRUCTIONS))
         page.form.append(fieldset)
         fieldset = page.fieldset(self.LEGEND)
-        fieldset.append(page.textarea("ids", label="CDR IDs")) #, rows=3))
+        fieldset.append(page.textarea("ids", label="CDR IDs"))
         opts = dict(label="Comment (optional)", value=self.reason)
         fieldset.append(page.textarea("reason", **opts))
         page.form.append(fieldset)
@@ -116,7 +116,7 @@ class Control(Controller):
     @cached_property
     def same_window(self):
         """Limit the number of new browser tabs."""
-        return [self.SUBMIT] if self.request else []
+        return [self.SUBMIT]
 
     @cached_property
     def status(self):

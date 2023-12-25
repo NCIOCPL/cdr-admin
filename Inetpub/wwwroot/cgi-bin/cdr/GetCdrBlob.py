@@ -13,6 +13,7 @@ from lxml import etree
 from cdrapi import db
 from cdrcgi import Controller, FieldStorage
 
+
 class DocInfo:
     def __init__(self, cursor, docId, docVer=None):
         self.docId = cdr.exNormalize(docId)[1]

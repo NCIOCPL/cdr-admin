@@ -7,6 +7,7 @@ import datetime
 import functools
 import cdrcgi
 
+
 class Page(cdrcgi.HTMLPage):
 
     @functools.cached_property
@@ -97,6 +98,7 @@ class Page(cdrcgi.HTMLPage):
 
         card_classes = "usa-card desktop:grid-col-6 usa-card-header-first"
         checked_out_label = "Documents checked out for editing"
+        drug_summary_count = self.drug_summary_count
         activity_counts = (
             self.B.LI(f"Logged-in users: {self.logged_in_count}"),
             self.B.LI(f"Documents saved today: {self.saved_today}"),
@@ -107,7 +109,7 @@ class Page(cdrcgi.HTMLPage):
         publishing_counts = (
             self.B.LI(f"Last full publishing job: {self.last_pub_date}"),
             self.B.LI(f"Cancer Information Summaries: {self.summary_count}"),
-            self.B.LI(f"Drug Information Summaries: {self.drug_summary_count}"),
+            self.B.LI(f"Drug Information Summaries: {drug_summary_count}"),
             self.B.LI(f"Glossary Terms: {self.glossary_term_count}"),
             self.B.LI(f"Media: {self.media_count}"),
         )
@@ -175,6 +177,7 @@ class Page(cdrcgi.HTMLPage):
             ),
             self.B.CLASS("usa-section")
         )
+
 
 class Control(cdrcgi.Controller):
     """Logic for dynamic construction of the top-level CDR admin menu."""

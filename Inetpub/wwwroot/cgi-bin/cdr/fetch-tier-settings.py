@@ -3,18 +3,6 @@
 """Collect settings from this tier as JSON (OCECDR-4101).
 """
 
-"""
-import hashlib
-import json
-import os
-import sys
-import lxml.etree as etree
-import cdr
-import cdrcgi
-from cdrapi.settings import Tier
-from cdrapi import db
-"""
-
 from functools import cached_property
 from hashlib import md5
 from importlib.metadata import packages_distributions, version
@@ -31,6 +19,7 @@ class Control(Controller):
     """Web page creator."""
 
     TITLE = SUBTITLE = "Tier Settings"
+    LOGNAME = "tier-settings"
 
     def populate_form(self, page):
         """Explain the report.

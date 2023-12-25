@@ -38,12 +38,20 @@ class Control(Controller):
 
             caption = "Count for Conditions"
             cat_opts = dict(columns=cat_columns, caption=caption)
+            cat_opts["id"] = "totals-table"
             tables.append(self.Reporter.Table(cat_rows, **cat_opts))
 
         opts = dict(caption=self.caption, columns=self.columns)
         tables.append(self.Reporter.Table(self.rows, **opts))
         return tables
 
+    @cached_property
+    def report_css(self):
+        return """\
+.report .usa-table { width: auto; }
+#totals-table th:last-child, #totals-table td:last-child {
+  text-align: right;
+}"""
     def populate_form(self, page):
         """Ask the user for the report's parameters.
 

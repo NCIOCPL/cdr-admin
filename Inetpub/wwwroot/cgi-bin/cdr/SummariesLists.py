@@ -121,7 +121,7 @@ function check_included(val) {
         # Not SVPC-only: don't narrow by board if none are selected.
         ids = self.fields.getlist("board")
         if not ids or "all" in ids:
-            return [Board(self, id) for id in self.boards]# + [Board(self)]
+            return [Board(self, id) for id in self.boards]
 
         # We've been asked to restrict the report to specific boards.
         board = []
@@ -298,7 +298,6 @@ class Board:
         if self.id:
             return f"{self.control.boards[self.id]} Editorial Board"
         return ""
-
 
     @cached_property
     def summaries(self):

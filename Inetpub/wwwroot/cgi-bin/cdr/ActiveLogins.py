@@ -53,7 +53,6 @@ class Control(Controller):
         ))
         page.form.append(fieldset)
 
-
     def build_tables(self):
         """Serve up the table."""
         query = db.Query("session s", *self.FIELDS).order("s.last_act")

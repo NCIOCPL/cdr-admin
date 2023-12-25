@@ -103,8 +103,8 @@ class Control(Controller):
         if self.language != "any":
             caption.append(f"Language: {self.language.capitalize()}")
         if self.diagnosis != "all":
-            diagnoses = dict(self.diagnoses)
-            caption.append(f"Image Diagnosis: {diagnoses[int(self.diagnosis)]}")
+            diagnosis = dict(self.diagnoses)[int(self.diagnosis)]
+            caption.append(f"Image Diagnosis: {diagnosis}")
         for name in self.DEMOGRAPHIC_FIELDS:
             value = self.fields.getvalue(name, "all")
             if value != "all":
@@ -233,7 +233,7 @@ class Control(Controller):
                     self.bail("No image title specified.")
                 title = self.image_title
                 query.join("query_term_pub t", "t.doc_id = i.doc_id")
-                query.where ("t.path = '/Media/MediaTitle'")
+                query.where("t.path = '/Media/MediaTitle'")
                 query.where(query.Condition("t.value", title, "LIKE"))
             case "category":
                 path = '/Media/MediaContent/Categories/Category'
@@ -257,7 +257,8 @@ class Control(Controller):
         elif self.language == "spanish":
             join_condition = "translation_of.doc_id = i.doc_id"
             query.join("query_term_pub translation_of", join_condition)
-            query.where("translation_of.path = '/Media/TranslationOf/@cdr:ref'")
+            path = "/Media/TranslationOf/@cdr:ref"
+            query.where(f"translation_of.path = '{path}'")
 
         # Filter on audience as requested.
         audiences = dict(hp="Health_professionals", patient="Patients")
@@ -734,10 +735,10 @@ jQuery(function() {
         # Log tbe assembled query.
         query.log(label="Image Demographic Report Query")
 
-
     class Image:
         NAMES = "id", "title", "age", "sex", "race", "skin_tone", "ethnicity"
         SINGLE = "id", "title"
+
         def __init__(self, doc):
             self.control = doc.control
             self.english = self.spanish = None
@@ -745,6 +746,7 @@ jQuery(function() {
                 self.english = doc
             else:
                 self.spanish = doc
+
         @cached_property
         def rows(self):
             Cell = self.control.Reporter.Cell
@@ -780,7 +782,6 @@ jQuery(function() {
                     cell = Cell("QC Report", **opts)
                 row.append(cell)
             return [row]
-
 
     class MediaDoc:
         def __init__(self, control, id):
@@ -824,7 +825,7 @@ jQuery(function() {
                     if value:
                         try:
                             return Doc.extract_id(value)
-                        except:
+                        except Exception:
                             self.control.logger.exception(value)
             return None
 
@@ -978,7 +979,6 @@ jQuery(function() {
             self.control.logger.debug("returning %d summary rows", len(rows))
             return rows
 
-
     class SummaryDoc:
         """Summary and the images to which it links."""
 
@@ -1001,7 +1001,7 @@ jQuery(function() {
                     if value:
                         try:
                             return Doc.extract_id(value)
-                        except:
+                        except Exception:
                             self.control.logger.exception(value)
             return None
 

@@ -94,16 +94,21 @@ class Control(Controller):
             alias = self.fields.getvalue(f"alias-{i:d}")
             if url and alias:
                 if alias in new:
-                    self.bail(f"Duplicate alias {alias!r}")
+                    message = f"Duplicate alias {alias!r}."
+                    self.alerts.append(dict(message=message, type="error"))
                 if not url.startswith("http"):
-                    self.bail(f"{url!r} is not an HTTP URL")
+                    message = f"{url!r} is not an HTTP URL."
+                    self.alerts.append(dict(message=message, type="error"))
                 url = url.strip("/")
                 key = url.lower()
                 if key in urls:
-                    self.bail("f{key!r} appears more than once")
+                    message = f"{key!r} appears more than once."
+                    self.alerts.append(dict(message=message, type="error"))
                 urls.add(key)
                 new[alias] = url
             i += 1
+        if self.alerts:
+            return self.show_form()
         opts = dict(group=self.GROUP)
         for alias in new:
             url = new[alias]

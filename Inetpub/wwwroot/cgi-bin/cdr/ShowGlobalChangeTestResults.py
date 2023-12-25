@@ -77,6 +77,11 @@ class Control(Controller):
 
         return f"{self.session.tier.basedir}/GlobalChange"
 
+    @cached_property
+    def buttons(self):
+        """No buttons needed on the form."""
+        return []
+
     @property
     def caption(self):
         """What we display at the top of the report table."""

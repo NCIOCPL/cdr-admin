@@ -109,7 +109,7 @@ table.usa-table th:first-child { text-align: center; }
 
         columns = "\u2713", "Job", "Type", "Started", "Status", "Name"
         headers = [self.HTMLPage.B.TH(column) for column in columns]
-        return self.HTMLPage.B.TR(*headers)
+        return self.HTMLPage.B.THEAD(self.HTMLPage.B.TR(*headers))
 
     @cached_property
     def buttons(self):

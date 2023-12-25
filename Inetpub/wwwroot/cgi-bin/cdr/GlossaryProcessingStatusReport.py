@@ -204,7 +204,7 @@ class GlossaryTermDocument:
         """`Doc` object for this CDR GlossaryConceptName document."""
 
         doc = Doc(self.control, id=self.id) if self.id else None
-        if doc and not doc.root:
+        if doc and not doc.root is not None:
             message = f"CDR{self.id} has no parsed XML."
             self.control.alerts.append(dict(message=message, type="warning"))
         return doc
@@ -213,7 +213,7 @@ class GlossaryTermDocument:
     def status(self):
         """First processing status found for the document."""
 
-        if self.doc and self.doc.root:
+        if self.doc and self.doc.root is not None:
             for node in self.doc.root.findall(self.STATUS_PATH):
                 status = Doc.get_text(node, "").strip()
                 if status:
@@ -241,7 +241,7 @@ class Concept(GlossaryTermDocument):
     def comment(self):
         """Comment for the definition for the selected language/audience."""
 
-        if self.doc and self.doc.root:
+        if self.doc and self.doc.root is not None:
             control = self.__control
             tag = "TermDefinition"
             if control.language != "English":
@@ -266,7 +266,7 @@ class Concept(GlossaryTermDocument):
 
     @cached_property
     def names(self):
-        """Dictionary of linked glossary name documents (populated by controller)."""
+        """Dictionary of linked GTN documents (populated by controller)."""
         return {}
 
     @cached_property

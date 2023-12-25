@@ -48,7 +48,7 @@ class Control(Controller):
         "Changes",
         "Comments",
     )
-    assert(len(WIDTHS) == len(HEADERS))
+    assert len(WIDTHS) == len(HEADERS)
 
     def build_tables(self):
         """Assemble the report's single table."""

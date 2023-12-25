@@ -40,13 +40,12 @@ class Control(Controller):
 
     @cached_property
     def filter_key(self):
-        """String used to select filters for the report.
+        """String used to select filters for the report."""
 
-        Note that the parameter used to convey this value has a
-        completely misleading name.
-        """
-
-        return self.fields.getvalue("DocType") or self.doc.doctype.name
+        key = self.doc.doctype.name
+        if not self.report_type:
+            return key
+        return f"{key}:{self.report_type}"
 
     @cached_property
     def filters(self):
@@ -64,12 +63,18 @@ class Control(Controller):
         id = self.fields.getvalue("parmid") or self.bail("Missing parameters")
 
         # Testing if 'parmid' includes a fragment ID
-        if '#' in id: id = id.split('#')[0]
+        if '#' in id:
+            id = id.split('#')[0]
 
         query = self.Query("url_parm_set", "longURL")
         query.where(query.Condition("id", id))
         rows = query.execute(self.cursor).fetchall()
         return dict(loads(rows[0].longURL))
+
+    @cached_property
+    def report_type(self):
+        """Flavor of the report (e.g., "rs" for redline/strikeout)."""
+        return self.fields.getvalue("ReportType")
 
 
 if __name__ == "__main__":

@@ -26,7 +26,8 @@ class Control(Controller):
     SCRIPT = "/js/filter.js"
     CSS = (
         ".action-buttons { text-wrap: nowrap; }",
-        ".action-buttons { .usa-button { margin-top: 0; }",
+        ".action-buttons .usa-button { margin-top: 0; }",
+        ".usa-form a:visited { color: white; }",
     )
 
     def build_tables(self):
@@ -489,6 +490,7 @@ class Control(Controller):
     def same_window(self):
         """Reduce generation of new browser tabs."""
         return [self.SUBMIT] if self.request else []
+
     @property
     def standard_wording(self):
         """True if standard wording display options are requested."""
@@ -597,7 +599,6 @@ class FilterSpec:
     def filter_id(self):
         """Integer for the ID of a CDR Filter document."""
 
-        #### raise Exception("how did we get here???")
         filter_id = None
         if self.filter_name:
             key = self.filter_name.upper()
@@ -685,7 +686,7 @@ class ResolvedFilterSet:
         control = self.__control
         B = control.HTMLPage.B
         params = {
-            self.DOCID: control.doc.cdr_id,
+            control.DOCID: control.doc.cdr_id,
             "DocVer": control.doc.version,
             "filter": self.filter_ids,
         }

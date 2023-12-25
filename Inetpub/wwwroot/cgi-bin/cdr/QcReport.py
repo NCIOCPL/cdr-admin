@@ -57,7 +57,7 @@ class Control(Controller):
     MARKUP_LEVEL_OPTIONS = (
         ("markup-publish", "With publish attribute"),
         ("markup-approved", "With approved attribute"),
-        ("markup-propsed", "With proposed attribute"),
+        ("markup-proposed", "With proposed attribute"),
     )
     MISCELLANEOUS_OPTIONS = (
         ("glossary", "Display glossary terms at end of report"),
@@ -142,7 +142,7 @@ class Control(Controller):
     PATIENT_ONLY_OPTIONS = {"keypoints", "std-wording", "pat-cites", "more"}
     PATIENT_ONLY_DEFAULTS = {"com-int", "com-aud-int", "com-src-adv"}
     HIDDEN_OPTIONS = {"publishable-images"}
-    HIDDEN_FOR_PATIENT =  {"com-adv"}
+    HIDDEN_FOR_PATIENT = {"com-adv"}
     IMAGE_VERSIONS = "pub", "unpub"
 
     def populate_form(self, page: HTMLPage):
@@ -213,10 +213,11 @@ class Control(Controller):
                 parmstring="yes",
                 parmid=self.parameter_set_id,
             )
+            if self.report_type:
+                params["ReportType"] = self.report_type
             if self.version_integer:
                 params["DocVersion"] = self.version_integer
             self.logger.info("packed params=%s", params)
-            #return self.redirect("QCforWord.py", **params)
             return self.redirect("QCforWord.py", **params)
         self.send_page(self.html_page)
 
@@ -278,13 +279,13 @@ class Control(Controller):
         # XXX Commented out, because unless I'm misreading the original
         #     code, there was no logical path which results in display
         #     of the "version" form for GTN documents.
-        #if self.doc.doctype.name == "GlossaryTermName":
-        #    fieldset = page.fieldset("Display Audience Definition")
-        #    for value, label in self.GLOSSARY_DEFINITION_OPTIONS:
-        #        checked = value in defaults
-        #        opts = dict(value=value, label=label, checked=checked)
-        #        fieldset.append(page.checkbox("options", **opts))
-        #    page.form.append(fieldset)
+        # if self.doc.doctype.name == "GlossaryTermName":
+        #     fieldset = page.fieldset("Display Audience Definition")
+        #     for value, label in self.GLOSSARY_DEFINITION_OPTIONS:
+        #         checked = value in defaults
+        #         opts = dict(value=value, label=label, checked=checked)
+        #         fieldset.append(page.checkbox("options", **opts))
+        #     page.form.append(fieldset)
 
         # Show the miscellaneous options here for patient summaries.
         if self.doc.doctype.name == "Summary" and self.patient:
@@ -328,7 +329,12 @@ class Control(Controller):
             fieldset.append(page.B.P("Mark comment types to be displayed."))
             wrapper = page.B.DIV(page.B.CLASS("grid-row grid-gap"))
             for header, options, _ in self.DETAILED_COMMENT_OPTIONS:
-                column = page.B.DIV(page.B.DIV(header, page.B.CLASS("subheading")))
+                column = page.B.DIV(
+                    page.B.DIV(
+                        header,
+                        page.B.CLASS("subheading")
+                    )
+                )
                 for value, label in options:
                     checked = value in defaults
                     opts = dict(value=value, label=label, checked=checked)
@@ -473,6 +479,7 @@ class Control(Controller):
         """XSL/T filter used to transform our document."""
 
         key = self.doc.doctype.name
+        self.logger.info("filters(): self.report_type=%r", self.report_type)
         if self.report_type:
             key = f"{key}:{self.report_type}"
             if "qd" in self.options:
@@ -636,7 +643,10 @@ class Control(Controller):
         report_type = self.fields.getvalue("ReportType")
         if report_type:
             return report_type
-        match self.doctype:
+        doctype = self.doctype or self.doc and self.doc.doctype.name or None
+        if not doctype:
+            return None
+        match doctype:
             case "Media":
                 return "img"
             case "MiscellaneousDocument":
@@ -739,6 +749,7 @@ class Control(Controller):
         class Flags:
             def __init__(self, options):
                 self.options = options
+
             def __getattr__(self, name):
                 if name == "citations":
                     if "hp-reference" in self.options:

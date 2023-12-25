@@ -250,7 +250,11 @@ class Concept:
     @cached_property
     def definition_rows(self):
         """How many rows are needed for the concept's definitions?"""
-        return max(len(self.english_definitions), len(self.spanish_definitions))
+
+        return max(
+            len(self.english_definitions),
+            len(self.spanish_definitions)
+        )
 
     @cached_property
     def doc(self):

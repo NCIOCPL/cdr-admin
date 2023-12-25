@@ -118,6 +118,7 @@ class Control(Controller):
         """Give the report some extra space."""
         return self.Reporter.Table.WIDE_CSS
 
+
 class Term:
     """Glossary term information for the report."""
 
