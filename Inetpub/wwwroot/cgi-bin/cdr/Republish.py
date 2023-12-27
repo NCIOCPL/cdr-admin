@@ -51,6 +51,8 @@ class Control(Controller):
             page - HTMLPage object on which to draw the form
         """
 
+        if not self.session.can_do("USE PUBLISHING SYSTEM"):
+            self.bail("You are not authorized to use the publishing system")
         fieldset = page.fieldset("Instructions")
         for paragraph in self.INSTRUCTIONS:
             fieldset.append(page.B.P(paragraph))
@@ -78,6 +80,8 @@ class Control(Controller):
         """Submit the job and re-draw the form."""
 
         # Make sure we have what we need.
+        if not self.session.can_do("USE PUBLISHING SYSTEM"):
+            self.bail("You are not authorized to use the publishing system")
         if not (self.docs or self.jobs or self.doctype):
             self.alerts.append(dict(
                 message="Document(s), job(s), or document type required.",
