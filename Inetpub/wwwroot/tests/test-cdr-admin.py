@@ -2,6 +2,9 @@
 
 """Test the CDR Administration web pages.
 
+Make sure you're on the NCI network when you run these tests. Otherwise,
+the tests will all fail with "unknown error: net::ERR_NAME_NOT_RESOLVED.
+
 Some examples of code which can be added (usually temporarily) when trying
 to troubleshoot unexplained failures of new or modified tests:
 
@@ -29,7 +32,7 @@ from re import search as re_search, escape as re_escape, sub as re_sub
 from ssl import _create_unverified_context
 from sys import argv
 from time import sleep
-from unittest import TestCase, main as run_tests
+from unittest import TestCase, TextTestRunner, TextTestResult, main
 from urllib.parse import urlencode
 from urllib.request import urlopen, Request
 from openpyxl import load_workbook
@@ -58,20 +61,27 @@ class Tester(TestCase):
     CDR_ID_PATTERN = r"CDR\d+"
     ISO_DATE_PATTERN = r"\d{4}-\d\d-\d\d"
     DATETIME_PATTERN = rf"{ISO_DATE_PATTERN} \d\d:\d\d:\d\d"
-    LAST_JOB_STARTED = None
-    NS =  "cips.nci.nih.gov/cdr"
+    NS = "cips.nci.nih.gov/cdr"
     NSMAP = dict(cdr=NS)
+    STARTED = datetime.now()
+    SUCCESSES = FAILURES = ERRORS = 0
     del HANDLER, LOG_FORMAT, LOG_PATH
 
     def setUp(self):
         """This gets run at the start of every test."""
 
+        self.started = datetime.now()
         self.driver = webdriver.Chrome()
         self.driver.implicitly_wait(self.DEFAULT_WAIT)
 
     def tearDown(self):
         """This gets run at the end of every test."""
+
         self.driver.close()
+        elapsed = datetime.now() - self.started
+        _, test_set, method_name = self.id().split(".")
+        args = elapsed, test_set, method_name
+        self.logger.info("%s elapsed for %s.%s", *args)
 
     @cached_property
     def base(self):
@@ -144,6 +154,7 @@ class Tester(TestCase):
         Required positional argument:
           expected - string we should find
         """
+
         self.assertIn(str(expected), self.get_page_source())
 
     def assert_page_not_has(self, expected):
@@ -152,6 +163,7 @@ class Tester(TestCase):
         Required positional argument:
           expected - string we should not find
         """
+
         self.assertNotIn(expected, self.get_page_source())
 
     def assert_plain_report(self):
@@ -208,7 +220,7 @@ class Tester(TestCase):
         self.assertEqual(len(tables), 1)
 
     def assert_tables_in_grid_container(self):
-        """Confirm that the report tables are inside the page's grid container."""
+        """Confirm that the report tables are inside the page's grid."""
 
         selector = "main div.grid-container table"
         table = self.driver.find_element(By.CSS_SELECTOR, selector)
@@ -242,12 +254,12 @@ class Tester(TestCase):
 
         script = f"""document.getElementById("{field_id}").click();"""
         try:
-            self.logger.info("submitting script %r", script)
+            self.logger.debug("submitting script %r", script)
             self.driver.execute_script(script)
         except Exception:
             self.logger.exception(f"click({field_id})")
             sleep(2)
-            self.logger.info("submitting it again ...")
+            self.logger.warning("submitting %r again ...", script)
             self.driver.execute_script(script)
 
     def create_external_mapping(self, value, **opts):
@@ -278,14 +290,14 @@ class Tester(TestCase):
         root = etree.fromstring(response)
         self.assertEqual(root.tag, "CdrResponseSet")
         message = "server time for create_external_mapping: %s"
-        self.logger.info(message, root.get("Time"))
+        self.logger.debug(message, root.get("Time"))
         cdr_response = root.find("CdrResponse")
         self.assertIsNotNone(cdr_response)
         elapsed = cdr_response.get("Elapsed")
         status = cdr_response.get("Status")
         message = "create_external_mapping server elapsed time: %s"
-        self.logger.info(message, elapsed)
-        self.logger.info(str(response, "utf-8"))
+        self.logger.debug(message, elapsed)
+        self.logger.debug(str(response, "utf-8"))
         if status != "success":
             message = "create_external_mapping response: %s"
             self.logger.error(message, str(response, "utf-8"))
@@ -293,7 +305,7 @@ class Tester(TestCase):
         mapping_response = cdr_response.find("CdrAddExternalMappingResp")
         mapping_id = mapping_response.get("MappingId")
         self.assertTrue(mapping_id and mapping_id.isdigit())
-        self.logger.info("created mapping %s", mapping_id)
+        self.logger.debug("created mapping %s", mapping_id)
         return int(mapping_id)
 
     def create_test_gtn(self, **opts):
@@ -370,7 +382,7 @@ class Tester(TestCase):
           reason - defaults to "Deleted by automated test"
         """
 
-        self.logger.info("delete_doc(%s)", cdr_id)
+        self.logger.debug("delete_doc(%s)", cdr_id)
         self.navigate_to("del-some-docs.py")
         self.assert_title("CDR Document Deletion")
         self.set_field_value("ids", cdr_id)
@@ -401,7 +413,7 @@ class Tester(TestCase):
         """Submit an HTTP request and return the bytes of the response.
 
         Required positional argument:
-          url - string for the request (possibly wrappen in a Request object)
+          url - string for the request (possibly wrapped in a Request object)
 
         Return:
           bytes returned from the HTTP server
@@ -444,7 +456,7 @@ class Tester(TestCase):
                 if not has_session:
                     params.append(("Session", self.session))
             url = f"{self.cgi}/{script_or_url}?{urlencode(params)}"
-        self.logger.info("loading workbook from %s", url)
+        self.logger.debug("loading workbook from %s", url)
         content = self.fetch_from_url(url)
         if content:
             if save:
@@ -477,6 +489,7 @@ class Tester(TestCase):
 
     def find_test_citation_docs(self):
         """Find test Citation documents created from PMID 1."""
+
         sql = (
             "SELECT doc_id"
             "  FROM query_term"
@@ -489,7 +502,7 @@ class Tester(TestCase):
         """Wait for the page to be completely loaded."""
 
         attempts = 3
-        sleep(1)
+        sleep(2)
         while attempts > 0:
             source = self.driver.page_source
             if "</body>" in source and "</html>" in source:
@@ -667,15 +680,9 @@ class Tester(TestCase):
           string for the handle of the browser tab for the page
         """
 
-        started = datetime.now()
-        if Tester.LAST_JOB_STARTED is not None:
-            elapsed = started - Tester.LAST_JOB_STARTED
-            if elapsed.total_seconds() >= self.DEFAULT_WAIT:
-                self.logger.info("previous job took %s", elapsed)
-        Tester.LAST_JOB_STARTED = started
         params["Session"] = self.session
         url = f"{self.cgi}/{script}?{urlencode(params)}"
-        self.logger.info("navigating to %s", script)
+        self.logger.debug("navigating to %s", script)
         self.driver.get(url)
         handle = self.driver.current_window_handle
         self.open_tabs.add(handle)
@@ -776,21 +783,21 @@ class Tester(TestCase):
         response = self.fetch_from_url(request)
         root = etree.fromstring(response)
         self.assertEqual(root.tag, "CdrResponseSet")
-        self.logger.info("server time for save_doc: %s", root.get("Time"))
+        self.logger.debug("server time for save_doc: %s", root.get("Time"))
         cdr_response = root.find("CdrResponse")
         self.assertIsNotNone(cdr_response)
         elapsed = cdr_response.get("Elapsed")
         status = cdr_response.get("Status")
-        self.logger.info("save_doc server elapsed time: %s", elapsed)
+        self.logger.debug("save_doc server elapsed time: %s", elapsed)
         if status != "success":
             self.logger.error("save_doc response: %s", str(response, "utf-8"))
         self.assertEqual(status, "success")
         if opts.get("id"):
-            self.logger.info("updated %s", opts["id"])
+            self.logger.debug("updated %s", opts["id"])
             return opts["id"]
         doc_id = cdr_response.find("CdrAddDocResp/DocId")
         self.assertIsNotNone(doc_id)
-        self.logger.info("created %s", doc_id.text)
+        self.logger.debug("created %s", doc_id.text)
         return self.extract_id(doc_id.text)
 
     def save_pdf(self, filename="page.pdf"):
@@ -897,8 +904,17 @@ class Tester(TestCase):
         """
 
         self.driver.switch_to.window(tab)
-        # self.driver.implicitly_wait(wait)
-        self.logger.info("switch_to(%s)", tab)
+        self.logger.debug("switch_to(%s)", tab)
+
+    @classmethod
+    def setUpClass(cls):
+        cls._started = datetime.now()
+        cls.LOGGER.info("starting %s", cls.__name__)
+
+    @classmethod
+    def tearDownClass(cls):
+        now = datetime.now()
+        cls.LOGGER.info("%s elapsed for %s", now - cls._started, cls.__name__)
 
     class Table:
         """Collects the body cells for the node's table."""
@@ -969,9 +985,8 @@ class CitationTests(Tester):
         doc_id = int(doc["id"])
         journal = doc["journal"]
         pub_year = doc["year"]
-        form = self.navigate_to("CiteSearch.py")
+        self.navigate_to("CiteSearch.py")
         self.assert_title("Citation")
-        ######## self.switch_to(form)
         button = self.find("submit-button-import", method=By.ID)
         self.assertIsNotNone(button)
         self.assertFalse(button.is_enabled())
@@ -1021,7 +1036,7 @@ class CitationTests(Tester):
         self.assert_page_has(pub_year)
 
         # Test import of a new Citation document.
-        form = self.navigate_to("CiteSearch.py")
+        self.navigate_to("CiteSearch.py")
         self.assert_title("Citation")
         self.set_field_value("pmid", "1")
         self.click("submit-button-import")
@@ -1145,7 +1160,7 @@ class CitationTests(Tester):
         etree.SubElement(citation, "PMID").text = "1"
         xml = etree.tostring(root, encoding="unicode")
         doc_id = self.save_doc(xml, "Citation", unlock=True, version=True)
-        self.logger.info(f"created CDR{doc_id} linked to PMID 1")
+        self.logger.debug(f"created CDR{doc_id} linked to PMID 1")
 
         # Test the utility.
         self.navigate_to("UpdatePreMedlineCitations.py")
@@ -1179,6 +1194,1006 @@ class CitationTests(Tester):
 
         # Don't leave test trash lying around.
         self.delete_doc(doc_id)
+
+
+class DeveloperTests(Tester):
+    """Tests of tools used by the development tesam."""
+
+    def test_client_file_tools(self):
+        """Test the client file tools."""
+
+        # Test installation of a client file.
+        file_bytes = b"This is a test file\n"
+        path = Path("dada.txt").resolve()
+        path.write_bytes(file_bytes)
+        self.navigate_to("InstallClientFile.py")
+        self.assert_title("Install Client File")
+        self.assert_page_has("Instructions")
+        self.assert_page_has("Select the file to be installed")
+        self.set_field_value("file", str(path))
+        self.set_field_value("location", "dada.txt")
+        self.submit_form(new_tab=False)
+        self.assert_title("Install Client File")
+        expected = r"D:\cdr\ClientFiles\dada.txt successfully installed"
+        self.assert_page_has(expected)
+
+        # Fetch the file.
+        script = "FetchClientFile.py"
+        self.navigate_to(script)
+        self.assert_title("Fetch Client File")
+        params = dict(path="dada.txt", Request="Submit")
+        url = f"{self.cgi}/{script}?{urlencode(params)}"
+        data = self.fetch_from_url(url)
+        self.assertEqual(data, file_bytes)
+
+        # Remove the file.
+        self.navigate_to("RemoveClientFile.py")
+        self.assert_title("Remove Client File")
+        self.select_values("path", "dada.txt")
+        self.submit_form(new_tab=False)
+        self.assert_title("Remove Client File")
+        self.assert_page_has("Processing Logs")
+        self.assert_page_has(r"Removed D:\cdr\ClientFiles\dada.txt")
+        self.assert_page_has("Running RefreshManifest.py ...")
+        self.assert_page_has("fixing permissions...")
+        self.assert_page_has("File removed successfully.")
+        path.unlink()
+
+    def test_configuration(self):
+        """Test the interface for managing server configuration."""
+
+        # Bring up the page and switch to the ports values.
+        self.navigate_to("EditConfig.py")
+        self.assert_title("CDR Settings")
+        self.select_values("filename", "dbports")
+        sleep(1)
+        original = self.find("content", method=By.ID).text
+        self.assertRegex(original, r"PROD:cdr:\d+")
+
+        # Make a change and save it.
+        insertion = "# This is a comment for automated testing.\n"
+        self.set_field_value("content", insertion + original)
+        self.click("submit-button-save")
+        self.assert_title("CDR Settings")
+        self.assert_page_has("Saved new values")
+        modified = self.find("content", method=By.ID).text
+        self.assertEqual(modified, insertion + original)
+
+        # Back out the change.
+        self.set_field_value("content", original)
+        self.click("submit-button-save")
+        self.assert_title("CDR Settings")
+        self.assert_page_has("Saved new values")
+        final = self.find("content", method=By.ID).text
+        self.assertEqual(final, original)
+
+    def test_control_values(self):
+        """Test the utility for managing control values."""
+
+        # Before we do anything else, make sure nothing was left behind
+        # from a previous, failed test.
+        form = self.navigate_to("EditControlValues.py")
+        self.assert_title("Manage Control Values")
+        self.assert_page_has("Instructions")
+        self.assert_page_has(
+            "Enter a group or value name (or both) in the New Value block to "
+            "override where the value (and its comment) will be stored when "
+            "the Save button is clicked."
+        )
+        test_group = "test-control-value-group"
+        test_names = "test-control-value-name-1", "test-control-value-name-2"
+        test_values = "dada", "yada, yada"
+        test_comments = "This is a test control value", "Another test value"
+
+        def load_values():
+            params = dict(Session=self.session, Request="JSON")
+            url = f"{self.cgi}/EditControlValues.py?{urlencode(params)}"
+            json = self.fetch_from_url(url)
+            return load_from_json(json)
+        values = load_values()
+        while test_group in values:
+            self.select_values("group", test_group)
+            self.click("submit-button-delete")
+            self.assert_page_has("Value successfully dropped.")
+            values = load_values()
+
+        # Create some test values.
+        for i, name in enumerate(test_names):
+            self.set_field_value("new_group", test_group)
+            self.set_field_value("new_name", name)
+            self.set_field_value("value", test_values[i])
+            self.set_field_value("comment", test_comments[i])
+            self.click("submit-button-save")
+
+        # Verify the values using the HTML table report.
+        self.click("submit-button-show-all-values")
+        self.select_new_tab()
+        tables = self.load_tables()
+        self.assertEqual(len(tables), 1)
+        value_dictionary = defaultdict(dict)
+        for row in tables[0].rows:
+            (value, comment) = row[2].text, row[3].text
+            value_dictionary[row[0].text][row[1].text] = (value, comment)
+        test_group_values = value_dictionary[test_group]
+        for i, name in enumerate(test_names):
+            self.assertEqual(test_group_values[name][0], test_values[i])
+            self.assertEqual(test_group_values[name][1], test_comments[i])
+
+        # Change the values.
+        new_test_values = "dada2", "yadissimo"
+        new_test_comments = "I've changed my mind.", "Won't be around long."
+        self.switch_to(form)
+        for i, name in enumerate(test_names):
+            self.select_values("group", test_group)
+            self.select_values("name", name)
+            self.set_field_value("value", new_test_values[i])
+            self.set_field_value("comment", new_test_comments[i])
+            self.click("submit-button-save")
+
+        # Verify the values using the JSON report.
+        group = load_values().get(test_group)
+        self.assertIsNotNone(group)
+        values = group["values"]
+        for i, name in enumerate(test_names):
+            self.assertEqual(values[name]["value"], new_test_values[i])
+            self.assertEqual(values[name]["comment"], new_test_comments[i])
+
+        # Remove the test control values.
+        for i, name in enumerate(test_names):
+            self.select_values("group", test_group)
+            self.select_values("name", name)
+            self.click("submit-button-delete")
+
+        # Verify that they're gone.
+        group = load_values().get(test_group)
+        self.assertIsNone(group)
+
+    def test_database_table_report(self):
+        """Test the Database Tables and Views report."""
+
+        self.navigate_to("db-tables.py")
+        self.assert_title("Database Tables and Views")
+        databases = "CDR", "CDR_ARCHIVED_VERSIONS"
+        for db in databases:
+            self.assert_page_has(f'<legend class="usa-legend">{db}</legend>')
+        self.assert_page_has("<h3>TABLES</h3>")
+        self.assert_page_has("<dt>all_docs</dt>")
+
+    def test_doctypes(self):
+        """Test the interface for managing CDR document types."""
+
+        # Establish values used by the test.
+        test_type_name = "DoctypeForRegressionTesting"
+        del_msg = f"Successfully deleted document type {test_type_name!r}."
+        add_msg = f"New document type {test_type_name!r} successfully added."
+
+        # Create a local function we'll use more than once.
+        def find_test_type_link():
+            for link in self.find("form ul li a", all=True):
+                if link.text == test_type_name:
+                    return link
+            return None
+
+        # Clean out any leftover test data.
+        self.navigate_to("EditDocTypes.py")
+        self.assert_title("Manage Document Types")
+        self.assert_page_has("Existing Document Types (click to edit)")
+        link = find_test_type_link()
+        if link is not None:
+            link.click()
+            self.select_new_tab()
+            self.assert_title(f"Edit {test_type_name} Document Type")
+            self.click("submit-button-delete-document-type")
+            self.assert_title("Manage Document Types")
+            self.assert_page_has(del_msg)
+
+        # Create the test document type.
+        self.click("submit-button-add-new-document-type")
+        if link is None:
+            self.select_new_tab()
+        self.assert_title("Adding New Document Type")
+        self.set_field_value("doctype", test_type_name)
+        self.select_values("schema", "xxtest.xml")
+        self.select_values("title_filter", "DocTitle for xxtest")
+        self.set_field_value("comment", "this is a bogus test document type")
+        self.click("submit-button-save-new-document-type")
+        self.assert_title(f"Edit {test_type_name} Document Type")
+        self.assert_page_has(add_msg)
+        self.click("submit-button-document-type-menu")
+        link = find_test_type_link()
+        self.assertIsNotNone(link)
+
+        # Remove the test type.
+        link.click()
+        self.assert_title(f"Edit {test_type_name} Document Type")
+        self.click("submit-button-delete-document-type")
+        self.assert_title("Manage Document Types")
+        self.assert_page_has(del_msg)
+        self.assertIsNone(find_test_type_link())
+
+    def test_dtds(self):
+        """Test the interface for posting a DTD to the CDR server."""
+
+        # We'll need this a couple of times.
+        def fetch_dtd(filename):
+            url = f"{self.cgi}/get-dtd.py?dtd={filename}"
+            return self.fetch_from_url(url).strip().replace(b"\r", b"") + b"\n"
+
+        # Get a copy of the DTD and save it to disk.
+        original_dtd = fetch_dtd("pdq.dtd")
+        self.assertIn(b"<!ELEMENT", original_dtd)
+        path = Path("pdq.dtd").resolve()
+        path.write_bytes(original_dtd)
+
+        # Post it to the server.
+        self.navigate_to("PostDTD.py")
+        self.assert_title("Post DTD")
+        self.set_field_value("file", str(path))
+        self.click("flavor-vendor")
+        self.submit_form(new_tab=False)
+        self.assert_title("Post DTD")
+        self.assert_page_has("Successfully installed D:/cdr/licensee/pdq.dtd.")
+
+        # Verify that it made the round trip intact.
+        fetched_dtd = fetch_dtd("pdq.dtd")
+        self.assertEqual(fetched_dtd, original_dtd)
+
+        # Clean up after ourselves.
+        path.unlink()
+
+    def test_elements_report(self):
+        """Test the Summary Elements report."""
+
+        self.navigate_to("ShowSummaryIncludes.py")
+        self.assert_title("Elements Included In PDQ Summaries")
+        self.assert_page_has("Choose summary type")
+        self.click("doctype-dis")
+        self.submit_form()
+        self.assert_title("Elements Included In PDQ Summaries")
+        self.assert_plain_report()
+        self.assert_non_tabular_report()
+        self.assert_page_has("<h2>Report Elements</h2>")
+        self.assert_page_has("<h2>Summaries</h2>")
+        self.assertIsNotNone(self.driver.find_element(By.CSS_SELECTOR, "ul"))
+        self.assertIsNotNone(self.driver.find_element(By.CSS_SELECTOR, "dl"))
+        drug = self.get_test_drug_info()
+        self.assert_page_has(drug["id"])
+        self.assert_page_has(drug["name"])
+
+    def test_link_types(self):
+        """Test the interface for managing link type controls."""
+
+        # Before we begin the real test, clear out leftover test residue.
+        landing_page = self.navigate_to("EditLinkControl.py")
+        test_link_type_name = "Link Type For Automated Testing"
+        self.assert_title("Manage Link Types")
+        self.assert_page_has("Existing Link Types (click to edit)")
+        self.assertIsNotNone(self.find("form ul li a"))
+
+        def find_test_type_link():
+            for link in self.find("form ul li a", all=True):
+                if link.text == test_link_type_name:
+                    return link
+            return None
+        test_type_link = find_test_type_link()
+        if test_type_link is not None:
+            test_type_link.click()
+            self.select_new_tab()
+            self.click("submit-button-delete")
+            self.assert_title("Manage Link Types")
+            self.assert_page_has(
+                f"Successfully deleted link type '{test_link_type_name}'."
+            )
+            self.switch_to(landing_page)
+            self.driver.refresh()
+
+        # Create our test rule.
+        self.find("input[value='Add New Link Type']").click()
+        self.select_new_tab()
+        self.assert_title("Add Link Type")
+        self.set_field_value("name", test_link_type_name)
+        self.set_field_value("comment", "something insightful and intelligent")
+        self.select_values("version", "V")
+        self.select_values("doctype-1", "Person")
+        self.set_field_value("element-1", "LinkingElement")
+        self.find("#block-1 img").click()
+        self.find("#block-2 img").click()
+        self.select_values("doctype-3", "Organization")
+        self.set_field_value("element-3", "AnotherLinkingElement")
+        self.click("target-documentation")
+        self.click("target-documentationtoc")
+        self.select_values("ruletype-2", "LinkTargetContains")
+        self.set_field_value("ruletext-2", '/Foo == "some value"')
+        self.set_field_value("rulecomment-2", "yada yada")
+        self.select_values("ruletype-4", "LinkTargetContains")
+        self.set_field_value("ruletext-4", '//Bar == "another value"')
+        self.set_field_value("rulecomment-4", "molto yada")
+        self.click("submit-button-save")
+
+        # Verify that the link type was recorded correctly.
+        self.assert_title("Edit Link Type")
+        self.assert_page_has(f"Added new link type {test_link_type_name}.")
+        # landing_page = self.navigate_to("EditLinkControl.py")
+        self.switch_to(landing_page)
+        self.driver.refresh()
+        self.assert_title("Manage Link Types")
+        self.assert_page_has(test_link_type_name)
+        self.find("input[value='Show All Link Types']").click()
+        self.select_new_tab()
+        self.assert_title("Show All Link Types")
+        self.assert_single_table_report()
+        self.assert_tables_in_grid_container()
+        table = self.load_table()
+        expected_caption = "All Available Linking Element Combinations"
+        self.assertEqual(table.caption.text, expected_caption)
+        columns = (
+            "Link Type",
+            "Source Doctype",
+            "Linking Element",
+            "Target Doctype",
+            "Pub/Ver/Cwd",
+        )
+        table.check_headers(columns)
+        test_rows = []
+        for row in table.rows:
+            if row[0].text == "Link Type For Automated Testing":
+                test_rows.append([cell.text for cell in row[1:]])
+        self.assertEqual(len(test_rows), 4)
+        sources = (
+            ("Organization", "AnotherLinkingElement"),
+            ("Person", "LinkingElement"),
+        )
+        targets = "Documentation", "DocumentationToC"
+        expected = []
+        for doctype, element in sources:
+            for target in targets:
+                expected.append([doctype, element, target, "V"])
+        self.assertEqual(test_rows, expected)
+
+        # Remove the test link type.
+        self.switch_to(landing_page)
+        self.driver.refresh()
+        self.assert_title("Manage Link Types")
+        self.assert_page_has(test_link_type_name)
+        test_type_link = find_test_type_link()
+        self.assertIsNotNone(test_type_link)
+        test_type_link.click()
+        self.select_new_tab()
+        self.click("submit-button-delete")
+        self.assert_title("Manage Link Types")
+        self.assert_page_has(
+            f"Successfully deleted link type '{test_link_type_name}'."
+        )
+        test_type_link = find_test_type_link()
+        self.assertIsNone(test_type_link)
+
+    def test_lock_management(self):
+        """Test the utilities for clearing processing locks."""
+
+        # Test the interface for removing the file sweeper lock.
+        self.navigate_to("clear-filesweeper-lockfile.py")
+        self.assert_title("Clear File Sweeper Lockfile")
+        self.assert_page_has("Instructions")
+        self.assert_page_has("The processing performed by this")
+        self.submit_form(new_tab=False)
+        page_source = self.get_page_source()
+        not_found = "Lock file not found."
+        success = "Lock file successfully removed."
+        self.assert_title("Clear File Sweeper Lockfile")
+        self.assertTrue(success in page_source or not_found in page_source)
+
+        # Test the interface for removing the media lock. There's a limit
+        # to what we can test without risk of disrupting an ongoing sync
+        # of the media documents. We don't want that risk, even on a non-
+        # production server. So we just verify the expected error message
+        # for an operation we know will fail.
+        self.navigate_to("UnlockMedia.py")
+        self.assert_title("Unlock Media")
+        self.assert_page_has("Instructions")
+        self.assert_page_has("Media documents published from the CDR are")
+        self.set_field_value("to", "/some/bogus/path")
+        self.submit_form(new_tab=False)
+        regex = r"(Path .* not found)|(Directory rename failed)"
+        self.assert_regex(regex)
+
+    def test_log_viewers(self):
+        """Test the interfaces for reviewing logs."""
+
+        # Check the server log viewer's UI.
+        script = "log-tail.py"
+        self.navigate_to(script)
+        self.assert_title("Log Viewer")
+        options = self.find("#p option", all=True)
+        option_value = None
+        for option in options:
+            if option.text == "testing.log":
+                option_value = option.get_attribute("value")
+                break
+        self.assertIsNotNone(option_value)
+        self.select_values("p", option_value)
+        self.set_field_value("c", "1")
+        self.get_test_board()
+        expected = "[INFO] started get-boards API service"
+        self.submit_form()
+        self.assert_page_has(expected)
+
+        # Fetch the raw log.
+        params = dict(
+            Request="Submit",
+            Session=self.session,
+            p=option_value,
+            r="yes"
+        )
+        url = f"{self.cgi}/{script}?{urlencode(params)}"
+        log = self.fetch_from_url(url)
+        self.assertIsNotNone(log)
+        self.assertIn(expected, str(log, encoding="utf-8"))
+
+        # Test the client log viewer.
+        self.navigate_to("ShowClientLogs.py")
+        self.assert_title("Client Log Viewer")
+        self.set_field_value("date_range-start", "1/1/2023")
+        self.set_field_value("date_range-end", "12/31/2023")
+        self.submit_form()
+        self.assert_title("Client Log Viewer")
+        self.assert_plain_report()
+        tables = self.load_tables()
+        self.assertEqual(len(tables), 10)
+        expected = ["Session", "Saved", "User"]
+        for table in tables:
+            self.assertEqual(len(table.rows), 3)
+            headers = table.node.find_elements(By.TAG_NAME, "th")
+            actual = [header.text for header in headers]
+            self.assertEqual(actual, expected)
+
+    def test_messaging(self):
+        """Test interface for sending an email message to logged-in users."""
+
+        subject = "Test message for automated CDR tests"
+        body = "This is sent by an automated test. It can be ignored."
+        self.navigate_to("MessageLoggedInUsers.py")
+        self.assert_title("Send a Message to Logged-In CDR Users")
+        self.assert_page_has("All fields are required")
+        self.set_field_value("subject", subject)
+        self.set_field_value("body", body)
+        self.submit_form()
+        self.assert_title("Send a Message to Logged-In CDR Users")
+        self.assert_single_table_report()
+        table = self.load_table()
+        self.assert_tables_in_grid_container()
+        table.check_headers(["Message Recipients"])
+
+    def test_permissions(self):
+        """Test the interface for managing accounts and permissions."""
+
+        # We'll need these more than once, but only locally.
+        def find_test_link(target):
+            for link in self.find("#primary-form ul li a", all=True):
+                if link.text == target:
+                    return link
+
+        def can_do(account, action, doctype):
+            params = dict(
+                account=account,
+                action=action,
+                doctype=doctype,
+                Session=self.session,
+            )
+            url = f"{self.cgi}/check-auth.py?{urlencode(params)}"
+            response = self.fetch_from_url(url).strip()
+            return response == b"Y"
+
+        test_data_types = "group", "action", "user"
+
+        def remove_test_data(final):
+            for type in test_data_types:
+                script = f"Edit{type.capitalize()}s.py"
+                self.navigate_to(script)
+                name = f"Automated Test {type.capitalize()}"
+                if type == "action":
+                    name = name.upper()
+                link = find_test_link(name)
+                if final:
+                    self.assertIsNotNone(link)
+                button_id = f"submit-button-delete-{type}"
+                expected = f"Successfully deleted {type} {name!r}."
+                if type == "user":
+                    button_id = "submit-button-inactivate-account"
+                while link is not None:
+                    if not final:
+                        self.logger.warning("clearing out leftover %s", type)
+                    link.click()
+                    self.select_new_tab()
+                    if type == "user":
+                        name_field = self.find("name", method=By.ID)
+                        self.assertIsNotNone(name_field)
+                        pattern = "Successfully retired account for user {}."
+                        user_machine_name = name_field.get_attribute("value")
+                        expected = pattern.format(user_machine_name)
+                    self.logger.debug("clicking button %r", button_id)
+                    self.click(button_id)
+                    self.assert_page_has(expected)
+                    link = find_test_link(name)
+
+        # First clear out any dross left by a previous, failed test.
+        remove_test_data(final=False)
+
+        # Add the test action.
+        action_name = "AUTOMATED TEST ACTION"
+        self.navigate_to("EditActions.py")
+        self.assert_title("Manage Actions")
+        self.assert_page_has("Existing Actions (click to edit)")
+        link = find_test_link(action_name)
+        self.assertIsNone(link)
+        self.click("submit-button-add-new-action")
+        self.select_new_tab()
+        self.assert_title("Add New Action")
+        self.set_field_value("name", action_name)
+        self.set_field_value("comment", "This is a test action.")
+        self.click("submit-button-save-new-action")
+        self.assert_page_has(f"Action {action_name!r} successfully added.")
+        self.assert_title(f"Edit {action_name} Action")
+        self.click("options-doctype-specific")
+        self.click("submit-button-save-changes")
+        self.assert_page_has(f"Action {action_name!r} successfully updated.")
+        self.assert_title(f"Edit {action_name} Action")
+
+        # Create the test user.
+        user_fullname = "Automated Test User"
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        user_name = f"testuser_{timestamp}"
+        self.navigate_to("EditUsers.py")
+        self.assert_title("Manage Users")
+        self.assert_page_has("Existing Users (click to edit)")
+        link = find_test_link(user_fullname)
+        self.assertIsNone(link)
+        self.click("submit-button-add-new-user")
+        self.select_new_tab()
+        self.assert_title("Adding New User Account")
+        self.set_field_value("name", user_name)
+        self.set_field_value("full_name", user_fullname)
+        self.set_field_value("office", "My basement office")
+        self.set_field_value("email", f"{user_name}@example.com")
+        self.set_field_value("phone", "Butterfield 8")
+        self.set_field_value("comment", "This is a test user.")
+        self.click("submit-button-save-new-user-account")
+        self.assert_page_has(f"New user {user_name} saved successfully.")
+        self.assert_title(f"Editing User Account {user_fullname}")
+
+        # Create the test group.
+        group_name = "Automated Test Group"
+        self.navigate_to("EditGroups.py")
+        self.assert_title("Manage Groups")
+        self.assert_page_has("Existing Groups (click to edit)")
+        link = find_test_link(group_name)
+        self.assertIsNone(link)
+        self.click("submit-button-add-new-group")
+        self.select_new_tab()
+        self.assert_title("Add New Group")
+        self.set_field_value("name", group_name)
+        self.set_field_value("description", "This is a test group.")
+        self.click("submit-button-save-new-group")
+        self.assert_page_has(f"Group {group_name!r} successfully added.")
+        self.assert_title(group_name)
+
+        # At this point the account should be denied the action, because
+        # the user doesn't have a membership in a group with the appropriate
+        # permission. So let's add the user to our new test group.
+        self.assertFalse(can_do(user_name, action_name, "Summary"))
+        self.navigate_to("EditUsers.py")
+        self.assert_title("Manage Users")
+        self.assert_page_has("Existing Users (click to edit)")
+        link = find_test_link(user_fullname)
+        self.assertIsNotNone(link)
+        link.click()
+        self.select_new_tab()
+        self.assert_title(f"Editing User Account {user_fullname}")
+        self.click("group-automated-test-group")
+        self.click("submit-button-save-changes")
+        self.assert_title(f"Editing User Account {user_fullname}")
+        expected = f"Changes to account {user_name} saved successfully."
+        self.assert_page_has(expected)
+
+        # That shouldn't be sufficient, because the group of which the
+        # user just became a member doesn't have permission for the
+        # new action. Grant such permission to the group, and while
+        # we're on the page, verify that the page reflects the membership
+        # of the new test user in the group.
+        self.assertFalse(can_do(user_name, action_name, "Summary"))
+        self.navigate_to("EditGroups.py")
+        self.assertTrue("Manage Groups")
+        self.assert_page_has("Existing Groups (click to edit)")
+        link = find_test_link(group_name)
+        self.assertIsNotNone(link)
+        link.click()
+        self.select_new_tab()
+        self.assert_title(group_name)
+        checkbox = self.find(f"user-{user_name}", method=By.ID)
+        self.assertIsNotNone(checkbox)
+        self.assertTrue(checkbox.is_selected())
+        self.click("automated_test_action-doctype-term")
+        self.click("submit-button-save-changes")
+        self.assert_page_has(f"Group {group_name!r} successfully updated.")
+
+        # The account is a member of the group and now the group has
+        # permission to perform the action. But the permission has been
+        # granted for a different document type than the type for which
+        # the account is requesting permission, so permission should
+        # still be denied. Grant the permission for the Summary document
+        # type, and the permission should finally be granted.
+        self.assertFalse(can_do(user_name, action_name, "Summary"))
+        self.click("automated_test_action-doctype-summary")
+        self.click("submit-button-save-changes")
+        self.assert_page_has(f"Group {group_name!r} successfully updated.")
+        self.assertTrue(can_do(user_name, action_name, "Summary"))
+
+        # Remove the user from the group and confirm that the permission
+        # is no longer granted.
+        self.click(f"user-{user_name}")
+        self.click("submit-button-save-changes")
+        self.assert_page_has(f"Group {group_name!r} successfully updated.")
+        self.assertFalse(can_do(user_name, action_name, "Summary"))
+
+        # Finally, clean up behind ourselves, removing the test data.
+        remove_test_data(final=True)
+
+    def test_query_term_definitions(self):
+        """Test the interface for managing query-term definitions."""
+
+        # Test the Compare button. Using STAGE for the upper tier,
+        # because while I was developing this test CDR PROD was down
+        # all day, and CBIIT couldn't figure out how to bring it back up.
+        self.navigate_to("EditQueryTermDefs.py")
+        self.assert_title("Manage Query Term Definitions")
+        self.select_values("upper", "STAGE")
+        self.click("submit-button-compare")
+        self.assert_title("Manage Query Term Definitions")
+
+        # Make sure nothing is left behind from a previous run of the test.
+        test_path = "/Country/Chicken"
+        self.click("submit-button-return-to-form")
+        self.assert_title("Manage Query Term Definitions")
+        if test_path in self.get_page_source():
+            self.click("path-SLASHcountrySLASHchicken")
+            self.click("submit-button-remove")
+            self.assert_page_has("/Country/Chicken successfully removed.")
+
+        def find_chickens():
+            return self.run_query(
+                "SELECT doc_id, value FROM query_term "
+                f"WHERE path = '{test_path}'"
+            )
+        for doc_id, _ in find_chickens():
+            self.delete_doc(doc_id, reason="Cleaning up query term dross")
+        self.assertEqual(len(find_chickens()), 0)
+
+        # Add the path definition.
+        self.navigate_to("EditQueryTermDefs.py")
+        self.assert_title("Manage Query Term Definitions")
+        self.set_field_value("new_path", test_path)
+        self.click("submit-button-add")
+        self.assert_title("Manage Query Term Definitions")
+        self.assert_page_has("/Country/Chicken successfully added.")
+
+        # Verify that the new query term definition gets applied.
+        root = etree.Element("Country")
+        etree.SubElement(root, "Chicken").text = "Nuggets"
+        xml = etree.tostring(root, encoding="unicode")
+        doc_id = self.save_doc(xml, "Country")
+        self.assertEqual(find_chickens(), [[str(doc_id), "Nuggets"]])
+
+        # Drop the definition.
+        self.navigate_to("EditQueryTermDefs.py")
+        self.assert_title("Manage Query Term Definitions")
+        self.click("path-SLASHcountrySLASHchicken")
+        self.click("submit-button-remove")
+        self.assert_page_has("/Country/Chicken successfully removed.")
+        self.save_doc(xml, "Country", id=f"CDR{doc_id:010d}", unlock=True)
+        self.assertEqual(len(find_chickens()), 0)
+        self.delete_doc(doc_id)
+        self.assertEqual(len(find_chickens()), 0)
+
+    def test_scheduler(self):
+        """Test the interface for managing scheduled jobs."""
+
+        # Create local variables we'll use throughout.
+        job_name = "Automated Testing Job"
+        job_class = "test.Stub"
+
+        # Create a local function we'll use more than once.
+        def find_test_job_link(table):
+            for link in table.node.find_elements(By.TAG_NAME, "a"):
+                if link.text == job_name:
+                    return link
+            return None
+
+        # Start by clearing out any old jobs.
+        for i in range(2):
+            self.navigate_to("Scheduler.py")
+            self.assert_title("Scheduled Jobs")
+            tables = self.load_tables()
+            self.assertEqual(len(tables), 2)
+            link = find_test_job_link(tables[i])
+            while link is not None:
+                link.click()
+                self.click("submit-button-delete-job")
+                alert = self.wait.until(expected_conditions.alert_is_present())
+                self.logger.debug("alert text: %s", alert.text)
+                alert.accept()
+                sleep(1)
+                self.assert_title("Scheduled Jobs")
+                self.assert_page_has(f"Job {job_name} successfully deleted.")
+                tables = self.load_tables()
+                link = find_test_job_link(tables[i])
+                self.assertEqual(len(tables), 2)
+
+        # Create the test job.
+        self.click("submit-button-add-new-job")
+        self.assert_title("Scheduled Jobs")
+        self.click("submit-button-save")
+        self.assert_page_has("Job name is required.")
+        self.assert_page_has("Class name for job is required.")
+        self.set_field_value("name", job_name)
+        self.set_field_value("job_class", job_class)
+        self.set_field_value("hour", "3")
+        self.set_field_value("minute", "59")
+        self.set_field_value("opt-name-1", "stooge")
+        self.set_field_value("opt-value-1", "Larry")
+        self.find("#primary-form img").click()
+        self.set_field_value("opt-name-2", "pep-boy")
+        self.set_field_value("opt-value-2", "Manny")
+        self.click("submit-button-save")
+        self.assert_title("Scheduled Jobs")
+        self.assert_page_has(
+            f"Enabled job {job_name!r} saved. "
+            "Job will run every day at 03:59."
+        )
+
+        # Modify the job and save it again.
+        self.click("opts-enabled")
+        self.click("submit-button-save")
+        self.assert_title("Scheduled Jobs")
+        self.assert_page_has(f"Disabled job {job_name!r} saved.")
+
+        # Verify that it shows up in the correct table on the Jobs page.
+        self.click("submit-button-jobs")
+        self.assert_title("Scheduled Jobs")
+        tables = self.load_tables()
+        self.assertEqual(len(tables), 2)
+        link = find_test_job_link(tables[0])
+        self.assertIsNone(link)
+        link = find_test_job_link(tables[1])
+        self.assertIsNotNone(link)
+
+        # Run the test job manually.
+        link.click()
+        self.assert_title("Scheduled Jobs")
+        self.click("submit-button-run-job-now")
+        alert = self.wait.until(expected_conditions.alert_is_present())
+        self.logger.debug("alert text: %s", alert.text)
+        alert.accept()
+        sleep(1)
+        self.assert_title("Scheduled Jobs")
+        self.assert_page_has(f"Job {job_name!r} queued.")
+
+        # Verify that the JSON report reflects the job's presence and values.
+        # Make sure that it only shows up once.
+        params = dict(
+            Request="JSON",
+            Session=self.session,
+        )
+        json_url = f"{self.cgi}/Scheduler.py?{urlencode(params)}"
+        job = None
+        for values in load_from_json(self.fetch_from_url(json_url)):
+            if values[0] == job_name:
+                self.assertIsNone(job)
+                options = load_from_json(values[3]) if values[3] else {}
+                schedule = load_from_json(values[4]) if values[4] else {}
+                job = dict(
+                    name=values[0],
+                    enabled=values[1],
+                    job_class=values[2],
+                    options=options,
+                    schedule=schedule,
+                )
+        expected_options = {"pep-boy": "Manny", "stooge": "Larry"}
+        expected_schedule = {"hour": "3", "minute": "59"}
+        self.assertIsNotNone(job)
+        self.assertFalse(job["enabled"])
+        self.assertEqual(job["job_class"], job_class)
+        self.assertEqual(job["options"], expected_options)
+        self.assertEqual(job["schedule"], expected_schedule)
+
+        # Remove the test job and verify that it is gone.
+        self.click("submit-button-delete-job")
+        alert = self.wait.until(expected_conditions.alert_is_present())
+        self.logger.debug("alert text: %s", alert.text)
+        alert.accept()
+        sleep(1)
+        self.assert_title("Scheduled Jobs")
+        self.assert_page_has(f"Job {job_name} successfully deleted.")
+        tables = self.load_tables()
+        self.assertEqual(len(tables), 2)
+        link = find_test_job_link(tables[0])
+        self.assertIsNone(link)
+        link = find_test_job_link(tables[1])
+        self.assertIsNone(link)
+
+        # An enabled job with no schedule should be run but not retained.
+        self.click("submit-button-add-new-job")
+        self.assert_title("Scheduled Jobs")
+        self.set_field_value("name", job_name)
+        self.set_field_value("job_class", job_class)
+        self.set_field_value("opt-name-1", "stooge")
+        self.set_field_value("opt-value-1", "Curly")
+        self.find("#primary-form img").click()
+        self.set_field_value("opt-name-2", "pep-boy")
+        self.set_field_value("opt-value-2", "Jack")
+        self.click("submit-button-save")
+        self.assert_title("Scheduled Jobs")
+        expected = f"Enabled job {job_name!r} will be run but not retained"
+        self.assert_page_has(expected)
+        self.click("submit-button-jobs")
+        self.assert_title("Scheduled Jobs")
+        tables = self.load_tables()
+        self.assertEqual(len(tables), 2)
+        link = find_test_job_link(tables[0])
+        self.assertIsNone(link)
+        link = find_test_job_link(tables[1])
+        self.assertIsNone(link)
+
+        # Verify that there is no trace of the test remaining.
+        for values in load_from_json(self.fetch_from_url(json_url)):
+            self.assertNotEqual(values[0], job_name)
+
+    def test_schemas(self):
+        """Test the interface for managing schemas on the CDR server."""
+
+        # We'll need this a couple of times.
+        def fetch_schema(name):
+            for link in self.find("form ul li a", all=True):
+                if link.text == name:
+                    url = link.get_attribute("href")
+                    self.logger.debug("fetching from %s", url)
+                    return self.fetch_from_url(url)
+            return None
+
+        # Get a copy of the test schema and save it to disk.
+        self.navigate_to("GetSchema.py")
+        self.assert_title("Show Schema")
+        schema = fetch_schema("xxtest").strip().replace(b"\r", b"")
+        self.assertIsNotNone(schema)
+        path = Path("xxtest.xml").resolve()
+        path.write_bytes(schema)
+
+        # Post it to the server.
+        self.navigate_to("post-schema.py")
+        self.assert_title("Post CDR Schema")
+        self.set_field_value("file", str(path))
+        self.set_field_value("comment", "posted by automated test")
+        self.submit_form(new_tab=False)
+        self.assert_title("Post CDR Schema")
+        self.assert_page_has("Schema posted successfully.")
+
+        # Verify that it made the round trip intact.
+        self.navigate_to("GetSchema.py")
+        self.assert_title("Show Schema")
+        fetched = fetch_schema("xxtest").strip().replace(b"\r", b"")
+        self.assertEqual(fetched, schema)
+
+        # Clean up after ourselves.
+        path.unlink()
+
+    def test_tier_settings(self):
+        """Test the service to fetch the server settings on the tested tier."""
+
+        script = "fetch-tier-settings.py"
+        self.navigate_to(script, prompt="yes")
+        self.assert_title("Tier Settings")
+        self.assert_page_has("Instructions")
+        self.assert_page_has("Click Submit to generate a JSON representation")
+        url = f"{self.cgi}/{script}?Session={self.session}"
+        self.logger.debug("fetching tier settings from %s", url)
+        json = self.fetch_from_url(url)
+        self.assertIsNotNone(json)
+        values = load_from_json(json)
+        self.assertIn("windows", values)
+        self.assertIn("version", values["windows"])
+        self.assertIn("major", values["windows"]["version"])
+
+    def test_value_tables(self):
+        """Test the interface for managing status valid value tables."""
+
+        # We'll use this a bunch in this test, but nowhere else.
+        def collect_values():
+            class ValueLink:
+                PATTERN = r"(.+) \(position (\d+)\)"
+
+                def __init__(self, tester, node):
+                    self.element = node
+                    re_match = re_search(self.PATTERN, node.text)
+                    tester.assertIsNotNone(re_match)
+                    self.value = re_match.group(1)
+                    self.position = int(re_match.group(2))
+            values = {}
+            for element in self.find("fieldset ul li a", all=True):
+                value_link = ValueLink(self, element)
+                values[value_link.value] = value_link
+            return values
+
+        # Verify the tables on the starting page.
+        script = "edit-value-table.py"
+        self.navigate_to(script)
+        self.assert_title("Edit Value Tables")
+        self.assert_page_has("Select Table")
+        tables = [
+            "glossary_translation_state",
+            "media_translation_state",
+            "summary_translation_state",
+            "summary_change_type",
+        ]
+        selector = "fieldset input[type='radio']"
+        for i, button in enumerate(self.find(selector, all=True)):
+            id = button.get_attribute("id")
+            self.assertEqual(id, f"table-{tables[i]}")
+
+        # Verify the required table selection.
+        self.submit_form(new_tab=False)
+        self.assert_page_has("Please select a table to edit.")
+
+        # Test editing each of the tables.
+        test_value = "Regression Test Valid Value"
+        for table_name in tables:
+            self.navigate_to(script)
+            self.click(f"table-{table_name}")
+            self.submit_form(new_tab=False)
+            self.assert_title("Edit Value Tables")
+            self.assert_page_has("Values (click link to edit a value)")
+
+            # Clear out any old test data.
+            values = collect_values()
+            if test_value in values:
+                values[test_value].element.click()
+                self.click("submit-button-drop")
+                values = collect_values()
+                self.assertNotIn(test_value, values)
+            self.assert_page_not_has(test_value)
+
+            # Test error conditions on the Add form.
+            self.click("submit-button-add")
+            self.assert_title("Edit Value Tables")
+            self.click("submit-button-save")
+            self.assert_page_has("Value name is required.")
+            self.assert_page_has("Position field is required.")
+            last_value = values[list(values)[-1]].value
+            last_pos = values[list(values)[-1]].position
+            self.set_field_value("value", last_value)
+            self.set_field_value("position", last_pos)
+            self.click("submit-button-save")
+            self.assert_page_has(f"The name '{last_value}' is already in use.")
+            self.assert_page_has(f"Position {last_pos} is already in use.")
+
+            # Add the new value and confirm that it's in the list.
+            new_pos = last_pos + 10
+            self.set_field_value("value", test_value)
+            self.set_field_value("position", new_pos)
+            self.click("submit-button-save")
+            self.assert_page_has(f"Value '{test_value}' saved.")
+            old_count = len(values)
+            values = collect_values()
+            self.assertEqual(old_count, len(values)-1)
+            self.assertIn(test_value, values)
+            value_link = values[test_value]
+            self.assertEqual(value_link.position, new_pos)
+            self.assertEqual(value_link.value, test_value)
+
+            # Drop the test value and confirm that it's gone.
+            value_link.element.click()
+            self.click("submit-button-drop")
+            self.assert_page_has(f"Value {test_value!r} successfully dropped.")
+            values = collect_values()
+            self.assertNotIn(test_value, values)
+            self.assertEqual(len(values), old_count)
 
 
 class DrugTests(Tester):
@@ -1432,7 +2447,8 @@ class DrugTests(Tester):
             checkbox = self.driver.find_element(By.ID, f"type-{type.lower()}")
             self.assertTrue(checkbox.is_selected())
         self.submit_form()
-        self.assert_page_has(f"Count of Revision Level Markup - {date.today()}")
+        expected = f"Count of Revision Level Markup - {date.today()}"
+        self.assert_page_has(expected)
         for type in types:
             self.assert_page_has(f"{type}</th>")
 
@@ -1630,10 +2646,6 @@ class DrugTests(Tester):
         self.assert_page_not_has("Drug Type(s): All")
         self.assert_page_has("Drug Type(s): Hormone therapy, Immunotherapy")
 
-
-class GeneralTests(Tester):
-    """Tests not belonging to a specific category."""
-
     def test_permissions(self):
         """Test the interface for managing accounts and permissions."""
 
@@ -1642,6 +2654,7 @@ class GeneralTests(Tester):
             for link in self.find("#primary-form ul li a", all=True):
                 if link.text == target:
                     return link
+
         def can_do(account, action, doctype):
             params = dict(
                 account=account,
@@ -1654,6 +2667,7 @@ class GeneralTests(Tester):
             return response == b"Y"
 
         test_data_types = "group", "action", "user"
+
         def remove_test_data(final):
             for type in test_data_types:
                 script = f"Edit{type.capitalize()}s.py"
@@ -1679,7 +2693,7 @@ class GeneralTests(Tester):
                         pattern = "Successfully retired account for user {}."
                         user_machine_name = name_field.get_attribute("value")
                         expected = pattern.format(user_machine_name)
-                    self.logger.info("clicking button %r", button_id)
+                    self.logger.debug("clicking button %r", button_id)
                     self.click(button_id)
                     self.assert_page_has(expected)
                     link = find_test_link(name)
@@ -1806,6 +2820,10 @@ class GeneralTests(Tester):
         # Finally, clean up behind ourselves, removing the test data.
         remove_test_data(final=True)
 
+
+class GeneralTests(Tester):
+    """Tests not belonging to a specific category."""
+
     def test_activity_report(self):
         """Test the Document Activity report."""
 
@@ -1835,153 +2853,6 @@ class GeneralTests(Tester):
         self.driver.find_element(By.CSS_SELECTOR, "tr a").click()
         self.assert_page_has("Drug Information Summary")
         self.assert_page_has("QC Report")
-
-    def test_client_file_tools(self):
-        """Test the client file tools."""
-
-        # Test installation of a client file.
-        file_bytes = b"This is a test file\n"
-        path = Path("dada.txt").resolve()
-        path.write_bytes(file_bytes)
-        self.navigate_to("InstallClientFile.py")
-        self.assert_title("Install Client File")
-        self.assert_page_has("Instructions")
-        self.assert_page_has("Select the file to be installed")
-        self.set_field_value("file", str(path))
-        self.set_field_value("location", "dada.txt")
-        self.submit_form(new_tab=False)
-        self.assert_title("Install Client File")
-        expected = r"D:\cdr\ClientFiles\dada.txt successfully installed"
-        self.assert_page_has(expected)
-
-        # Fetch the file.
-        script = "FetchClientFile.py"
-        self.navigate_to(script)
-        self.assert_title("Fetch Client File")
-        params = dict(path="dada.txt", Request="Submit")
-        url = f"{self.cgi}/{script}?{urlencode(params)}"
-        data = self.fetch_from_url(url)
-        self.assertEqual(data, file_bytes)
-
-        # Remove the file.
-        self.navigate_to("RemoveClientFile.py")
-        self.assert_title("Remove Client File")
-        self.select_values("path", "dada.txt")
-        self.submit_form(new_tab=False)
-        self.assert_title("Remove Client File")
-        self.assert_page_has("Processing Logs")
-        self.assert_page_has(r"Removed D:\cdr\ClientFiles\dada.txt")
-        self.assert_page_has("Running RefreshManifest.py ...")
-        self.assert_page_has("fixing permissions...")
-        self.assert_page_has("File removed successfully.")
-
-    def test_configuration(self):
-        """Test the interface for managing server configuration."""
-
-        # Bring up the page and switch to the ports values.
-        self.navigate_to("EditConfig.py")
-        self.assert_title("CDR Settings")
-        self.select_values("filename", "dbports")
-        sleep(1)
-        original = self.find("content", method=By.ID).text
-        self.assertRegex(original, r"PROD:cdr:\d+")
-
-        # Make a change and save it.
-        insertion = "# This is a comment for automated testing.\n"
-        self.set_field_value("content", insertion + original)
-        self.click("submit-button-save")
-        self.assert_title("CDR Settings")
-        self.assert_page_has("Saved new values")
-        modified = self.find("content", method=By.ID).text
-        self.assertEqual(modified, insertion + original)
-
-        # Back out the change.
-        self.set_field_value("content", original)
-        self.click("submit-button-save")
-        self.assert_title("CDR Settings")
-        self.assert_page_has("Saved new values")
-        final = self.find("content", method=By.ID).text
-        self.assertEqual(final, original)
-
-    def test_control_values(self):
-        """Test the utility for managing control values."""
-
-        # Before we do anything else, make sure nothing was left behind
-        # from a previous, failed test.
-        form = self.navigate_to("EditControlValues.py")
-        self.assert_title("Manage Control Values")
-        self.assert_page_has("Instructions")
-        self.assert_page_has(
-            "Enter a group or value name (or both) in the New Value block to "
-            "override where the value (and its comment) will be stored when "
-            "the Save button is clicked."
-        )
-        test_group = "test-control-value-group"
-        test_names = "test-control-value-name-1", "test-control-value-name-2"
-        test_values = "dada", "yada, yada"
-        test_comments = "This is a test control value", "Another test value"
-        def load_values():
-            params = dict(Session=self.session, Request="JSON")
-            url = f"{self.cgi}/EditControlValues.py?{urlencode(params)}"
-            json = self.fetch_from_url(url)
-            return load_from_json(json)
-        values = load_values()
-        while test_group in values:
-            self.select_values("group", test_group)
-            self.click("submit-button-delete")
-            self.assert_page_has("Value successfully dropped.")
-            values = load_values()
-
-        # Create some test values.
-        for i, name in enumerate(test_names):
-            self.set_field_value("new_group", test_group)
-            self.set_field_value("new_name", name)
-            self.set_field_value("value", test_values[i])
-            self.set_field_value("comment", test_comments[i])
-            self.click("submit-button-save")
-
-        # Verify the values using the HTML table report.
-        self.click("submit-button-show-all-values")
-        self.select_new_tab()
-        tables = self.load_tables()
-        self.assertEqual(len(tables), 1)
-        value_dictionary = defaultdict(dict)
-        for row in tables[0].rows:
-            (value, comment) = row[2].text, row[3].text
-            value_dictionary[row[0].text][row[1].text] = (value, comment)
-        test_group_values = value_dictionary[test_group]
-        for i, name in enumerate(test_names):
-            self.assertEqual(test_group_values[name][0], test_values[i])
-            self.assertEqual(test_group_values[name][1], test_comments[i])
-
-        # Change the values.
-        new_test_values = "dada2", "yadissimo"
-        new_test_comments = "I've changed my mind.", "Won't be around long."
-        self.switch_to(form)
-        for i, name in enumerate(test_names):
-            self.select_values("group", test_group)
-            self.select_values("name", name)
-            self.set_field_value("value", new_test_values[i])
-            self.set_field_value("comment", new_test_comments[i])
-            self.click("submit-button-save")
-
-        # Verify the values using the JSON report.
-        group = load_values().get(test_group)
-        self.assertIsNotNone(group)
-        values = group["values"]
-        for i, name in enumerate(test_names):
-            self.assertEqual(values[name]["value"], new_test_values[i])
-            self.assertEqual(values[name]["comment"], new_test_comments[i])
-
-        # Remove the test control values.
-        for i, name in enumerate(test_names):
-            self.select_values("group", test_group)
-            self.select_values("name", name)
-            self.click("submit-button-delete")
-
-        # Verify that they're gone.
-        group = load_values().get(test_group)
-        self.assertIsNone(group)
 
     def test_country_qc_report(self):
         """Test the Country QC reort."""
@@ -2118,17 +2989,6 @@ class GeneralTests(Tester):
         # Clean up after ourselves.
         self.delete_doc(cdr_id, reason="Don't leave clutter behind.")
 
-    def test_database_table_report(self):
-        """Test the Database Tables and Views report."""
-
-        self.navigate_to("db-tables.py")
-        self.assert_title("Database Tables and Views")
-        databases = "CDR", "CDR_ARCHIVED_VERSIONS"
-        for db in databases:
-            self.assert_page_has(f'<legend class="usa-legend">{db}</legend>')
-        self.assert_page_has("<h3>TABLES</h3>")
-        self.assert_page_has("<dt>all_docs</dt>")
-
     def test_date_last_modified_report(self):
         """Test the Date Last Modified report."""
 
@@ -2146,56 +3006,6 @@ class GeneralTests(Tester):
         columns = "Date Last Modified", "CDR ID", "Document Title"
         table = self.load_table()
         table.check_headers(columns)
-
-    def test_doctypes(self):
-        """Test the interface for managing CDR document types."""
-
-        # Create a local function we'll use more than once.
-        test_type_name = "DoctypeForRegressionTesting"
-        del_msg = f"Successfully deleted document type {test_type_name!r}."
-        add_msg = f"New document type {test_type_name!r} successfully added."
-        def find_test_type_link():
-            for link in self.find("form ul li a", all=True):
-                if link.text == test_type_name:
-                    return link
-            return None
-
-        # Clean out any leftover test data.
-        self.navigate_to("EditDocTypes.py")
-        self.assert_title("Manage Document Types")
-        self.assert_page_has("Existing Document Types (click to edit)")
-        link = find_test_type_link()
-        if link is not None:
-            link.click()
-            self.select_new_tab()
-            self.assert_title(f"Edit {test_type_name} Document Type")
-            self.click("submit-button-delete-document-type")
-            self.assert_title("Manage Document Types")
-            self.assert_page_has(del_msg)
-
-        # Create the test document type.
-        self.click("submit-button-add-new-document-type")
-        if link is None:
-            self.select_new_tab()
-        self.assert_title("Adding New Document Type")
-        self.set_field_value("doctype", test_type_name)
-        self.select_values("schema", "xxtest.xml")
-        self.select_values("title_filter", "DocTitle for xxtest")
-        self.set_field_value("comment", "this is a bogus test document type")
-        self.click("submit-button-save-new-document-type")
-        self.assert_title(f"Edit {test_type_name} Document Type")
-        self.assert_page_has(add_msg)
-        self.click("submit-button-document-type-menu")
-        link = find_test_type_link()
-        self.assertIsNotNone(link)
-
-        # Remove the test type.
-        link.click()
-        self.assert_title(f"Edit {test_type_name} Document Type")
-        self.click("submit-button-delete-document-type")
-        self.assert_title("Manage Document Types")
-        self.assert_page_has(del_msg)
-        self.assertIsNone(find_test_type_link())
 
     def test_documentation_search(self):
         """Test Documentation advanced search page."""
@@ -2237,52 +3047,6 @@ class GeneralTests(Tester):
         self.submit_form(new_tab=False)
         self.assert_page_has(doc["title"])
         self.assert_page_has("<SummaryType>Treatment</SummaryType>")
-
-    def test_dtd(self):
-        """Test the interface for posting a DTD to the CDR server."""
-
-        # We'll need this a couple of times.
-        def fetch_dtd(filename):
-            url = f"{self.cgi}/get-dtd.py?dtd={filename}"
-            return self.fetch_from_url(url).strip().replace(b"\r", b"") + b"\n"
-
-        # Get a copy of the DTD and save it to disk.
-        original_dtd = fetch_dtd("pdq.dtd")
-        self.assertIn(b"<!ELEMENT", original_dtd)
-        path = Path("pdq.dtd").resolve()
-        path.write_bytes(original_dtd)
-
-        # Post it to the server.
-        self.navigate_to("PostDTD.py")
-        self.assert_title("Post DTD")
-        self.set_field_value("file", str(path))
-        self.click("flavor-vendor")
-        self.submit_form()
-        self.assert_title("Post DTD")
-        self.assert_page_has("Successfully installed D:/cdr/licensee/pdq.dtd.")
-
-        # Verify that it made the round trip intact.
-        fetched_dtd = fetch_dtd("pdq.dtd")
-        self.assertEqual(fetched_dtd, original_dtd)
-
-    def test_elements_report(self):
-        """Test the Summary Elements report."""
-
-        self.navigate_to("ShowSummaryIncludes.py")
-        self.assert_title("Elements Included In PDQ Summaries")
-        self.assert_page_has("Choose summary type")
-        self.click("doctype-dis")
-        self.submit_form()
-        self.assert_title("Elements Included In PDQ Summaries")
-        self.assert_plain_report()
-        self.assert_non_tabular_report()
-        self.assert_page_has("<h2>Report Elements</h2>")
-        self.assert_page_has("<h2>Summaries</h2>")
-        self.assertIsNotNone(self.driver.find_element(By.CSS_SELECTOR, "ul"))
-        self.assertIsNotNone(self.driver.find_element(By.CSS_SELECTOR, "dl"))
-        drug = self.get_test_drug_info()
-        self.assert_page_has(drug["id"])
-        self.assert_page_has(drug["name"])
 
     def test_external_map_failures_report(self):
         """Test the External Map Failures report."""
@@ -2419,6 +3183,8 @@ class GeneralTests(Tester):
             "Last Action",
             "Action Date",
         )
+        table = self.load_table()
+        table.check_headers(columns)
 
     def test_invalid_docs_report(self):
         """Test the Invalid Documents report."""
@@ -2492,112 +3258,6 @@ class GeneralTests(Tester):
         for column in columns:
             self.assert_regex(f"<th[^>]*>{column}</th>")
 
-    def test_link_types(self):
-        """Test the interface for managing link type controls."""
-
-        # Before we begin the real test, clear out leftover test residue.
-        landing_page = self.navigate_to("EditLinkControl.py")
-        test_link_type_name = "Link Type For Automated Testing"
-        self.assert_title("Manage Link Types")
-        self.assert_page_has("Existing Link Types (click to edit)")
-        self.assertIsNotNone(self.find("form ul li a"))
-        def find_test_type_link():
-            for link in self.find("form ul li a", all=True):
-                if link.text == test_link_type_name:
-                    return link
-            return None
-        test_type_link = find_test_type_link()
-        if test_type_link is not None:
-            test_type_link.click()
-            self.select_new_tab()
-            self.click("submit-button-delete")
-            self.assert_title("Manage Link Types")
-            self.assert_page_has(
-                f"Successfully deleted link type '{test_link_type_name}'."
-            )
-            self.switch_to(landing_page)
-            self.driver.refresh()
-
-        # Create our test rule.
-        self.find("input[value='Add New Link Type']").click()
-        self.select_new_tab()
-        self.assert_title("Add Link Type")
-        self.set_field_value("name", test_link_type_name)
-        self.set_field_value("comment", "something insightful and intelligent")
-        self.select_values("version", "V")
-        self.select_values("doctype-1", "Person")
-        self.set_field_value("element-1", "LinkingElement")
-        self.find("#block-1 img").click()
-        self.find("#block-2 img").click()
-        self.select_values("doctype-3", "Organization")
-        self.set_field_value("element-3", "AnotherLinkingElement")
-        self.click("target-documentation")
-        self.click("target-documentationtoc")
-        self.select_values("ruletype-2", "LinkTargetContains")
-        self.set_field_value("ruletext-2", '/Foo == "some value"')
-        self.set_field_value("rulecomment-2", "yada yada")
-        self.select_values("ruletype-4", "LinkTargetContains")
-        self.set_field_value("ruletext-4", '//Bar == "another value"')
-        self.set_field_value("rulecomment-4", "molto yada")
-        self.click("submit-button-save")
-
-        # Verify that the link type was recorded correctly.
-        self.assert_title("Edit Link Type")
-        self.assert_page_has(f"Added new link type {test_link_type_name}.")
-        # landing_page = self.navigate_to("EditLinkControl.py")
-        self.switch_to(landing_page)
-        self.driver.refresh()
-        self.assert_title("Manage Link Types")
-        self.assert_page_has(test_link_type_name)
-        self.find("input[value='Show All Link Types']").click()
-        self.select_new_tab()
-        self.assert_title("Show All Link Types")
-        self.assert_single_table_report()
-        self.assert_tables_in_grid_container()
-        table = self.load_table()
-        expected_caption = "All Available Linking Element Combinations"
-        self.assertEqual(table.caption.text, expected_caption)
-        columns = (
-            "Link Type",
-            "Source Doctype",
-            "Linking Element",
-            "Target Doctype",
-            "Pub/Ver/Cwd",
-        )
-        table.check_headers(columns)
-        test_rows = []
-        for row in table.rows:
-            if row[0].text == "Link Type For Automated Testing":
-                test_rows.append([cell.text for cell in row[1:]])
-        self.assertEqual(len(test_rows), 4)
-        sources = (
-            ("Organization", "AnotherLinkingElement"),
-            ("Person", "LinkingElement"),
-        )
-        targets = "Documentation", "DocumentationToC"
-        expected = []
-        for doctype, element in sources:
-            for target in targets:
-                expected.append([doctype, element, target, "V"])
-        self.assertEqual(test_rows, expected)
-
-        # Remove the test link type.
-        self.switch_to(landing_page)
-        self.driver.refresh()
-        self.assert_title("Manage Link Types")
-        self.assert_page_has(test_link_type_name)
-        test_type_link = find_test_type_link()
-        self.assertIsNotNone(test_type_link)
-        test_type_link.click()
-        self.select_new_tab()
-        self.click("submit-button-delete")
-        self.assert_title("Manage Link Types")
-        self.assert_page_has(
-            f"Successfully deleted link type '{test_link_type_name}'."
-        )
-        test_type_link = find_test_type_link()
-        self.assertIsNone(test_type_link)
-
     def test_locked_docs_report(self):
         """Test Checked-Out Documents report."""
 
@@ -2619,102 +3279,6 @@ class GeneralTests(Tester):
         columns = "Checked Out", "Type", "CDR ID", "Document Title"
         for column in columns:
             self.assert_regex(rf"<th[^>]*>{column}</th>")
-
-    def test_lock_management(self):
-        """Test the utilities for clearing processing locks."""
-
-        # Test the interface for removing the file sweeper lock.
-        self.navigate_to("clear-filesweeper-lockfile.py")
-        self.assert_title("Clear File Sweeper Lockfile")
-        self.assert_page_has("Instructions")
-        self.assert_page_has("The processing performed by this")
-        self.submit_form(new_tab=False)
-        page_source = self.get_page_source()
-        not_found = "Lock file not found."
-        success = "Lock file successfully removed."
-        self.assert_title("Clear File Sweeper Lockfile")
-        self.assertTrue(success in page_source or not_found in page_source)
-
-        # Test the interface for removing the media lock. There's a limit
-        # to what we can test without risk of disrupting an ongoing sync
-        # of the media documents. We don't want that risk, even on a non-
-        # production server. So we just verify the expected error message
-        # for an operation we know will fail.
-        self.navigate_to("UnlockMedia.py")
-        self.assert_title("Unlock Media")
-        self.assert_page_has("Instructions")
-        self.assert_page_has("Media documents published from the CDR are")
-        self.set_field_value("to", "/some/bogus/path")
-        self.submit_form(new_tab=False)
-        regex = r"(Path .* not found)|(Directory rename failed)"
-        self.assert_regex(regex)
-
-    def test_log_viewers(self):
-        """Test the interfaces for reviewing logs."""
-
-        # Check the server log viewer's UI.
-        script = "log-tail.py"
-        self.navigate_to(script)
-        self.assert_title("Log Viewer")
-        options = self.find("#p option", all=True)
-        option_value = None
-        for option in options:
-            if option.text == "testing.log":
-                option_value = option.get_attribute("value")
-                break
-        self.assertIsNotNone(option_value)
-        self.select_values("p", option_value)
-        self.set_field_value("c", "1")
-        self.get_test_board()
-        expected = "[INFO] started get-boards API service"
-        self.submit_form()
-        self.assert_page_has(expected)
-
-        # Fetch the raw log.
-        params = dict(
-            Request="Submit",
-            Session=self.session,
-            p=option_value,
-            r="yes"
-        )
-        url = f"{self.cgi}/{script}?{urlencode(params)}"
-        log = self.fetch_from_url(url)
-        self.assertIsNotNone(log)
-        self.assertIn(expected, str(log, encoding="utf-8"))
-
-        # Test the client log viewer.
-        self.navigate_to("ShowClientLogs.py")
-        self.assert_title("Client Log Viewer")
-        self.set_field_value("date_range-start", "1/1/2023")
-        self.set_field_value("date_range-end", "12/31/2023")
-        self.submit_form()
-        self.assert_title("Client Log Viewer")
-        self.assert_plain_report()
-        tables = self.load_tables()
-        self.assertEqual(len(tables), 10)
-        expected = ["Session", "Saved", "User"]
-        for table in tables:
-            self.assertEqual(len(table.rows), 3)
-            headers = table.node.find_elements(By.TAG_NAME, "th")
-            actual = [header.text for header in headers]
-            self.assertEqual(actual, expected)
-
-    def test_messaging(self):
-        """Test interface for sending an email message to logged-in users."""
-
-        subject = "Test message for automated CDR tests"
-        body = "This is sent by an automated test. It can be ignored."
-        self.navigate_to("MessageLoggedInUsers.py")
-        self.assert_title("Send a Message to Logged-In CDR Users")
-        self.assert_page_has("All fields are required")
-        self.set_field_value("subject", subject)
-        self.set_field_value("body", body)
-        self.submit_form()
-        self.assert_title("Send a Message to Logged-In CDR Users")
-        self.assert_single_table_report()
-        table = self.load_table()
-        self.assert_tables_in_grid_container()
-        table.check_headers(["Message Recipients"])
 
     def test_miscellaneous_doc_qc_report(self):
         """Test the Miscellanous Document QC report."""
@@ -2782,8 +3346,6 @@ class GeneralTests(Tester):
             "Pub?",
             "Earlier Pub Ver?",
         )
-        with open("drug-info-summary.html", "w", encoding="utf-8") as fp:
-            fp.write(self.get_page_source())
         table = self.load_table()
         table.check_headers(columns)
 
@@ -2816,7 +3378,6 @@ class GeneralTests(Tester):
         pattern = r"(\d+) documents match 'Bethesda'"
         re_match = re_search(pattern, table.caption.text)
         self.assertIsNotNone(re_match)
-        count = int(re_match.group(1))
         target = "National Cancer Institute; NCI; Bethesda; Maryland"
         link = None
         for row in table.rows:
@@ -2852,7 +3413,6 @@ class GeneralTests(Tester):
         self.assertEqual(table.rows[0][1].text, f"CDR{id:010d}")
         self.assertTrue(table.rows[0][2].text.startswith(surname))
         table.rows[0][1].find_element(By.TAG_NAME, "a").click()
-        self.select_new_tab()
         self.assert_plain_report()
         self.assert_page_has("<center>Person<br>QC Report</center>")
         self.assert_page_has(surname)
@@ -2892,7 +3452,6 @@ class GeneralTests(Tester):
         else:
             self.assertEqual(len(table.rows), 1)
         table.rows[0][1].find_element(By.TAG_NAME, "a").click()
-        self.select_new_tab()
         self.assert_plain_report()
         self.assert_page_has("<center>Person<br>QC Report</center>")
         self.assert_page_has(surname)
@@ -2919,247 +3478,6 @@ class GeneralTests(Tester):
         self.assert_page_has("<center>Political SubUnit<br>QC Report</center>")
         self.assert_page_has("North Dakota")
         self.assert_page_has("ND")
-
-    def test_query_term_definitions(self):
-        """Test the interface for managing query-term definitions."""
-
-        # Test the Compare button. Using STAGE for the upper tier,
-        # because while I was developing this test CDR PROD was down
-        # all day, and CBIIT couldn't figure out how to bring it back up.
-        self.navigate_to("EditQueryTermDefs.py")
-        self.assert_title("Manage Query Term Definitions")
-        self.select_values("upper", "STAGE")
-        self.click("submit-button-compare")
-        self.assert_title("Manage Query Term Definitions")
-
-        # Make sure nothing is left behind from a previous run of the test.
-        test_path = "/Country/Chicken"
-        self.click("submit-button-return-to-form")
-        self.assert_title("Manage Query Term Definitions")
-        if test_path in self.get_page_source():
-            self.click("path-SLASHcountrySLASHchicken")
-            self.click("submit-button-remove")
-            self.assert_page_has("/Country/Chicken successfully removed.")
-        def find_chickens():
-            return self.run_query(
-                "SELECT doc_id, value FROM query_term "
-                f"WHERE path = '{test_path}'"
-            )
-        for doc_id, _ in find_chickens():
-            self.delete_doc(doc_id, reason="Cleaning up query term dross")
-        self.assertEqual(len(find_chickens()), 0)
-
-        # Add the path definition.
-        self.navigate_to("EditQueryTermDefs.py")
-        self.assert_title("Manage Query Term Definitions")
-        self.set_field_value("new_path", test_path)
-        self.click("submit-button-add")
-        self.assert_title("Manage Query Term Definitions")
-        self.assert_page_has("/Country/Chicken successfully added.")
-
-        # Verify that the new query term definition gets applied.
-        root = etree.Element("Country")
-        etree.SubElement(root, "Chicken").text = "Nuggets"
-        xml = etree.tostring(root, encoding="unicode")
-        doc_id = self.save_doc(xml, "Country")
-        self.assertEqual(find_chickens(), [[str(doc_id), "Nuggets"]])
-
-        # Drop the definition.
-        self.navigate_to("EditQueryTermDefs.py")
-        self.assert_title("Manage Query Term Definitions")
-        self.click("path-SLASHcountrySLASHchicken")
-        self.click("submit-button-remove")
-        self.assert_page_has("/Country/Chicken successfully removed.")
-        self.save_doc(xml, "Country", id=f"CDR{doc_id:010d}", unlock=True)
-        self.assertEqual(len(find_chickens()), 0)
-        self.delete_doc(doc_id)
-        self.assertEqual(len(find_chickens()), 0)
-
-    def test_scheduler(self):
-        """Test the interface for managing scheduled jobs."""
-
-        # Create a local function we'll use more than once.
-        job_name = "Automated Testing Job"
-        job_class = "test.Stub"
-        def find_test_job_link(table):
-            for link in table.node.find_elements(By.TAG_NAME, "a"):
-                if link.text == job_name:
-                    return link
-            return None
-
-        # Start by clearing out any old jobs.
-        for i in range(2):
-            self.navigate_to("Scheduler.py")
-            self.assert_title("Scheduled Jobs")
-            tables = self.load_tables()
-            self.assertEqual(len(tables), 2)
-            link = find_test_job_link(tables[i])
-            while link is not None:
-                link.click()
-                self.click("submit-button-delete-job")
-                alert = self.wait.until(expected_conditions.alert_is_present())
-                self.logger.info("alert text: %s", alert.text)
-                alert.accept()
-                sleep(1)
-                self.assert_title("Scheduled Jobs")
-                self.assert_page_has(f"Job {job_name} successfully deleted.")
-                tables = self.load_tables()
-                link = find_test_job_link(tables[i])
-                self.assertEqual(len(tables), 2)
-
-        # Create the test job.
-        self.click("submit-button-add-new-job")
-        self.assert_title("Scheduled Jobs")
-        self.click("submit-button-save")
-        self.assert_page_has("Job name is required.")
-        self.assert_page_has("Class name for job is required.")
-        self.set_field_value("name", job_name)
-        self.set_field_value("job_class", job_class)
-        self.set_field_value("hour", "3")
-        self.set_field_value("minute", "59")
-        self.set_field_value("opt-name-1", "stooge")
-        self.set_field_value("opt-value-1", "Larry")
-        self.find("#primary-form img").click()
-        self.set_field_value("opt-name-2", "pep-boy")
-        self.set_field_value("opt-value-2", "Manny")
-        self.click("submit-button-save")
-        self.assert_title("Scheduled Jobs")
-        self.assert_page_has(
-            f"Enabled job {job_name!r} saved. "
-            "Job will run every day at 03:59."
-        )
-
-        # Modify the job and save it again.
-        self.click("opts-enabled")
-        self.click("submit-button-save")
-        self.assert_title("Scheduled Jobs")
-        self.assert_page_has(f"Disabled job {job_name!r} saved.")
-
-        # Verify that it shows up in the correct table on the Jobs page.
-        self.click("submit-button-jobs")
-        self.assert_title("Scheduled Jobs")
-        tables = self.load_tables()
-        self.assertEqual(len(tables), 2)
-        link = find_test_job_link(tables[0])
-        self.assertIsNone(link)
-        link = find_test_job_link(tables[1])
-        self.assertIsNotNone(link)
-
-        # Run the test job manually.
-        link.click()
-        self.assert_title("Scheduled Jobs")
-        self.click("submit-button-run-job-now")
-        alert = self.wait.until(expected_conditions.alert_is_present())
-        self.logger.info("alert text: %s", alert.text)
-        alert.accept()
-        sleep(1)
-        self.assert_title("Scheduled Jobs")
-        self.assert_page_has(f"Job {job_name!r} queued.")
-
-        # Verify that the JSON report reflects the job's presence and values.
-        # Make sure that it only shows up once.
-        params = dict(
-            Request="JSON",
-            Session=self.session,
-        )
-        json_url = f"{self.cgi}/Scheduler.py?{urlencode(params)}"
-        job = None
-        for values in load_from_json(self.fetch_from_url(json_url)):
-            if values[0] == job_name:
-                self.assertIsNone(job)
-                options = load_from_json(values[3]) if values[3] else {}
-                schedule = load_from_json(values[4]) if values[4] else {}
-                job = dict(
-                    name=values[0],
-                    enabled=values[1],
-                    job_class=values[2],
-                    options=options,
-                    schedule=schedule,
-                )
-        expected_options = {"pep-boy": "Manny", "stooge": "Larry"}
-        expected_schedule = {"hour": "3", "minute": "59"}
-        self.assertIsNotNone(job)
-        self.assertFalse(job["enabled"])
-        self.assertEqual(job["job_class"], job_class)
-        self.assertEqual(job["options"], expected_options)
-        self.assertEqual(job["schedule"], expected_schedule)
-
-        # Remove the test job and verify that it is gone.
-        self.click("submit-button-delete-job")
-        alert = self.wait.until(expected_conditions.alert_is_present())
-        self.logger.info("alert text: %s", alert.text)
-        alert.accept()
-        sleep(1)
-        self.assert_title("Scheduled Jobs")
-        self.assert_page_has(f"Job {job_name} successfully deleted.")
-        tables = self.load_tables()
-        self.assertEqual(len(tables), 2)
-        link = find_test_job_link(tables[0])
-        self.assertIsNone(link)
-        link = find_test_job_link(tables[1])
-        self.assertIsNone(link)
-
-        # An enabled job with no schedule should be run but not retained.
-        self.click("submit-button-add-new-job")
-        self.assert_title("Scheduled Jobs")
-        self.set_field_value("name", job_name)
-        self.set_field_value("job_class", job_class)
-        self.set_field_value("opt-name-1", "stooge")
-        self.set_field_value("opt-value-1", "Curly")
-        self.find("#primary-form img").click()
-        self.set_field_value("opt-name-2", "pep-boy")
-        self.set_field_value("opt-value-2", "Jack")
-        self.click("submit-button-save")
-        self.assert_title("Scheduled Jobs")
-        expected = f"Enabled job {job_name!r} will be run but not retained"
-        self.assert_page_has(expected)
-        self.click("submit-button-jobs")
-        self.assert_title("Scheduled Jobs")
-        tables = self.load_tables()
-        self.assertEqual(len(tables), 2)
-        link = find_test_job_link(tables[0])
-        self.assertIsNone(link)
-        link = find_test_job_link(tables[1])
-        self.assertIsNone(link)
-
-        # Verify that there is no trace of the test remaining.
-        for values in load_from_json(self.fetch_from_url(json_url)):
-            self.assertNotEqual(values[0], job_name)
-
-    def test_schemas(self):
-        """Test the interface for managing schemas on the CDR server."""
-
-        # We'll need this a couple of times.
-        def fetch_schema(name):
-            for link in self.find("form ul li a", all=True):
-                if link.text == name:
-                    url = link.get_attribute("href")
-                    self.logger.info("fetching from %s", url)
-                    return self.fetch_from_url(url)
-            return None
-
-        # Get a copy of the test schema and save it to disk.
-        self.navigate_to("GetSchema.py")
-        self.assert_title("Show Schema")
-        schema = fetch_schema("xxtest").strip().replace(b"\r", b"")
-        self.assertIsNotNone(schema)
-        path = Path("xxtest.xml").resolve()
-        path.write_bytes(schema)
-
-        # Post it to the server.
-        self.navigate_to("post-schema.py")
-        self.assert_title("Post CDR Schema")
-        self.set_field_value("file", str(path))
-        self.set_field_value("comment", "posted by automated test")
-        self.submit_form()
-        self.assert_title("Post CDR Schema")
-        self.assert_page_has("Schema posted successfully.")
-
-        # Verify that it made the round trip intact.
-        self.navigate_to("GetSchema.py")
-        self.assert_title("Show Schema")
-        fetched = fetch_schema("xxtest").strip().replace(b"\r", b"")
-        self.assertEqual(fetched, schema)
 
     def test_spanish_spellcheck_file_creation(self):
         """Test the utility to generate spellcheck files."""
@@ -3189,7 +3507,6 @@ class GeneralTests(Tester):
         self.submit_form(new_tab=False)
         self.assert_title("Unblock CDR Document")
         self.assert_page_has(f"Successfully unblocked {cdr_id}.")
-        self.driver.save_screenshot("unblock.png")
 
         # Confirm that attempting to unblock a document which is not
         # blocked results in a warning message.
@@ -3232,23 +3549,6 @@ class GeneralTests(Tester):
         self.submit_form(new_tab=False)
         self.assert_title("CDR Document Deletion")
         self.assert_page_has("deleted successfully.")
-
-    def test_tier_settings(self):
-        """Test the service to fetch the server settings on the tested tier."""
-
-        script = "fetch-tier-settings.py"
-        self.navigate_to(script, prompt="yes")
-        self.assert_title("Tier Settings")
-        self.assert_page_has("Instructions")
-        self.assert_page_has("Click Submit to generate a JSON representation")
-        url = f"{self.cgi}/{script}?Session={self.session}"
-        self.logger.info("fetching tier settings from %s", url)
-        json = self.fetch_from_url(url)
-        self.assertIsNotNone(json)
-        values = load_from_json(json)
-        self.assertIn("windows", values)
-        self.assertIn("version", values["windows"])
-        self.assertIn("major", values["windows"]["version"])
 
     def test_unchanged_docs_report(self):
         """Test the Unchanged Documents report."""
@@ -3296,101 +3596,6 @@ class GeneralTests(Tester):
         columns = "Doc ID", "Doc Title", "URL", "Display Text", "Source Title"
         for column in columns:
             self.assert_page_has(f"<th>{column}</th>")
-
-    def test_value_tables(self):
-        """Test the interface for managing status valid value tables."""
-
-        # We'll use this a bunch in this test, but nowhere else.
-        def collect_values():
-            class ValueLink:
-                PATTERN = r"(.+) \(position (\d+)\)"
-                def __init__(self, tester, node):
-                    self.element = node
-                    re_match = re_search(self.PATTERN, node.text)
-                    tester.assertIsNotNone(re_match)
-                    self.value = re_match.group(1)
-                    self.position = int(re_match.group(2))
-            values = {}
-            for element in self.find("fieldset ul li a", all=True):
-                value_link = ValueLink(self, element)
-                values[value_link.value] = value_link
-            return values
-
-        # Verify the tables on the starting page.
-        script = "edit-value-table.py"
-        self.navigate_to(script)
-        with open("forbidden.html", "w", encoding="utf-8") as fp:
-            fp.write(self.get_page_source())
-        self.assert_title("Edit Value Tables")
-        self.assert_page_has("Select Table")
-        tables = [
-            "glossary_translation_state",
-            "media_translation_state",
-            "summary_translation_state",
-            "summary_change_type",
-        ]
-        selector = "fieldset input[type='radio']"
-        for i, button in enumerate(self.find(selector, all=True)):
-            id = button.get_attribute("id")
-            self.assertEqual(id, f"table-{tables[i]}")
-
-        # Verify the required table selection.
-        self.submit_form(new_tab=False)
-        self.assert_page_has("Please select a table to edit.")
-
-        # Test editing each of the tables.
-        test_value = "Regression Test Valid Value"
-        for table_name in tables:
-            self.navigate_to(script)
-            self.click(f"table-{table_name}")
-            self.submit_form(new_tab=False)
-            self.assert_title("Edit Value Tables")
-            self.assert_page_has("Values (click link to edit a value)")
-
-            # Clear out any old test data.
-            values = collect_values()
-            if test_value in values:
-                values[test_value].element.click()
-                self.click("submit-button-drop")
-                values = collect_values()
-                self.assertNotIn(test_value, values)
-            self.assert_page_not_has(test_value)
-
-            # Test error conditions on the Add form.
-            self.click("submit-button-add")
-            self.assert_title("Edit Value Tables")
-            self.click("submit-button-save")
-            self.assert_page_has("Value name is required.")
-            self.assert_page_has("Position field is required.")
-            last_value = values[list(values)[-1]].value
-            last_pos = values[list(values)[-1]].position
-            self.set_field_value("value", last_value)
-            self.set_field_value("position", last_pos)
-            self.click("submit-button-save")
-            self.assert_page_has(f"The name '{last_value}' is already in use.")
-            self.assert_page_has(f"Position {last_pos} is already in use.")
-
-            # Add the new value and confirm that it's in the list.
-            new_pos = last_pos + 10
-            self.set_field_value("value", test_value)
-            self.set_field_value("position", new_pos)
-            self.click("submit-button-save")
-            self.assert_page_has(f"Value '{test_value}' saved.")
-            old_count = len(values)
-            values = collect_values()
-            self.assertEqual(old_count, len(values)-1)
-            self.assertIn(test_value, values)
-            value_link = values[test_value]
-            self.assertEqual(value_link.position, new_pos)
-            self.assertEqual(value_link.value, test_value)
-
-            # Drop the test value and confirm that it's gone.
-            value_link.element.click()
-            self.click("submit-button-drop")
-            self.assert_page_has(f"Value {test_value!r} successfully dropped.")
-            values = collect_values()
-            self.assertNotIn(test_value, values)
-            self.assertEqual(len(values), old_count)
 
     def test_version_history_report(self):
         """Test the Document Version History report."""
@@ -3474,8 +3679,8 @@ class GlossaryTests(Tester):
         self.click("options-also-include-unmappable-values")
         self.click("submit-button-get-values")
         no_mappings = "No mappings found matching the filtering criteria."
-        if not no_mappings in self.get_page_source():
-            self.logger.info("Cleaning up leftover test external map entry.")
+        if no_mappings not in self.get_page_source():
+            self.logger.debug("Cleaning up leftover test external map entry.")
             table = self.load_table()
             self.assertIsNotNone(table)
             row = table.rows[0]
@@ -3607,10 +3812,12 @@ class GlossaryTests(Tester):
         test_alias = "Bogus Server For Automated Testing"
         test_url = "https://example.com"
         bogus_url = "not a real URL"
+
         def get_server_count():
             field = self.find("input[name='num-servers']")
             self.assertIsNotNone(field)
             return int(field.get_attribute("value"))
+
         def find_test_server():
             blocks = self.find("fieldset.server-block", all=True)
             self.assertGreaterEqual(len(blocks), 1)
@@ -3621,6 +3828,7 @@ class GlossaryTests(Tester):
                 if value == test_alias:
                     return block
             return None
+
         def add_server_block():
             img = self.find("img[title='Add another server']")
             self.assertIsNotNone(img)
@@ -3857,8 +4065,6 @@ class GlossaryTests(Tester):
 
         # This report shows the term names along with the concept.
         term = self.get_test_glossary_term()
-        name = term
-        name_id = term["id"]
         concept_id = term["concept_id"]
         params = {"initial-menu-page": "true"}
         form = self.navigate_to("GlossaryConceptFull.py", **params)
@@ -3895,7 +4101,6 @@ class GlossaryTests(Tester):
                 spanish_name = candidate["name"]
                 break
         self.assertIsNotNone(spanish_name)
-        concept_id = term["concept_id"]
         self.set_field_value("name_en", english_name)
         self.find("main form input[value='Search']").click()
         self.select_new_tab()
@@ -3983,7 +4188,7 @@ class GlossaryTests(Tester):
         term = self.get_test_glossary_term()
         term_id = term["id"]
         params = dict(DocType="GlossaryTermName", ReportType="gtnwc")
-        form = self.navigate_to("QcReport.py", **params)
+        self.navigate_to("QcReport.py", **params)
         self.assert_title("Glossary Term Name With Concept Report")
         self.assert_page_has("Title or Document ID")
         self.set_field_value("DocId", term_id)
@@ -4140,7 +4345,6 @@ class GlossaryTests(Tester):
         self.assert_page_has(warning)
         term = self.get_test_glossary_term()
         term_id = term["id"]
-        term_name = term["english_name"]
         self.set_field_value("id", term_id)
         self.click("types-patientsummaries")
         self.click("language-spanish")
@@ -4204,6 +4408,7 @@ class GlossaryTests(Tester):
         self.navigate_to("glossary-translation-jobs.py")
         self.assert_title("Glossary Translation Job Queue")
         self.assert_single_table_report()
+
         def find_job_row():
             table = self.load_table()
             for row in table.rows:
@@ -4214,11 +4419,11 @@ class GlossaryTests(Tester):
         while (job_row := find_job_row()) is not None:
             link = job_row[1].find_element(By.TAG_NAME, "a")
             obsolete_docs.append(link.text)
-            self.logger.info("removing translation job for %s", link.text)
+            self.logger.debug("removing translation job for %s", link.text)
             link.click()
             self.click("submit-button-delete")
             alert = self.wait.until(expected_conditions.alert_is_present())
-            self.logger.info("alert text: %s", alert.text)
+            self.logger.debug("alert text: %s", alert.text)
             alert.accept()
             sleep(1)
         for obsolete_doc in obsolete_docs:
@@ -4329,7 +4534,7 @@ class ManagementTests(Tester):
         rows = self.driver.find_elements(By.CSS_SELECTOR, "tbody tr")
         single_board_row_count = len(rows)
         args = default_row_count, single_board_row_count
-        self.logger.info("all-boards count=%d, single-board count=%d", *args)
+        self.logger.debug("all-boards count=%d, single-board count=%d", *args)
         self.assertLess(single_board_row_count * 4, default_row_count)
 
         # Adding one or more columns should to a non-USWDS report.
@@ -4416,7 +4621,7 @@ class ManagementTests(Tester):
         self.assertEqual(len(tables), 0)
         self.assert_page_has(f"<h4>{summary_title}</h4>")
         summaries = self.driver.find_elements(By.CSS_SELECTOR, "h4")
-        self.logger.info("PDQBoards.py found %d summaries", len(summaries))
+        self.logger.debug("PDQBoards.py found %d summaries", len(summaries))
 
         # Switching to "Modules Only" results in fewer "topics."
         self.switch_to(form_page)
@@ -4428,7 +4633,7 @@ class ManagementTests(Tester):
         self.assert_page_has(f"<h4>{module_title} (module)</h4>")
         modules = self.driver.find_elements(By.CSS_SELECTOR, "h4")
         self.assertLess(len(modules), len(summaries))
-        self.logger.info("PDQBoards.py found %d modules", len(modules))
+        self.logger.debug("PDQBoards.py found %d modules", len(modules))
 
         # Switching to "Summaries and modules" should match the number
         # of topics for the previous two runs combined.
@@ -4438,7 +4643,7 @@ class ManagementTests(Tester):
         self.assert_page_has(f"<h4>{summary_title}</h4>")
         self.assert_page_has(f"<h4>{module_title} (module)</h4>")
         topics = self.driver.find_elements(By.CSS_SELECTOR, "h4")
-        self.logger.info("PDQBoards.py found %d topics", len(topics))
+        self.logger.debug("PDQBoards.py found %d topics", len(topics))
         self.assertEqual(len(topics), len(modules) + len(summaries))
 
         # Switching to grouping by board member moves the "topics"
@@ -4519,7 +4724,7 @@ class ManagementTests(Tester):
         self.assert_single_table_report()
         self.assert_regex("(?s)Board Member.+Board Name.+Email.+Start Date")
 
-        # Grouping the summary version of the report results in multiple tables.
+        # Group the summary version of the report results in multiple tables.
         self.switch_to(form_page)
         self.click("grouping-by_board")
         self.submit_form()
@@ -4612,7 +4817,7 @@ class ManagementTests(Tester):
         self.click(letter)
         self.click(f"member-{member_id}")
         self.assertTrue(button.is_displayed())
-        self.logger.info("submitting mailer publishing job")
+        self.logger.debug("submitting mailer publishing job")
         self.submit_form()
         self.assert_title("PDQ Board Member Correspondence Mailers")
         self.assert_page_has("Queued 1 Mailer(s)")
@@ -4684,7 +4889,7 @@ class MediaTests(Tester):
         self.assert_title("Audio Spreadsheet Creation")
         self.assert_page_has("Instructions")
         self.assert_page_has("Click Submit to request an Excel workbook ")
-        self.submit_form()
+        self.submit_form(new_tab=False)
         self.assert_title("Audio Spreadsheet Creation")
         self.assert_page_has("Glossary Term Names Without Pronunciation")
         self.assert_page_has("Pronunciation files are needed")
@@ -4769,25 +4974,32 @@ class MediaTests(Tester):
         # Find the archive we just created.
         def find_test_archive(driver):
             logger = self.logger
+
             class Archive:
+
                 def __init__(self, row):
                     self.row = row
+
                 @cached_property
                 def cells(self):
                     return list(self.row.find_elements(By.TAG_NAME, "td"))
+
                 @cached_property
                 def link(self):
                     driver.implicitly_wait(0)
                     nodes = self.cells[0].find_elements(By.TAG_NAME, "a")
-                    logger.info("found %d nodes", len(nodes))
+                    logger.debug("found %d nodes", len(nodes))
                     driver.implicitly_wait(Tester.DEFAULT_WAIT)
                     return nodes[0] if nodes else None
+
                 @cached_property
                 def modified(self):
                     return self.cells[2].text
+
                 @cached_property
                 def name(self):
                     return self.cells[0].text
+
                 @cached_property
                 def status(self):
                     return self.cells[1].text
@@ -4824,8 +5036,10 @@ class MediaTests(Tester):
 
         # Collect the information for each MP3 row.
         class MP3Row:
+
             def __init__(self, row):
                 self.row = row
+
             @cached_property
             def buttons(self):
                 nodes = self.cells[0].find_elements(By.CSS_SELECTOR, "input")
@@ -4834,31 +5048,40 @@ class MediaTests(Tester):
                 for i, node in enumerate(nodes):
                     buttons[keys[i]] = node
                 return buttons
+
             @cached_property
             def cells(self):
                 return list(self.row.find_elements(By.TAG_NAME, "td"))
+
             @cached_property
             def doc_id(self):
                 return self.cells[1].text
+
             @cached_property
             def id(self):
                 name = self.buttons["approved"].get_attribute("name")
                 return int(name.split("-")[1])
+
             @cached_property
             def language(self):
                 return self.cells[3].text
+
             @cached_property
             def name(self):
                 return self.cells[2].text
+
             @cached_property
             def path(self):
                 return self.cells[5].find_element(By.TAG_NAME, "a").text
+
             @cached_property
             def pronunciation(self):
                 return self.cells[4].text
+
             @cached_property
             def reader_note(self):
                 return self.cells[6].text
+
             @cached_property
             def reviewer_note(self):
                 return self.cells[7].find_element(By.TAG_NAME, "textarea").text
@@ -4925,7 +5148,7 @@ class MediaTests(Tester):
         alerts = (
            "Removed remote /sftp/sftphome/cdrstaging/ciat/dev/Audio"
            "/Audio_Transferred/Week_2099_01.zip.",
-           "Removed local D:\cdr\Audio_from_CIPSFTP\Week_2099_01.zip.",
+           r"Removed local D:\cdr\Audio_from_CIPSFTP\Week_2099_01.zip.",
            "Removed 2 rows from the term_audio_mp3 table.",
            "Removed 1 row from the term_audio_zipfile table.",
            f"Deleted GlossaryTermName document CDR{doc_id:010d}.",
@@ -4977,7 +5200,7 @@ class MediaTests(Tester):
         self.assert_page_has("Number of rows: 1")
         for thing in "ID", "Title":
             for language in "English", "Spanish":
-                    self.assert_page_has(f"<th>{language} Image {thing}</th>")
+                self.assert_page_has(f"<th>{language} Image {thing}</th>")
         for c in "Age", "Sex", "Race", "Skin Tone", "Ethnicity", "Image Link":
             for language in "en", "es":
                 self.assert_page_has(f"<th>{c} ({language})</th>")
@@ -5002,7 +5225,7 @@ class MediaTests(Tester):
         self.assert_page_has("Summary Options: exclude summary modules")
         for thing in "Summary ID", "Summary Title", "Image ID":
             for language in "English", "Spanish":
-                    self.assert_page_has(f"<th>{language} {thing}</th>")
+                self.assert_page_has(f"<th>{language} {thing}</th>")
         for c in "Age", "Sex", "Race", "Skin Tone", "Ethnicity", "Image Link":
             for language in "en", "es":
                 self.assert_page_has(f"<th>{c} ({language})</th>")
@@ -5297,6 +5520,7 @@ class MediaTests(Tester):
         self.navigate_to("media-translation-jobs.py")
         self.assert_title("Media Translation Job Queue")
         self.assert_single_table_report()
+
         def find_job_row():
             table = self.load_table()
             for row in table.rows:
@@ -5307,11 +5531,11 @@ class MediaTests(Tester):
         while (job_row := find_job_row()) is not None:
             link = job_row[1].find_element(By.TAG_NAME, "a")
             obsolete_docs.append(link.text)
-            self.logger.info("removing translation job for %s", link.text)
+            self.logger.debug("removing translation job for %s", link.text)
             link.click()
             self.click("submit-button-delete")
             alert = self.wait.until(expected_conditions.alert_is_present())
-            self.logger.info("alert text: %s", alert.text)
+            self.logger.debug("alert text: %s", alert.text)
             alert.accept()
             sleep(1)
         for obsolete_doc in obsolete_docs:
@@ -5447,7 +5671,7 @@ class PublishingTests(Tester):
         filters_page = self.navigate_to("EditFilters.py")
         self.assert_title("Manage Filters")
         tables = self.load_tables()
-        self.logger.info("%d tables", len(tables))
+        self.logger.debug("%d tables", len(tables))
         tables[0].check_headers(("CDR ID", "Filter Title"))
         tables[1].check_headers(("", ""))
         self.assertIn("Sorted By Title", tables[0].caption.text)
@@ -5495,7 +5719,6 @@ class PublishingTests(Tester):
         self.assertEqual("", tables[1].caption.text)
         link = tables[0].rows[0][0].find_element(By.TAG_NAME, "a")
         cdr_id = link.text
-        id = self.extract_id(cdr_id)
         title = tables[0].rows[0][1].text
         link.click()
         self.select_new_tab()
@@ -5511,8 +5734,10 @@ class PublishingTests(Tester):
     def test_filter_sets(self):
         """Test the interface for managing filter sets."""
 
-        # We'll need to use these more than once.
+        # This value is used multiple times locally.
         set_name = "Automated Test Filter Set"
+
+        # We'll need to use this more than once.
         def find_test_set_link():
             for link in self.find("#primary-form ul li a", all=True):
                 if link.text == set_name:
@@ -5550,7 +5775,6 @@ class PublishingTests(Tester):
         choices = sets[2], filters[3], sets[1], filters[2], sets[3]
         for choice in choices:
             webdriver.ActionChains(self.driver).double_click(choice).perform()
-        self.driver.save_screenshot("test-filter-set.png")
         expected = [choice.text for choice in choices]
         members = self.find("#members li", all=True)
         actual = [member.text for member in members]
@@ -5727,7 +5951,7 @@ class PublishingTests(Tester):
         self.select_new_tab()
         self.assert_title("Publishing Status")
         self.assert_wide_report()
-        re_match = re_search(f"Job (\d+) started.", self.get_page_source())
+        re_match = re_search(r"Job (\d+) started.", self.get_page_source())
         self.assertIsNotNone(re_match)
         job_id = int(re_match.group(1))
         tables = self.load_tables()
@@ -5776,7 +6000,7 @@ class PublishingTests(Tester):
         self.assert_regex(pattern)
         columns = "✓", "Job", "Type", "Started", "Status", "Name"
         table.check_headers(columns)
-        job_row  = None
+        job_row = None
         for row in table.rows:
             if row[1].text == str(job_id):
                 job_row = row
@@ -5833,7 +6057,7 @@ class SummaryTests(Tester):
         table.rows[0][1].find_element(By.TAG_NAME, "a").click()
         self.assert_plain_report()
         self.assert_page_has(f"<h2>{summary_title}</h2>")
-        self.assert_page_has(f"<h3>Treatment - Health professionals</h3>")
+        self.assert_page_has("<h3>Treatment - Health professionals</h3>")
 
     def test_changes_to_summaries_reports(self):
         """Test the Changes to Summaries report."""
@@ -6587,16 +6811,15 @@ class SummaryTests(Tester):
         spanish_title = "Esta es la versión de prueba en español"
         root.find("SummaryTitle").text = spanish_title
         path = Path("spanish-summary.xml").resolve()
-        self.logger.info("writing %s", path)
+        self.logger.debug("writing %s", path)
         path.write_bytes(etree.tostring(root, encoding="utf-8"))
         self.navigate_to("post-translated-summary.py")
         self.assert_title("Create World Server Translated Summary")
         self.set_field_value("file", str(path))
         comment = f"Created by automated translation test {datetime.now()}"
         self.set_field_value("comment", comment)
-        self.submit_form()
+        self.submit_form(new_tab=False)
         self.assert_title("Create World Server Translated Summary")
-        self.driver.save_screenshot("after-spanish-summary-post.png")
         pattern = r"Successfully created (CDR\d+)\."
         re_match = re_search(pattern, self.get_page_source())
         self.assertIsNotNone(re_match)
@@ -6605,7 +6828,7 @@ class SummaryTests(Tester):
         # Clean up behind ourselves.
         reason = f"Deleted by automated translation test {datetime.now()}"
         self.delete_doc(spanish_cdr_id, reason)
-        self.logger.info("removing %s", path)
+        self.logger.debug("removing %s", path)
         path.unlink()
 
     def test_translation_job_workflow_report(self):
@@ -6646,10 +6869,10 @@ class SummaryTests(Tester):
         self.add_user_to_group("tester", "Spanish Translators")
         sql = "SELECT id FROM usr WHERE name = 'tester'"
         user_id = int(self.run_query(sql)[0][0])
-        self.logger.info("tester user ID: %d", user_id)
+        self.logger.debug("tester user ID: %d", user_id)
         test_title = "Test English summary for translation queue"
         english_id = self.create_test_summary(title=test_title, svpc=True)
-        self.logger.info("english summary ID: %s", english_id)
+        self.logger.debug("english summary ID: %s", english_id)
 
         # Test the landing page for the translation queues.
         self.navigate_to("TranslationJobQueues.py", testing=True)
@@ -6671,6 +6894,7 @@ class SummaryTests(Tester):
         self.select_new_tab()
         self.assert_title("Summary Translation Job Queue")
         self.assert_single_table_report()
+
         def find_job_row():
             table = self.load_table()
             for row in table.rows:
@@ -6681,11 +6905,11 @@ class SummaryTests(Tester):
         while (job_row := find_job_row()) is not None:
             link = job_row[0].find_element(By.TAG_NAME, "a")
             obsolete_docs.append(link.text)
-            self.logger.info("removing translation job for %s", link.text)
+            self.logger.debug("removing translation job for %s", link.text)
             link.click()
             self.click("submit-button-delete")
             alert = self.wait.until(expected_conditions.alert_is_present())
-            self.logger.info("alert text: %s", alert.text)
+            self.logger.debug("alert text: %s", alert.text)
             alert.accept()
             sleep(1)
         for obsolete_doc in obsolete_docs:
@@ -6949,7 +7173,7 @@ class TerminologyTests(Tester):
         self.assert_plain_report()
         self.assert_non_tabular_report()
         top = self.find("ul li")
-        nested  = self.find("ul li ul")
+        nested = self.find("ul li ul")
         self.assertTrue(top.is_displayed())
         self.assertFalse(nested.is_displayed())
         top.find_element(By.TAG_NAME, "span").click()
@@ -7067,7 +7291,7 @@ class TerminologyTests(Tester):
         )
         for pattern in h2_patterns:
             self.assert_regex(pattern)
-        self.submit_form()
+        self.submit_form(new_tab=False)
         self.assert_title("Match Drug Terms By Name")
         tables = self.load_tables()
         if linked:
@@ -7104,13 +7328,11 @@ class TerminologyTests(Tester):
         # Check the landing page.
         landing_page = self.navigate_to("SyncWithEVS.py")
         self.assert_title("EVS Concept Tools")
-        self.driver.save_screenshot("instructions-closed.png")
         self.assert_page_has("Instructions")
         self.assert_page_has("Choose EVS Utility")
         instructions = self.find("instructions-accordion", method=By.ID)
         self.assertFalse(instructions.is_displayed())
         self.find("form h4").click()
-        self.driver.save_screenshot("instructions-open.png")
         self.assertTrue(instructions.is_displayed())
         utilities = self.find("#utilities a", all=True)
         labels = (
@@ -7226,6 +7448,44 @@ class TerminologyTests(Tester):
         self.assertRegex(table.rows[0][3].text, r"^CDR\d+$")
 
 
+def setUpModule():
+    """Note when we started the test run."""
+    Tester.STARTED = datetime.now()
+
+
+def tearDownModule():
+    """Tell how long the run took and summarize the results."""
+
+    elapsed = datetime.now() - Tester.STARTED
+    Tester.LOGGER.info("%s elapsed for complete test run", elapsed)
+    if Tester.SUCCESSES > 1 and not Tester.ERRORS and not Tester.FAILURES:
+        Tester.LOGGER.info("all %d tests passed", Tester.SUCCESSES)
+    else:
+        args = Tester.SUCCESSES, Tester.ERRORS, Tester.FAILURES
+        Tester.LOGGER.info("succeeded=%d errors=%d failures=%d", *args)
+
+
+class Result(TextTestResult):
+    """Customization to capture success/failure statistics."""
+
+    def addSuccess(self, test: TestCase) -> None:
+        Tester.SUCCESSES += 1
+        return super().addSuccess(test)
+
+    def addError(self, test: TestCase, err) -> None:
+        Tester.ERRORS += 1
+        return super().addError(test, err)
+
+    def addFailure(self, test: TestCase, err) -> None:
+        Tester.FAILURES += 1
+        return super().addFailure(test, err)
+
+
+class Runner(TextTestRunner):
+    """Overridden to register our custom Result type."""
+    resultclass = Result
+
+
 if __name__ == "__main__":
     """Don't run as a script if we are loaded as a module.
 
@@ -7252,4 +7512,4 @@ if __name__ == "__main__":
     argv[1:] = new_args
     del opts
     del parser
-    run_tests()
+    main(testRunner=Runner)
