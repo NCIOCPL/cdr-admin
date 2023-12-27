@@ -5,6 +5,33 @@
 Make sure you're on the NCI network when you run these tests. Otherwise,
 the tests will all fail with "unknown error: net::ERR_NAME_NOT_RESOLVED.
 
+You will need to set up a Python (3.10 or higher) environment in which the
+third-party modules lxml (4.9.3+), openpyxl (3.1.2+), and selenium (4.16.0+)
+are installed. A Python virtual environment is the most effective way to
+achieve this. You will also need to install Chrome for Testing (120.0+) from
+https://googlechromelabs.github.io/chrome-for-testing/. The most efficient
+way to run the tests involves launching Chrome for Testing before invoking
+the test script.
+
+Finally, you will need to use a CDR account which has all of the permissions
+needed to use every page in the administrative menu system. Any account which
+has membership in the Developers group should work.
+
+The DNS name for the CDR server which is being tested must be provided, as
+well as the name of a currently active session on that server. For obvious
+reasons, the tests cannot be run against the production server.
+
+$ ./test-cdr-admin.py
+usage: test-cdr-admin.py [-h] --host HOST --session SESSION [--verbose]
+                         [--tests [TESTS ...]]
+
+options:
+  -h, --help            show this help message and exit
+  --host HOST
+  --session SESSION
+  --verbose, -v
+  --tests [TESTS ...], -t [TESTS ...]
+
 Some examples of code which can be added (usually temporarily) when trying
 to troubleshoot unexplained failures of new or modified tests:
 
@@ -21,7 +48,6 @@ from argparse import ArgumentParser
 from base64 import b64decode
 from collections import defaultdict
 from datetime import date, datetime, timedelta
-from lxml import etree
 from functools import cached_property
 from html import escape as html_escape
 from io import BytesIO
@@ -35,6 +61,7 @@ from time import sleep
 from unittest import TestCase, TextTestRunner, TextTestResult, main
 from urllib.parse import urlencode
 from urllib.request import urlopen, Request
+from lxml import etree
 from openpyxl import load_workbook
 from selenium import webdriver
 from selenium.webdriver.common.by import By
