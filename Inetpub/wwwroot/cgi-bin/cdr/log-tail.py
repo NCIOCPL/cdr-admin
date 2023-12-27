@@ -43,7 +43,7 @@ class Control(Controller):
 
     def authenticate(self):
         """Ensure that only those authorized to do so can run this scropt."""
-        if not self.session or not cdr.canDo(self.session, "VIEW LOGS"):
+        if not self.session.can_do("VIEW LOGS"):
             self.bail("Account not authorized for this action")
 
     def populate_form(self, page):
