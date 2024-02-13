@@ -236,7 +236,8 @@ class Control(Controller):
             if version == 0:
                 self.version = None
             elif version < 0:
-                versions = listVersions("guest", self.id, limit=abs(version))
+                opts = dict(limit=abs(version), tier=self.tier)
+                versions = listVersions("guest", self.id, **opts)
                 if len(versions) < abs(version):
                     message = (
                         f"CDR{self.id} only has {len(versions)} "
@@ -244,7 +245,7 @@ class Control(Controller):
                     )
                     self.alerts.append(dict(message=message, type="error"))
                     return False
-                self.version = versions[-1]
+                self.version = versions[-1][0]
             else:
                 self.version = version
         return self.xml is not None
