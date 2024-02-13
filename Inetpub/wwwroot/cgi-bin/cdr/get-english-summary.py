@@ -239,7 +239,8 @@ class Control(Controller):
                 versions = listVersions("guest", self.id, limit=abs(version))
                 if len(versions) < abs(version):
                     message = (
-                        f"CDR{self.id} only has {len(versions)} on {self.tier}"
+                        f"CDR{self.id} only has {len(versions)} "
+                        f"versions on {self.tier}."
                     )
                     self.alerts.append(dict(message=message, type="error"))
                     return False
