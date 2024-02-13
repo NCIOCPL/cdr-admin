@@ -202,25 +202,27 @@ class Control(Controller):
             int_id = int(self.id)
             self.id = int_id
         except Exception:
-            self.logger.exception("id=%s", id)
-            message = f"Invalid document id {id!r}."
+            self.logger.exception("id=%s", self.id)
+            message = f"Invalid document id {self.id!r}."
             self.alerts.append(dict(message=message, type="error"))
             return False
         try:
             last_version, last_pub_version, _ = self.versions
         except Exception:
-            message = f"CDR{id} not found on {self.tier}."
+            message = f"CDR{self.id} not found on {self.tier}."
             self.alerts.append(dict(message=message, type="error"))
             return False
         if self.version == "pub":
             if last_pub_version < 1:
-                message = f"CDR{id} has no publishable version on {self.tier}."
+                message = (
+                    f"CDR{self.id} has no publishable version on {self.tier}."
+                )
                 self.alerts.append(dict(message=message, type="error"))
                 return False
             self.version = last_pub_version
         elif self.version == "last":
             if last_version < 1:
-                message = f"CDR{id} has no versions on {self.tier}."
+                message = f"CDR{self.id} has no versions on {self.tier}."
                 self.alerts.append(dict(message=message, type="error"))
                 return False
             self.version = last_version
@@ -237,7 +239,7 @@ class Control(Controller):
                 versions = listVersions("guest", self.id, limit=abs(version))
                 if len(versions) < abs(version):
                     message = (
-                        f"CDR{id} only has {len(versions)} on {self.tier}"
+                        f"CDR{self.id} only has {len(versions)} on {self.tier}"
                     )
                     self.alerts.append(dict(message=message, type="error"))
                     return False
