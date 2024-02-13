@@ -34,7 +34,7 @@ class Control(Controller):
         "which you can save to your local file system and pass on to "
         "Trados for translation."
     )
-    STRIP = [
+    STRIP = (
         "BoardMember",
         "Comment",
         "ComprehensiveReview",
@@ -48,7 +48,7 @@ class Control(Controller):
         "ResponseToComment",
         "TypeOfSummaryChange",
         "WillReplace",
-    ]
+    )
     RAW = (
         "ContentType: text/xml;charset=utf-8\n"
         "Content-disposition: attachment; filename={}\n\n{}"
@@ -92,10 +92,6 @@ class Control(Controller):
         fieldset.append(page.radio_button("fmt", **opts))
         opts = dict(value="raw", label="Raw (for import into Trados)")
         fieldset.append(page.radio_button("fmt", **opts))
-        page.form.append(fieldset)
-        fieldset = page.fieldset("Options")
-        opts = dict(label="Strip standard wording", value="strp-std-wrd")
-        fieldset.append(page.checkbox("options", **opts))
         page.form.append(fieldset)
         page.add_script("jQuery(function(){jQuery('id').focus();}")
 
@@ -187,14 +183,6 @@ class Control(Controller):
     def id(self):
         """Integer for the CDR document ID."""
         return self.fields.getvalue("id", "").strip()
-
-    @cached_property
-    def more_to_strip(self):
-        """Optional additional elements to be stripped."""
-
-        if "strp-std-wrd" in self.fields.getlist("options"):
-            return ["StandardWording"]
-        return []
 
     @property
     def raw(self):
@@ -337,8 +325,8 @@ class Control(Controller):
         node = root.find("SummaryMetaData/SummaryURL")
         if node is not None:
             node.set(f"{{{Doc.NS}}}xref", self.URL)
-        strip = self.STRIP + self.more_to_strip
-        etree.strip_elements(root, with_tail=False, *strip)
+        etree.strip_elements(root, with_tail=False, *self.STRIP)
+        etree.strip_tags(root, "StandardWording")
         etree.strip_attributes(root, "PdqKey")
         node = etree.SubElement(root, "TranslationOf")
         node.text = title
