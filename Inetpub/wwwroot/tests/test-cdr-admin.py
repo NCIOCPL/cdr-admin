@@ -21,7 +21,7 @@ The DNS name for the CDR server which is being tested must be provided, as
 well as the name of a currently active session on that server. For obvious
 reasons, the tests cannot be run against the production server.
 
-$ ./test-cdr-admin.py
+$ ./test-cdr-admin.py --help
 usage: test-cdr-admin.py [-h] --host HOST --session SESSION [--verbose]
                          [--tests [TESTS ...]]
 
