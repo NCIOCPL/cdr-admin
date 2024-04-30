@@ -3,6 +3,7 @@
 """Check server health on a CDR Tier.
 """
 
+from functools import cached_property
 from cdrcgi import Controller
 from cdrapi import db
 # pylint: disable-next=no-name-in-module
@@ -46,11 +47,9 @@ class Control(Controller):
 
         ROLES = dict(
             APPC=443,
-            APPWEB=443,
             DBWIN=None,
             SFTP=22,
             CG=443,
-            GLOSSIFIERC=80,
             DRUPAL=443,
         )
 
@@ -154,6 +153,11 @@ class Control(Controller):
                         except Exception:
                             self.logger.exception("%s not found", self.dns)
                 return self._id
+
+            @cached_property
+            def logger(self):
+                """Record what we do."""
+                return self.control.logger
 
             @property
             def ok(self):
