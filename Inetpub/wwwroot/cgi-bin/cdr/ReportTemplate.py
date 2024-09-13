@@ -4,6 +4,7 @@
 """
 
 from datetime import date, timedelta
+from functools import cached_property
 from cdrcgi import Controller
 
 
@@ -36,8 +37,8 @@ class Control(Controller):
         # For-loop to create a new list containing a cell object as the
         # first element and adding the SQL output for the remaining list
         # elements
-        # If no special formatting - like creating the link to the
-        # PubStatus.py report - is needed you may pass the rows list to
+        # If no special formatting (for example, creating the link to the
+        # PubStatus.py report) is needed you may pass the rows list to
         # the Reporter.Table class instead of the table_rows list.
         # --------------------------------------------------------------
         table_rows = []
@@ -49,7 +50,7 @@ class Control(Controller):
             table_rows.append(cells)
 
         columns = "Job ID", "Job Type", "Started", "Completed", "Status"
-        opts = dict(columns=columns, caption="Jobs")
+        opts = {"columns": columns, "caption": "Jobs"}
         return self.Reporter.Table(table_rows, **opts)
 
     def show_report(self):
@@ -82,43 +83,41 @@ class Control(Controller):
         fieldset.append(page.date_field("end", value=self.end))
         page.form.append(fieldset)
 
-    @property
+    @cached_property
     def end(self):
         """Ending date for the date range on which we are to report."""
 
-        if not hasattr(self, "_end"):
-            end = self.parse_date(self.fields.getvalue("end"))
-            self._end = end if end else date.today()
-        return self._end
+        end = self.parse_date(self.fields.getvalue("end"))
+        return end if end else date.today()
 
-    @property
+    @cached_property
     def start(self):
         """Start date for the date range on which we are to report."""
 
-        if not hasattr(self, "_start"):
-            start = self.parse_date(self.fields.getvalue("start"))
-            self._start = start if start else self.end - timedelta(7)
-        return self._start
+        start = self.parse_date(self.fields.getvalue("start"))
+        return start if start else self.end - timedelta(7)
+
+
+def main():
+    """Create an instance of our class and invoke the inherited run() method.
+
+    That method acts as a switch statement, in effect, and checks to see
+    whether any of the action buttons have been clicked. If so, and the
+    button is not the "Submit" button, the user is taken to whichever page
+    is appropriate to that button (e.g., logging out, the reports menu, or
+    the top-level administrative menu page). If the clicked button is the
+    "Submit" button, the show_report() method is invoked. The show_report()
+    method in turn invokes the build_tables() method, which we have overridden
+    above. Finally, show_report() invokes this.report.send() to display the
+    report.
+
+    If no button is clicked, the run() method invokes the show_form() method,
+    which in turn calls the populate_form() method so we can add the fields we
+    need for this report (as well as make any other tweaks to the form's page)
+    before displaying the form.
+    """
+    Control().run()
 
 
 if __name__ == "__main__":
-    """Don't execute the script if loaded as a module.
-
-    Instantiate an instance of our class and invoke the inherited run()
-    method. This method acts as a switch statement, in effect, and checks
-    to see whether any of the action buttons have been clicked. If so,
-    and the button is not the "Submit" button, the user is taken to
-    whichever page is appropriate to that button (e.g., logging out,
-    the reports menu, or the top-level administrative menu page).
-    If the clicked button is the "Submit" button, the show_report()
-    method is invoked. The show_report() method in turn invokes the
-    build_tables() method, which we have overridden above. Finally,
-    show_report() invokes this.report.send() to display the report.
-
-    If no button is clicked, the run() method invokes the show_form()
-    method, which in turn calls the populate_form() method so we can
-    add the fields we need for this report (as well as make any other
-    tweaks to the form's page) before displaying the form.
-    """
-
-    Control().run()
+    main()
