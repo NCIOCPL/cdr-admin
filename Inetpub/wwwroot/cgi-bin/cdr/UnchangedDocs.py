@@ -74,14 +74,14 @@ class Control(Controller):
 
     @property
     def docs(self):
-        """Unchanged document to be displayed for the report."""
+        """Unchanged documents to be displayed for the report."""
 
         if not hasattr(self, "_docs"):
             fields = "d.id", "d.title", "MAX(a.dt) AS last_saved"
             query = self.Query("document d", *fields).order("d.title", "d.id")
             query.join("audit_trail a", "a.document = d.id")
             query.group("d.id", "d.title")
-            query.having(query.Condition("MAX(a.dt)", self.cutoff, ">="))
+            query.having(query.Condition("MAX(a.dt)", self.cutoff, "<"))
             query.limit(self.max)
             if self.doctype and self.doctype != "all":
                 query.join("doc_type t", "t.id = d.doc_type")
