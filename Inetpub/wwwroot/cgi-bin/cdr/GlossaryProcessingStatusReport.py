@@ -209,6 +209,10 @@ class GlossaryTermDocument:
         if not hasattr(self, "_status"):
             self._status = None
             if self.doc:
+                if self.doc.root is None:
+                    self.control.logger.warning("CDR%s not found", self.id)
+                    self._status = "DOCUMENT DELETED"
+                    return "DOCUMENT DELETED"
                 for node in self.doc.root.findall(self.STATUS_PATH):
                     status = Doc.get_text(node, "").strip()
                     if status:
@@ -239,7 +243,7 @@ class Concept(GlossaryTermDocument):
 
         if not hasattr(self, "_comment"):
             self._comment = None
-            if self.doc:
+            if self.doc and self.doc.root is not None:
                 control = self.__control
                 tag = "TermDefinition"
                 if control.language != "English":
