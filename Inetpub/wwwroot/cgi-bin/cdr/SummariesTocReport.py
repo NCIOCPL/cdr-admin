@@ -502,7 +502,7 @@ jQuery(function() {
         if version:
             return int(version)
         if self.id and len(self.versions) == 1:
-            return self.versions[0].number
+            return self.versions[0].id
         return None
 
     @cached_property
