@@ -28,6 +28,11 @@ class Control(Controller):
             page - HTMLPage object to which we add the form fields.
         """
 
+        page.form.append(page.B.P(
+            "Note: Invitation letters for prospective Pediatric Treatment "
+            "editorial board members cannot be generated from this interface.",
+            page.B.CLASS("error")
+        ))
         fieldset = page.fieldset("Board")
         fieldset.set("id", "boards")
         checked = True
