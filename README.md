@@ -26,7 +26,7 @@ The following sections describe each of the available CGI administrative tools a
 
 ## User Activity reports
 ### Audit Trail
-Provides a list of all of the activity for a specific CDR document. Can be limited to the most recent N actions.
+Provides a list of all of the activity for a specific CDR document. Can be limited to the most recent N actions. The report's table has columns for the date and time of the action, the name of the user performing the action, and the name of the action (ADD DOCUMENT, MODIFY DOCUMENT, LOCK, UNLOCK).
 ### Current Sessions
 Provides a table showing the active logins, including information about the account for each session, as well as when the session was initiated and when the last activity was performed for that session.
 ### Document Activity Report
