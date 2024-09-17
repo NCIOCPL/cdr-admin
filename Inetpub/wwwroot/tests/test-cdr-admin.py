@@ -21,7 +21,7 @@ The DNS name for the CDR server which is being tested must be provided, as
 well as the name of a currently active session on that server. For obvious
 reasons, the tests cannot be run against the production server.
 
-$ ./test-cdr-admin.py
+$ ./test-cdr-admin.py --help
 usage: test-cdr-admin.py [-h] --host HOST --session SESSION [--verbose]
                          [--tests [TESTS ...]]
 
@@ -2567,12 +2567,15 @@ class DrugTests(Tester):
         self.click("options-markup-publish")
         self.click("options-markup-proposed")
         self.submit_form()
-        self.assert_page_has("Drug Information Summary")
-        self.assert_page_has("QC Report")
-        self.assert_page_has(str(date.today()))
-        self.assert_page_has(drug_name)
-        self.assert_page_has(f"CDR{drug_id}")
-        self.assert_page_has('<span class="insert')
+        page = self.get_page_source()
+        self.assertIn("Drug Information Summary", page)
+        self.assertIn("QC Report", page)
+        self.assertIn(str(date.today()), page)
+        self.assertIn(drug_name, page)
+        self.assertIn(f"CDR{drug_id}", page)
+        insert_span = '<span class="insert'
+        delete_span = '<span class="delete'
+        self.assertTrue(insert_span in page or delete_span in page)
         self.assert_plain_report()
 
     def test_drug_type_of_change_report(self):
@@ -6263,67 +6266,6 @@ class SummaryTests(Tester):
         self.assertEqual(sheet["H7"].value, "LastV Publish?")
         self.assertEqual(sheet["I7"].value, "User")
 
-    def test_replacement(self):
-        """Test replacement of an old summary with a new one."""
-
-        # Do some prep work, creating two test summaries.
-        root = etree.Element("Summary", nsmap=self.NSMAP)
-        old_title = "Old Test Summary"
-        new_title = "New Test Summary"
-        title_node = etree.SubElement(root, "SummaryTitle")
-        title_node.text = old_title
-        xml = etree.tostring(root, encoding="unicode")
-        old_doc_id = self.save_doc(xml, "Summary")
-        old_cdr_id = f"CDR{old_doc_id:010d}"
-        title_node.text = new_title
-        xml = etree.tostring(root, encoding="unicode")
-        new_doc_id = self.save_doc(xml, "Summary")
-        new_cdr_id = f"CDR{new_doc_id:010d}"
-
-        # Verify that the software will refuse the operation
-        # without the WillReplace element in place.
-        self.navigate_to("ReplaceDocWithNewDoc.py")
-        self.assert_title("Replace Old Document With New One")
-        self.assert_page_has("This program replaces the XML of a CDR document")
-        self.assert_page_has("Enter IDs for Old and New Documents")
-        self.set_field_value("old", old_doc_id)
-        self.set_field_value("new", new_doc_id)
-        self.submit_form()
-        self.assert_title("Replace Old Document With New One")
-        self.assert_page_has(f"CDR{new_doc_id} has no WillReplace element.")
-
-        # Add the element and try again. This time should succeed.
-        will_replace = etree.SubElement(root, "WillReplace")
-        will_replace.text = old_title
-        will_replace.set(f"{{{self.NS}}}ref", old_cdr_id)
-        xml = etree.tostring(root, encoding="unicode")
-        self.save_doc(xml, "Summary", id=new_cdr_id)
-        self.submit_form(new_tab=False)
-
-        # Confirm the replacement. The validation errors reported are
-        # expected (our test Summary documents are pretty bare-bones).
-        self.assert_title("Replacement Confirmation Required")
-        self.assert_regex(rf"{old_cdr_id} .+ will be replaced by {new_cdr_id}")
-        expected = (
-            "These errors occurred when validating the new document:",
-            "Replacing an existing document with a new one that is invalid "
-            "is allowed, but please consider whether you really want to do "
-            "that.",
-            "The new document will be saved as a non-publishable version.",
-        )
-        for text in expected:
-            self.assert_page_has(text)
-        self.click("submit-button-confirm-replacement")
-        self.assert_title("Replacement Successful")
-        self.assert_page_has(
-            f"XML from {new_cdr_id} successfully saved as a new "
-            f"version of {old_cdr_id}."
-        )
-
-        # Don't leave any dross behind.
-        self.delete_doc(old_cdr_id)
-        self.delete_doc(new_cdr_id)
-
     def test_internal_links_report(self):
         """Test the Summary Internal Links report."""
 
@@ -6740,6 +6682,67 @@ class SummaryTests(Tester):
         for selector, name, value in styles:
             self.assert_regex(f".{selector}[^{{]*{{[^}}]*{name}[^}}]*{value}")
 
+    def test_replacement(self):
+        """Test replacement of an old summary with a new one."""
+
+        # Do some prep work, creating two test summaries.
+        root = etree.Element("Summary", nsmap=self.NSMAP)
+        old_title = "Old Test Summary"
+        new_title = "New Test Summary"
+        title_node = etree.SubElement(root, "SummaryTitle")
+        title_node.text = old_title
+        xml = etree.tostring(root, encoding="unicode")
+        old_doc_id = self.save_doc(xml, "Summary")
+        old_cdr_id = f"CDR{old_doc_id:010d}"
+        title_node.text = new_title
+        xml = etree.tostring(root, encoding="unicode")
+        new_doc_id = self.save_doc(xml, "Summary")
+        new_cdr_id = f"CDR{new_doc_id:010d}"
+
+        # Verify that the software will refuse the operation
+        # without the WillReplace element in place.
+        self.navigate_to("ReplaceDocWithNewDoc.py")
+        self.assert_title("Replace Old Document With New One")
+        self.assert_page_has("This program replaces the XML of a CDR document")
+        self.assert_page_has("Enter IDs for Old and New Documents")
+        self.set_field_value("old", old_doc_id)
+        self.set_field_value("new", new_doc_id)
+        self.submit_form()
+        self.assert_title("Replace Old Document With New One")
+        self.assert_page_has(f"CDR{new_doc_id} has no WillReplace element.")
+
+        # Add the element and try again. This time should succeed.
+        will_replace = etree.SubElement(root, "WillReplace")
+        will_replace.text = old_title
+        will_replace.set(f"{{{self.NS}}}ref", old_cdr_id)
+        xml = etree.tostring(root, encoding="unicode")
+        self.save_doc(xml, "Summary", id=new_cdr_id)
+        self.submit_form(new_tab=False)
+
+        # Confirm the replacement. The validation errors reported are
+        # expected (our test Summary documents are pretty bare-bones).
+        self.assert_title("Replacement Confirmation Required")
+        self.assert_regex(rf"{old_cdr_id} .+ will be replaced by {new_cdr_id}")
+        expected = (
+            "These errors occurred when validating the new document:",
+            "Replacing an existing document with a new one that is invalid "
+            "is allowed, but please consider whether you really want to do "
+            "that.",
+            "The new document will be saved as a non-publishable version.",
+        )
+        for text in expected:
+            self.assert_page_has(text)
+        self.click("submit-button-confirm-replacement")
+        self.assert_title("Replacement Successful")
+        self.assert_page_has(
+            f"XML from {new_cdr_id} successfully saved as a new "
+            f"version of {old_cdr_id}."
+        )
+
+        # Don't leave any dross behind.
+        self.delete_doc(old_cdr_id)
+        self.delete_doc(new_cdr_id)
+
     def test_standard_wording_report(self):
         """Test the Summaries Standard Wording report."""
 
@@ -7085,6 +7088,14 @@ class SummaryTests(Tester):
 class TerminologyTests(Tester):
     """Tests for CDR Term document reports."""
 
+    def test_ambiguous_drug_concepts_report(self):
+        """Test the duplicate concept links report."""
+
+        self.navigate_to("AmbiguousEVSDrugConcepts.py")
+        expected = "EVS Drug Concepts Used By More Than One CDR Drug Term"
+        self.assert_title(expected)
+        self.assert_non_tabular_report()
+
     def test_cancer_diagnosis_hierarchy_report(self):
         """Test the CDR Cancer Diagnosis Hierarchy report."""
 
@@ -7179,14 +7190,6 @@ class TerminologyTests(Tester):
         self.assertEqual(sheet.max_column, len(headers))
         for column, header in enumerate(headers, start=1):
             self.assertEqual(sheet.cell(2, column).value, header)
-
-    def test_ambiguous_drug_concepts_report(self):
-        """Test the duplicate concept links report."""
-
-        self.navigate_to("AmbiguousEVSDrugConcepts.py")
-        expected = "EVS Drug Concepts Used By More Than One CDR Drug Term"
-        self.assert_title(expected)
-        self.assert_non_tabular_report()
 
     def test_hierarchy_tree_report(self):
         """Test the Term Hierarchy Tree report."""
