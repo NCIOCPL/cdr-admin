@@ -296,47 +296,52 @@ jQuery(function() {
             self._title = (self.fields.getvalue("title") or "").strip()
         return self._title
 
-    @property
+    @cached_property
     def fragment_matches(self):
         """Information about summaries which match the title fragment."""
 
-        if not hasattr(self, "_fragment_matches"):
-            if not self.fragment:
-                bail("No title fragment to match")
-            pattern = f"{self.fragment}%"
-            query = db.Query("document d", "d.id", "d.title").order(2, 1)
-            query.join("doc_type t", "t.id = d.doc_type")
-            query.where("t.name = 'Summary'")
-            query.where(query.Condition("d.title", pattern, "LIKE"))
-            self._fragment_matches = []
+        if not self.fragment:
+            bail("No title fragment to match")
+        pattern = f"{self.fragment}%"
+        query = db.Query("document d", "d.id", "d.title").order(2, 1)
+        query.join("doc_type t", "t.id = d.doc_type")
+        query.where("t.name = 'Summary'")
+        query.where(query.Condition("d.title", pattern, "LIKE"))
+        fragment_matches = []
 
-            class Summary:
-                def __init__(self, doc_id, display, tooltip=None):
-                    self.id = doc_id
-                    self.display = display
-                    self.tooltip = tooltip
-            for doc_id, title in query.execute(self.cursor).fetchall():
-                if len(title) > 60:
-                    short_title = title[:57] + "..."
-                    summary = Summary(doc_id, short_title, title)
-                else:
-                    summary = Summary(doc_id, title)
-                self._fragment_matches.append(summary)
-        return self._fragment_matches
+        class _Summary:
+            def __init__(self, doc_id, display, tooltip=None):
+                self.id = doc_id
+                self.display = display
+                self.tooltip = tooltip
+        for doc_id, title in query.execute(self.cursor).fetchall():
+            if len(title) > 60:
+                short_title = title[:57] + "..."
+                summary = _Summary(doc_id, short_title, title)
+            else:
+                summary = _Summary(doc_id, title)
+            fragment_matches.append(summary)
+        return fragment_matches
 
-    @property
+    @cached_property
     def id(self):
         """CDR document ID for the summary to be used for the report."""
 
-        if not hasattr(self, "_id"):
-            self._id = self.fields.getvalue("id")
-            if self._id:
-                self._id = int(self._id)
-            if self.fragment and len(self.fragment_matches) == 1:
-                self._id = self.fragment_matches[0].id
-        return self._id
+        doc_id = self.fields.getvalue("id")
+        if doc_id:
+            try:
+                doc = Doc(self.session, id=doc_id)
+                doctype = doc.doctype.name
+                if doctype != "Summary":
+                    self.bail(f"CDR{doc.id} is a {doctype} document.")
+            except Exception:
+                self.bail(f"Document {doc_id} was not found")
+            return doc.id
+        if self.fragment and len(self.fragment_matches) == 1:
+            return self.fragment_matches[0].id
+        return None
 
-    @property
+    @cached_property
     def include_id(self):
         """Boolean indicating whether Summary CDR IDs should be displayed."""
 
@@ -352,7 +357,7 @@ jQuery(function() {
                 bail()
         return self._language
 
-    @property
+    @cached_property
     def level(self):
         """Integer indicating how deep the report should go."""
 
@@ -459,7 +464,7 @@ jQuery(function() {
             if self._version:
                 self._version = int(self._version)
             elif self.id and len(self.versions) == 1:
-                self._version = self.versions[0].number
+                self._version = self.versions[0].id
         return self._version
 
     @property
