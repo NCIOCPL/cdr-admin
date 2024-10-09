@@ -556,7 +556,10 @@ class Control(Controller):
             ["DisplayLOETermList", self.yn_flags.loes],
         ]
         if "images" in self.options:
-            parms.append("DisplayPubImages", self.yn_flags.publishable_images)
+            parms.append([
+                "DisplayPubImages",
+                self.yn_flags.publishable_images
+            ])
         if self.patient:
             parms += [
                 ["ShowStandardWording", self.yn_flags.std_wording],
