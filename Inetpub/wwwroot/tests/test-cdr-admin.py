@@ -92,13 +92,18 @@ class Tester(TestCase):
     NSMAP = dict(cdr=NS)
     STARTED = datetime.now()
     SUCCESSES = FAILURES = ERRORS = 0
+    VERBOSE = False
     del HANDLER, LOG_FORMAT, LOG_PATH
 
     def setUp(self):
         """This gets run at the start of every test."""
 
         self.started = datetime.now()
-        self.driver = webdriver.Chrome()
+        options = webdriver.ChromeOptions()
+        if not self.VERBOSE:
+            exclude = ["enable-logging"]
+            options.add_experimental_option("excludeSwitches", exclude)
+        self.driver = webdriver.Chrome(options=options)
         self.driver.implicitly_wait(self.DEFAULT_WAIT)
 
     def tearDown(self):
@@ -3124,7 +3129,10 @@ class GeneralTests(Tester):
         self.assertGreaterEqual(first_size, last_size)
 
         # Verify that sort by CDR works.
-        self.find("form input").click()
+        self.assert_page_has("Sort By CDR ID")
+        self.find("#primary-form input").click()
+        self.assert_page_not_has("Sort By CDR ID")
+        table = self.load_table()
         first_id = table.rows[0][0].text
         last_id = None
         index = len(table.rows) - 1
@@ -3137,7 +3145,10 @@ class GeneralTests(Tester):
         self.assertLessEqual(first_id, last_id)
 
         # Same check for sorting by document size.
-        self.find("form input").click()
+        self.assert_page_has("Sort By Document Size")
+        self.find("#primary-form input").click()
+        self.assert_page_not_has("Sort By Document Size")
+        table = self.load_table()
         first_size = int(table.rows[0][-2].text)
         last_size = int(table.rows[-1][-2].text)
         self.assertGreaterEqual(first_size, last_size)
@@ -6563,7 +6574,7 @@ class SummaryTests(Tester):
         self.submit_form()
         self.assert_page_has(f"<h1>{summary_title}")
         self.assert_page_has("(PDQ®)–Health Professional Version</h1>")
-        self.assert_page_has("<h6>On This Page</h6>")
+        self.assert_page_has("On This Page")
         self.assert_page_has("Go to Patient Version")
 
     def test_qc_reports(self):
@@ -7537,6 +7548,8 @@ if __name__ == "__main__":
     Tester.LOGGER.info("-" * 40)
     Tester.LOGGER.info("Tests started using %s", opts.host)
     new_args = ["-v"] if opts.verbose else []
+    if opts.verbose:
+        Tester.VERBOSE = True
     if opts.tests:
         new_args += opts.tests
     argv[1:] = new_args
