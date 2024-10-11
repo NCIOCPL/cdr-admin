@@ -318,6 +318,11 @@ class Control(Controller):
     def race(self):
         return self.fields.getvalue("race")
 
+    @property
+    def report_css(self):
+        """Keep the caption lines from hugging the left margin."""
+        return ".usa-table caption { margin-left: 1rem; }"
+
     @cached_property
     def report_type(self):
         """Is this a report by images or a report by summaries?"""
