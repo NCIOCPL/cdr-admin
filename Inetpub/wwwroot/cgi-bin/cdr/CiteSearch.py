@@ -245,7 +245,13 @@ class Citation:
         root = etree.fromstring(response.content)
         node = root.find("PubmedArticle")
         if node is None:
-            raise Exception(f"PubmedArticle for {self.pmid} not found")
+            args = url, response.content
+            self.control.session.logger.error("url=%s response=%s", *args)
+            sleep(2)
+            response = requests.get(url)
+            root = etree.fromstring(response.content)
+            if root is None:
+                raise Exception(f"PubmedArticle for {pmid} not found")
         return prepare_pubmed_article_for_import(node)
 
     def lookup(self, pmid):

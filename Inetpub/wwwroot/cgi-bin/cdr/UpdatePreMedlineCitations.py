@@ -10,6 +10,7 @@ from collections import defaultdict
 from copy import deepcopy
 from datetime import datetime
 from functools import cached_property
+from time import sleep
 from cdrcgi import Controller
 from cdrapi.docs import Doc
 from cdr import prepare_pubmed_article_for_import
@@ -145,7 +146,7 @@ class Control(Controller):
         for row in rows:
             pmid = row.pmid.strip().upper()
             if pmid in self.skipped:
-                self.logger.info("skipping %s", pmid)
+                self.logger.info("skipping PMID %s", pmid)
                 continue
             if pmid in self.duplicates:
                 duplicates = sorted(self.duplicates[pmid] - {row.doc_id})
@@ -217,7 +218,7 @@ class Control(Controller):
         """PubMed IDs which we won't try to refresh."""
         return {pmid for pmid in self.fields.getlist("skipped")}
 
-    def __fetch(self, citations):
+    def __fetch(self, citations, retries=3):
         """Get the latest for the citations from NLM.
 
         Attach the PubMed articles to the Citation objects with which
@@ -229,7 +230,9 @@ class Control(Controller):
 
         data = dict(db="pubmed", id=",".join(list(citations)), retmode="xml")
         xml = post(self.URL, data).content
+        fetched = 0
         for node in etree.fromstring(xml).findall("PubmedArticle"):
+            fetched += 1
             article = PubmedArticle(node)
             if len(article.pmids) != 1:
                 message = f"NLM article has multiple IDs {article.pmids}."
@@ -239,6 +242,14 @@ class Control(Controller):
             else:
                 message = f"Got unexpected article with PMID {article.pmid}"
                 self.alerts.append(dict(message=message, type="warning"))
+        if fetched < len(citations):
+            args = len(citations), fetched
+            self.logger.warning("expected %d articles, got %d", *args)
+            if not fetched:
+                self.logger.warning("retries=%d response=%s", retries, xml)
+                if retries > 0:
+                    sleep(5-retries)
+                    self.__fetch(citations, retries-1)
 
 
 class Citation:
