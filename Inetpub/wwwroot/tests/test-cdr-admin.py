@@ -42,6 +42,24 @@ to troubleshoot unexplained failures of new or modified tests:
         self.driver.save_screenshot("./name-of-page.png")
 
         self.save_pdf("report.pdf")
+
+It's a good idea to leave the machine on which the tests are running alone
+during the run. It is possible to cause some of the tests to fail just by
+inadvertently clicking on the browser, thus changing the position of the
+cursor/focus (and therefore the behavior of the testing actions). To this
+end I prefer to run the tests in a Windows VM, so that I can continue
+working on my own local system without risking any disturbance of the tests.
+
+Because these tests rely on outside services over which we have little or no
+control, there is no guarantee that all of the tests will pass every time.
+If NLM is having a bad day, for example, and a request to PubMed times out,
+the best we can do is try again. When this happens, a reasonable attempt is
+made to make the test or the CGI script which it is testing more resilient
+by detecting the problem at runtime and submitting the request again after a
+delay. Then we repeatedly try the test which failed. If we get (say) ten
+successful attempts in a row, we'll be satisfied that we've done our best,
+with the realization that it's still possible that the test will fail at some
+point in the future.
 """
 
 from argparse import ArgumentParser
@@ -55,6 +73,7 @@ from json import loads as load_from_json
 from logging import getLogger, Formatter, FileHandler
 from pathlib import Path
 from re import search as re_search, escape as re_escape, sub as re_sub
+from re import compile as re_compile
 from ssl import _create_unverified_context
 from sys import argv
 from time import sleep
@@ -93,6 +112,7 @@ class Tester(TestCase):
     STARTED = datetime.now()
     SUCCESSES = FAILURES = ERRORS = 0
     VERBOSE = False
+    GOOD_BODY = re_compile("(?s)<body[^>]*>[^<]*<.*</body>")
     del HANDLER, LOG_FORMAT, LOG_PATH
 
     def setUp(self):
@@ -538,7 +558,8 @@ class Tester(TestCase):
         while attempts > 0:
             source = self.driver.page_source
             if "</body>" in source and "</html>" in source:
-                return source
+                if self.GOOD_BODY.search(source):
+                    return source
             attempts -= 1
             args = source, attempts
             self.logger.warning("body missing in %s, %d tries left", *args)
@@ -5355,7 +5376,7 @@ class MediaTests(Tester):
         )
 
     def test_lists_report(self):
-        """Test the Drug Info Summaries List report."""
+        """Test the Media Lists report."""
 
         self.navigate_to("MediaLists.py")
         self.assert_title("Media Lists")
