@@ -53,6 +53,7 @@ class Control(Controller):
         ("MODIFY DOCUMENT", "GlossaryTermName"),
         ("AUDIO IMPORT", None),
     )
+    NONE = "All available audio files sets have been loaded."
 
     def build_tables(self):
         """Assemble the table reporting the documents we created/updated."""
@@ -75,6 +76,8 @@ class Control(Controller):
         for zipfile in self.zipfiles:
             ordered_list.append(page.B.LI(zipfile))
         fieldset.append(ordered_list)
+        if not self.zipfiles:
+            fieldset.append(page.B.P(self.NONE))
         page.form.append(fieldset)
 
     @cached_property
@@ -113,6 +116,10 @@ class Control(Controller):
     @cached_property
     def term_docs(self):
         """Dictionary of term name docs for which we have new MP3 files."""
+
+        # Handle the case in which nothing is ready to be loaded.
+        if not self.zipfiles:
+            return {}
 
         # Process each zip archive.
         for path in self.zipfiles:
@@ -158,8 +165,8 @@ class Control(Controller):
         # Save the new or updated Media documents.
         self.logger.info("term ids: %s", sorted(term_docs))
         old = {}
-        for id in term_docs:
-            for mp3 in term_docs[id].mp3s:
+        for term_doc in term_docs.values():
+            for mp3 in term_doc.mp3s:
                 if mp3.media_id:
                     old[mp3.media_id] = mp3
                 mp3.save()
@@ -212,7 +219,7 @@ class Control(Controller):
             else:
                 self.logger.warning("skipping %r", path)
         if not weeks:
-            self.bail("Nothing to be loaded")
+            return []
         week = sorted(weeks)[-1]
         zipfiles = sorted(weeks[week], key=str.upper)
         self.logger.info("zipfiles: %s", zipfiles)
@@ -403,7 +410,7 @@ class AudioFile:
 
         language = self.__cell(self.LANGUAGE)
         if language not in ("English", "Spanish"):
-            raise Exception(f"Unexpected language {self._language!r}")
+            raise ValueError(f"Unexpected language {language!r}")
         return language
 
     @cached_property
