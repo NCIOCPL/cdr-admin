@@ -59,7 +59,12 @@ by detecting the problem at runtime and submitting the request again after a
 delay. Then we repeatedly try the test which failed. If we get (say) ten
 successful attempts in a row, we'll be satisfied that we've done our best,
 with the realization that it's still possible that the test will fail at some
-point in the future.
+point in the future. The most fragile link in the chain would be the Drupal
+CMS servers. We have absolutely no guarantees that no one will start
+modifying or rebuilding any of the non-production servers at any time.
+Not much we can do about that, aside from cheating and writing the publish
+preview test reports to use the production server, but then if we did that,
+we wouldn't be testing the same behavior that will go into production.
 """
 
 from argparse import ArgumentParser
@@ -2255,9 +2260,9 @@ class DrugTests(Tester):
     Note that some of the tests assume certain conventions in the patterns for
     comments associated with saved versions of the documents. Those patterns
     are used consistently, and since the test docuemtns chosen are the ones
-    created first, we can be confident that we will always a matching version
-    in the document we're testing, even if the currently used conventions
-    are later changed.
+    created first, we can be confident that we will always find a matching
+    version in the document we're testing, even if the currently used
+    conventions are later changed.
     """
 
     def test_drug_advanced_search(self):
