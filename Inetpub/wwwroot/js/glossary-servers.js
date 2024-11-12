@@ -6,9 +6,9 @@
 function add_buttons() {
     console.log("start add_buttons()")
     jQuery(".glossary-server-button").remove();
-    green_button().insertAfter(jQuery(".alias").last());
-    jQuery(".alias").each(function(i) {
-        red_button(i).insertAfter(jQuery(this));
+    jQuery(".server-block legend").last().append(green_button());
+    jQuery(".server-block legend").each(function(i) {
+        jQuery(this).append(red_button(i));
     });
     console.log("done add_buttons()")
 }
@@ -20,7 +20,8 @@ function green_button() {
         src: "/images/add.gif",
         onclick: "add_server_block()",
         class: "clickable",
-        title: "Add another server"
+        title: "Add another server",
+        alt: "green plus sign"
     });
     span.append(img);
     return span;
@@ -33,7 +34,8 @@ function red_button(i) {
         src: "/images/del.gif",
         onclick: "remove_server(" + ++i + ")",
         class: "clickable",
-        title: "Remove server"
+        title: "Remove server",
+        alt: "red X"
     });
     span.append(img);
     return span;
@@ -42,12 +44,12 @@ function red_button(i) {
 // Add a server block, possibly with existing values.
 function add_server_block(i, alias, url) {
     var id = i ? i : jQuery(".alias").length + 1;
-    var attrs = {class: "server-block", id: "server-block-" + id};
+    var attrs = {class: "server-block usa-fieldset", id: "server-block-" + id};
     var fieldset = jQuery("<fieldset>", attrs);
-    fieldset.append(jQuery("<legend>Server</legend>"));
+    fieldset.append(jQuery("<legend>", {class: "usa-legend"}).text("Server"));
     fieldset.append(make_field("alias", id, "Alias", alias));
     fieldset.append(make_field("url", id, "URL", url));
-    jQuery("form").append(fieldset);
+    jQuery("#submit-button-submit").before(fieldset)
     jQuery("input[name='num-servers']").val(id);
     if (!i) {
         add_buttons();
@@ -63,6 +65,9 @@ function remove_server(id) {
     jQuery.each(blocks, function(i, server) {
         add_server_block(i + 1, server["alias"], server["url"]);
     });
+    if (blocks.length === 0) {
+        add_server_block();
+    }
     add_buttons();
 }
 
@@ -70,9 +75,9 @@ function remove_server(id) {
 function make_field(name, id, label, value) {
     var id = name + "-" + id;
     var field = jQuery("<div>", {class: "labeled-field"});
-    field.append(jQuery("<label>", {for: id, text: label}));
+    field.append(jQuery("<label>", {class: "usa-label", for: id, text: label}));
     field.append(jQuery("<input>", {
-        class: name,
+        class: name + " usa-input usa-input--xl",
         name: id,
         id: id,
         value: value

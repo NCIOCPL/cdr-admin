@@ -7,6 +7,7 @@ BZIssue::1283 - add support for searching by user
 
 import datetime
 import cdr
+from functools import cached_property
 from cdrcgi import Controller
 from cdrapi import db
 
@@ -59,7 +60,7 @@ class ActivityReport(Controller):
         rows = []
         for user, name, action, when, dt, id, title, cmt in cursor.fetchall():
             who = f"{name} ({user})"
-            when = str(when)[:19]
+            when = str(when)[:19].replace("-", self.NONBREAKING_HYPHEN)
             cdrid = f"{id:010d}"
             url = f"QcReport.py?DocId={cdrid}&Session={self.session}"
             url += "&DocVersion=-1"
@@ -71,29 +72,38 @@ class ActivityReport(Controller):
         return self.Reporter.Table(rows, caption=caption, columns=self.COLS)
 
     def show_report(self):
-        """Override to provide a hook for some custom style rules."""
+        """Override so we can widen the report table."""
+
         self.report.page.body.set("id", "activity-report")
+        table = self.report.page.form.find("table")
+        report_footer = self.report.page.main.find("p")
+        report_footer.addprevious(table)
+        css = ".report .usa-table { width: 90%; margin: 3rem auto 1.25rem; }"
+        self.report.page.add_css(css)
         self.report.send(self.format)
 
-    @property
+    @cached_property
     def start_date(self):
-        if not hasattr(self, "_start_date"):
-            self._start_date = self.fields.getvalue("start_date")
-            if self._start_date:
-                if not cdr.strptime(self._start_date, "%Y-%m-%d"):
-                    msg = "Start Date must be valid date in YYYY-MM-DD format"
-                    self.bail(msg)
-        return self._start_date
+        """Make sure the start date is valid if present."""
+
+        start_date = self.fields.getvalue("start_date")
+        if not start_date:
+            return None
+        try:
+            return self.parse_date(start_date)
+        except Exception:
+            self.bail("Invalid start date")
 
     @property
     def end_date(self):
-        if not hasattr(self, "_end_date"):
-            self._end_date = self.fields.getvalue("end_date")
-            if self._end_date:
-                if not cdr.strptime(self._end_date, "%Y-%m-%d"):
-                    msg = "Start Date must be valid date in YYYY-MM-DD format"
-                    self.bail(msg)
-        return self._end_date
+        """Make sure the end date is valid if present."""
+        end_date = self.fields.getvalue("end_date")
+        if not end_date:
+            return None
+        try:
+            return self.parse_date(end_date)
+        except Exception:
+            self.bail("Invalid end date")
 
     @property
     def doctypes(self):

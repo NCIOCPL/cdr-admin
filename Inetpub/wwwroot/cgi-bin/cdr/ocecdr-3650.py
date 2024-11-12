@@ -9,15 +9,35 @@ sync during the HP reformat process.
 from functools import cached_property
 from re import sub as re_sub
 from sys import maxsize
-from cdrcgi import Controller, Reporter
+from cdrcgi import Controller, Reporter, HTMLPage
 from cdrapi.docs import Doc
 
 
 class Control(Controller):
     """Report logic."""
 
-    SUBTITLE = ("Report on Links From One Section of a Summary "
-                "to Another Section")
+    SUBTITLE = "Summary Internal Links"
+    INSTRUCTIONS = HTMLPage.B.DIV(
+        HTMLPage.B.P(
+            "This report show all of the links in a summary pointing from "
+            "one section of the summary to another part of that same summary "
+            "document. The report is generated as an Excel workbook, and "
+            "the report table contains the following columns:"
+        ),
+        HTMLPage.B.UL(
+            HTMLPage.B.LI("the fragment ID identifying the link target"),
+            HTMLPage.B.LI("the title of the target section or subsection"),
+            HTMLPage.B.LI("the title of the linking section or subsection"),
+            HTMLPage.B.LI("the text content of the linking element"),
+            HTMLPage.B.LI(
+                "a flag showing whether the link is from within a table"
+            ),
+            HTMLPage.B.LI(
+                "a flag showing whether the link is from within a list"
+            ),
+            HTMLPage.B.CLASS("usa-list")
+        )
+    )
     COLUMNS = (
         Reporter.Column("FragID", width="75px"),
         Reporter.Column("Target Section/Subsection", width="500px"),
@@ -35,11 +55,9 @@ class Control(Controller):
         """
         if self.ready:
             return self.show_report()
-        if self.problems:
-            fieldset = page.fieldset("Problems Were Found")
-            for problem in self.problems:
-                fieldset.append(page.B.DIV(problem, page.B.CLASS("error")))
-            page.form.append(fieldset)
+        fieldset = page.fieldset("Instructions")
+        fieldset.append(self.INSTRUCTIONS)
+        page.form.append(fieldset)
         fieldset = page.fieldset("Specify a Summary Document")
         fieldset.append(page.text_field("id", label="Summary ID"))
         page.form.append(fieldset)
@@ -64,37 +82,34 @@ class Control(Controller):
         return self.fields.getvalue("id", "").strip()
 
     @cached_property
-    def problems(self):
-        """Errors to show the user at the top of the form."""
-        return []
-
-    @cached_property
     def ready(self):
         """True if we have everything we need for the report."""
 
         if not self.request:
             return False
         if not self.id:
-            self.problems.append("A Summary ID is required.")
+            message = "A Summary ID is required."
+            self.alerts.append(dict(message=message, type="error"))
             return False
         try:
             if self.doc.doctype.name != "Summary":
                 message = f"CDR{self.doc.id} is a {self.doc.doctype} document."
-                self.problems.append(message)
+                self.alerts.append(dict(message=message, type="error"))
                 return False
         except Exception:
             message = f"Document {self.id} not found."
             self.logger.exception(message)
-            self.problems.append(message)
+            self.alerts.append(dict(message=message, type="error"))
             return False
         id = f"CDR{self.doc.id}"
         try:
             if not self.rows:
-                self.problems.append(f"{id} has no internal links.")
+                message = f"{id} has no internal links."
+                self.alerts.append(dict(message=message, type="warning"))
                 return False
         except Exception as e:
             message = f"Unexpected failure creating report for {id}: {e}"
-            self.problems.append(message)
+            self.alerts.append(dict(message=message, type="error"))
             return False
         return True
 

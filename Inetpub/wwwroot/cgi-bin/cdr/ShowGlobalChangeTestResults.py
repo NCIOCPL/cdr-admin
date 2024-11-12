@@ -4,6 +4,7 @@
 """
 
 from collections import defaultdict
+from functools import cached_property
 from glob import glob
 from os import listdir, path, stat
 from re import sub
@@ -15,11 +16,9 @@ from cdrapi.docs import Doc
 class Control(Controller):
 
     SUBTITLE = "Global Change Test Results"
-    CSS = "fieldset { width: 225px; }"
-    TESTS = "Test Runs"
-    BY_ID = "ID Sort"
-    BY_DOCSIZE = "Doc Size Sort"
-    BY_DIFFSIZE = "Diff Size Sort"
+    BY_ID = "Sort By CDR ID"
+    BY_DOCSIZE = "Sort By Document Size"
+    BY_DIFFSIZE = "Sort By Diff Size"
     SORTS = BY_ID, BY_DOCSIZE, BY_DIFFSIZE
 
     def build_tables(self):
@@ -41,16 +40,11 @@ class Control(Controller):
             link_list.append(page.B.LI(link))
         fieldset.append(link_list)
         page.form.append(fieldset)
-        page.add_css(self.CSS)
 
     def run(self):
         """Override base class logic for some custom routing."""
 
-        if self.request in (self.ADMINMENU, self.REPORTS_MENU, self.LOG_OUT):
-            Controller.run(self)
-        if self.request == self.TESTS:
-            self.show_form()
-        elif self.text:
+        if self.text:
             self.show_file()
         elif self.docs:
             self.show_report()
@@ -68,22 +62,25 @@ class Control(Controller):
         """Override the base class version so we can add extra buttons."""
 
         page = self.report.page
-        page.add_css("#docs a { margin: auto 5px; }")
+        page.add_css("#docs a { margin: auto .3rem; }")
+        page.add_css(".usa-form .usa-button { margin-top: 0; }")
         page.form.append(page.hidden_field("dir", self.directory))
-        buttons = page.body.find("form/header/h1/span")
         for sort in reversed(self.SORTS):
             if sort != self.sort:
-                buttons.insert(0, page.button(sort))
-        buttons.insert(0, page.button(self.TESTS))
+                button = page.button(sort)
+                page.form.insert(0, button)
         self.report.send()
 
-    @property
+    @cached_property
     def base(self):
         """Top-level directory for the global change test output."""
 
-        if not hasattr(self, "_base"):
-            self._base = f"{self.session.tier.basedir}/GlobalChange"
-        return self._base
+        return f"{self.session.tier.basedir}/GlobalChange"
+
+    @cached_property
+    def buttons(self):
+        """No buttons needed on the form."""
+        return []
 
     @property
     def caption(self):
@@ -98,97 +95,76 @@ class Control(Controller):
     @property
     def columns(self):
         """Headers for the report table's columns."""
-
         return "CDR ID", "Ver.", "Files", "New Size", "Diff Size"
-        return (
-            self.Reporter.Column("CDR ID"),
-            self.Reporter.Column("Ver."),
-            self.Reporter.Column("Files", colspan=4),
-            self.Reporter.Column("New Size"),
-            self.Reporter.Column("Diff Size"),
-        )
 
     @property
     def directory(self):
         """Name of the directory for the selected job."""
         return self.fields.getvalue("dir")
 
-    @property
+    @cached_property
     def docs(self):
         """`DocSet` object, containing all of the documents in the test run."""
-
-        if not hasattr(self, "_docs"):
-            self._docs = None
-            if self.directory:
-                self._docs = DocSet(self)
-        return self._docs
+        return DocSet(self) if self.directory else None
 
     @property
     def filename(self):
         """Name of the file selected for display (if any)."""
         return self.fields.getvalue("file")
 
-    @property
+    @cached_property
     def links(self):
         """Links for choosing a test run."""
 
-        if not hasattr(self, "_links"):
-            self._links = []
-            for directory in sorted(glob(f"{self.base}/20*_*"), reverse=True):
-                name = path.basename(directory)
-                date_time = name.split("_")
-                time_string = date_time[1].replace("-", ":")
-                label = f"{date_time[0]} {time_string}"
-                url = self.make_url(self.script, dir=name)
-                self._links.append(self.HTMLPage.B.A(label, href=url))
-        return self._links
+        links = []
+        for directory in sorted(glob(f"{self.base}/20*_*"), reverse=True):
+            name = path.basename(directory)
+            date_time = name.split("_")
+            time_string = date_time[1].replace("-", ":")
+            label = f"{date_time[0]} {time_string}"
+            url = self.make_url(self.script, dir=name)
+            opts = dict(href=url, target="_blank")
+            links.append(self.HTMLPage.B.A(label, **opts))
+        return links
 
-    @property
+    @cached_property
     def runtime(self):
         """String for the date/time when the test global change job was run."""
 
-        if not hasattr(self, "_runtime"):
-            date_string, time_string = self.directory.split("_")
-            time_string = time_string.replace("-", ":")
-            self._runtime = f"{date_string} {time_string}"
-        return self._runtime
+        date_string, time_string = self.directory.split("_")
+        time_string = time_string.replace("-", ":")
+        return f"{date_string} {time_string}"
 
-    @property
+    @cached_property
     def sort(self):
         """How should the documents be ordered?"""
 
-        if not hasattr(self, "_sort"):
-            self._sort = self.fields.getvalue("sortBy")
-            if not self._sort:
-                if self.request in self.SORTS:
-                    self._sort = self.request
-            if self._sort not in self.SORTS:
-                self._sort = self.BY_DIFFSIZE
-        return self._sort
+        sort = self.fields.getvalue("sortBy")
+        if not sort and self.request in self.SORTS:
+            sort = self.request
+        if sort not in self.SORTS:
+            sort = self.BY_DIFFSIZE
+        return sort
 
-    @property
+    @cached_property
     def text(self):
         """Unicode string for the currently selected file."""
 
         if not (self.directory and self.filename):
             return None
-        if not hasattr(self, "_text"):
-            path = f"{self.base}/{self.directory}/{self.filename}"
-            with open(path, encoding="utf-8") as fp:
-                self._text = fp.read()
-            if self.filename.lower().endswith(".xml"):
-                xml = sub(r"<\?xml[^?]*\?>\s*", "", self._text)
-                doc = Doc(self.session, xml=xml)
-                doc.doctype = doc.root.tag
-                doc.normalize()
-                opts = dict(pretty_print=True, encoding="unicode")
-                xml = etree.tostring(doc.root, **opts).replace("\r", "")
-                lines = [line for line in xml.split("\n") if line.strip()]
-                self._text = "\n".join(lines)
-            else:
-                nbsp = "[NON-BREAKING SPACE]"
-                self._text = self._text.replace("\xa0", nbsp)
-        return self._text
+        path = f"{self.base}/{self.directory}/{self.filename}"
+        with open(path, encoding="utf-8") as fp:
+            text = fp.read()
+        if self.filename.lower().endswith(".xml"):
+            xml = sub(r"<\?xml[^?]*\?>\s*", "", text)
+            doc = Doc(self.session, xml=xml)
+            doc.doctype = doc.root.tag
+            doc.normalize()
+            opts = dict(pretty_print=True, encoding="unicode")
+            xml = etree.tostring(doc.root, **opts).replace("\r", "")
+            lines = [line for line in xml.split("\n") if line.strip()]
+            return "\n".join(lines)
+        return text.replace("\xa0", "[NON-BREAKING SPACE]")
 
 
 class DocSet:
@@ -477,7 +453,8 @@ class DocSet:
 
                     if not hasattr(self, "_link"):
                         B = self.docs.control.HTMLPage.B
-                        self._link = B.A(self.label, href=self.url)
+                        opts = dict(href=self.url, target="_blank")
+                        self._link = B.A(self.label, **opts)
                     return self._link
 
                 @property

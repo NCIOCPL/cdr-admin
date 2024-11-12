@@ -3,6 +3,7 @@
 """Post a new or modified CDR schema document.
 """
 
+from functools import cached_property
 from cdrcgi import Controller
 from cdrapi.docs import Doc
 from os.path import basename
@@ -53,130 +54,122 @@ class Control(Controller):
         """Cycle back to the form."""
         self.show_form()
 
-    @property
+    @cached_property
     def action(self):
         """Are we replacing an existing schema or adding a new one?"""
         return self.fields.getvalue("action")
 
-    @property
-    def buttons(self):
-        """Customize the action buttons on the banner bar."""
-        return self.SUBMIT, self.DEVMENU, self.ADMINMENU, self.LOG_OUT
-
-    @property
+    @cached_property
     def comment(self):
         """Override the default comment as appropriate."""
 
-        if not hasattr(self, "_comment"):
-            self._comment = self.fields.getvalue("comment")
-            if not self._comment:
-                verb = "Replacing" if self.document.id else "Adding"
-                self._comment = f"{verb} schema using admin interface"
-        return self._comment
+        comment = self.fields.getvalue("comment")
+        if comment:
+            return comment
+        verb = "Replacing" if self.document.id else "Adding"
+        return f"{verb} schema using admin interface"
 
-    @property
+    @cached_property
     def document(self):
         """Uploaded schema document to be posted."""
 
-        if not hasattr(self, "_document"):
-            self._document = None
-            if self.schema_title and self.file_bytes:
-                title = self.schema_title
-                xml = self.file_bytes
-                opts = dict(xml=xml, doctype="schema")
-                query = self.Query("document d", "d.id")
-                query.join("doc_type t", "t.id = d.doc_type")
-                query.where("t.name = 'schema'")
-                query.where(query.Condition("d.title", title))
-                rows = query.execute(self.cursor).fetchall()
-                if rows:
-                    if self.action == "add":
-                        raise Exception(f"Schema {title} already exists")
-                    if len(rows) > 1:
-                        raise Exception(f"Multiple schemas match {title}")
-                    opts["id"] = rows[0].id
-                else:
-                    if self.action != "add":
-                        raise Exception(f"Schema document {title} not found")
-                self._document = Doc(self.session, **opts)
-                if rows:
-                    self._document.check_out(comment="locking for update")
-        return self._document
+        if self.schema_title and self.file_bytes:
+            title = self.schema_title
+            xml = self.file_bytes
+            opts = dict(xml=xml, doctype="schema")
+            query = self.Query("document d", "d.id")
+            query.join("doc_type t", "t.id = d.doc_type")
+            query.where("t.name = 'schema'")
+            query.where(query.Condition("d.title", title))
+            rows = query.execute(self.cursor).fetchall()
+            if rows:
+                if self.action == "add":
+                    raise Exception(f"Schema {title} already exists")
+                if len(rows) > 1:
+                    raise Exception(f"Multiple schemas match {title}")
+                opts["id"] = rows[0].id
+            else:
+                if self.action != "add":
+                    raise Exception(f"Schema document {title} not found")
+            document = Doc(self.session, **opts)
+            if rows:
+                document.check_out(comment="locking for update")
+            return document
+        if self.request:
+            message = "No document provided."
+            self.alerts.append(dict(message=message, type="warning"))
+        return None
 
-    @property
+    @cached_property
     def file_bytes(self):
         """UTF-8 serialization of the document to be posted."""
 
-        if not hasattr(self, "_file_bytes"):
-            self._file_bytes = None
-            if self.file_field is not None:
-                if self.file_field.file:
-                    segments = []
-                    while True:
-                        more_bytes = self.file_field.file.read()
-                        if not more_bytes:
-                            break
-                        segments.append(more_bytes)
-                else:
-                    segments = [self.file_field.value]
-                self._file_bytes = b"".join(segments)
-        return self._file_bytes
+        if self.file_field is None:
+            return None
+        if self.file_field.file:
+            segments = []
+            while True:
+                more_bytes = self.file_field.file.read()
+                if not more_bytes:
+                    break
+                segments.append(more_bytes)
+        else:
+            segments = [self.file_field.value]
+        return b"".join(segments)
 
-    @property
+    @cached_property
     def file_field(self):
         """CGI field for the uploaded file, if any."""
 
-        if not hasattr(self, "_file_field"):
-            self._file_field = None
-            if "file" in list(self.fields.keys()):
-                self._file_field = self.fields["file"]
-        return self._file_field
+        if "file" in list(self.fields.keys()):
+            return self.fields["file"]
+        return None
 
-    @property
+    @cached_property
     def logs(self):
         """Log output describing the outcome of a post action."""
 
-        if not hasattr(self, "_logs"):
-            self._logs = None
-            if self.document:
-                if not self.session.can_do("MODIFY DOCUMENT", "schema"):
-                    error = "Account not authorized for posting schemas."
-                    self.bail(error)
-                self.document.save(**self.opts)
-                message = "\n\n".join([
-                    f"Saved {self.document.cdr_id}.",
-                    self.__check_dtds().strip(),
-                    self.__refresh_manifest().strip(),
-                    "Schema posted successfully.",
-                    f"Elapsed: {self.elapsed}",
-                ])
-                self._logs = self.HTMLPage.B.PRE(message)
-        return self._logs
+        if not self.document:
+            return None
+        if not self.session.can_do("MODIFY DOCUMENT", "schema"):
+            error = "Account not authorized for posting schemas."
+            self.bail(error)
+        self.document.save(**self.opts)
+        message = "\n\n".join([
+            f"Saved {self.document.cdr_id}.",
+            self.__check_dtds().strip(),
+            self.__refresh_manifest().strip(),
+            "Schema posted successfully.",
+            f"Elapsed: {self.elapsed}",
+        ])
+        return self.HTMLPage.B.PRE(message)
 
-    @property
+    @cached_property
     def opts(self):
         """Options passed to the `Doc.save()` method."""
 
-        if not hasattr(self, "_opts"):
-            self._opts = dict(
-                version=True,
-                unlock=True,
-                comment=self.comment,
-                reason=self.comment,
-                title=self.schema_title,
-            )
-        return self._opts
+        return dict(
+            version=True,
+            unlock=True,
+            comment=self.comment,
+            reason=self.comment,
+            title=self.schema_title,
+        )
 
-    @property
+    @cached_property
+    def same_window(self):
+        """Stay on the same browser tab."""
+        return [self.SUBMIT]
+
+    @cached_property
     def schema_title(self):
         """Name of the uploaded file without the full path."""
 
-        if not hasattr(self, "_filename"):
-            self._title = None
-            if self.file_field is not None:
-                self._title = basename(self.file_field.filename)
-                self.logger.info("filename for schema is %r", self._title)
-        return self._title
+        title = None
+        if self.file_field is not None:
+            title = basename(self.file_field.filename)
+            self.logger.info("filename for schema is %r", title)
+        return title
 
     def __check_dtds(self):
         """Regenerate the DTDs to reflect the new/updated schema.

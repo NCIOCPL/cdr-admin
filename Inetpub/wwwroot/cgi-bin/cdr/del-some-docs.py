@@ -6,6 +6,7 @@ The documents aren't actually deleted, but instead their active_status
 column is set to 'D'.
 """
 
+from functools import cached_property
 from cdrcgi import Controller
 from cdrapi.docs import Doc
 
@@ -14,7 +15,7 @@ class Control(Controller):
 
     SUBTITLE = "CDR Document Deletion"
     LOGNAME = "del-some-docs"
-    LEGEND = "Select Documents To Delete (with optional comment)"
+    LEGEND = "Select Documents To Delete"
     REASON = "Deleted using the CDR Admin interface"
     INSTRUCTIONS = (
         "Enter document IDs separated by spaces and/or line breaks. "
@@ -42,88 +43,94 @@ class Control(Controller):
         page.form.append(fieldset)
         fieldset = page.fieldset(self.LEGEND)
         fieldset.append(page.textarea("ids", label="CDR IDs", rows=3))
-        fieldset.append(page.textarea("reason", label="Comment"))
+        opts = dict(label="Comment (optional)", value=self.reason)
+        fieldset.append(page.textarea("reason", **opts))
         page.form.append(fieldset)
         fieldset = page.fieldset("Options")
         label = "Validate? (Please read the instructions above)"
         opts = dict(value="validate", label=label, checked=True)
         fieldset.append(page.checkbox("options", **opts))
         page.form.append(fieldset)
-        if self.results is not None:
-            fieldset = page.fieldset("Processing Results")
-            fieldset.append(self.results)
-            page.form.append(fieldset)
 
     def show_report(self):
-        """Override to handle everything on the form page."""
+        """Process the deletions and return to the form page."""
+
+        if not self.ids:
+            if not self.alerts:
+                self.alerts.append(dict(
+                    message="At least one document ID is required.",
+                    type="error",
+                ))
+        else:
+            self.logger.info(" session: %r", self.session)
+            self.logger.info("    user: %r", self.session.user_name)
+            self.logger.info("validate: %r", self.validate)
+            self.logger.info("  reason: %r", self.reason)
+            opts = dict(reason=self.reason, validate=self.validate)
+            for id in self.ids:
+                doc = Doc(self.session, id=id)
+                cdr_id = doc.cdr_id
+                if doc.active_status == Doc.DELETED:
+                    self.alerts.append(dict(
+                        message=f"{doc.cdr_id} has already been deleted.",
+                        type="warning",
+                    ))
+                    continue
+                try:
+                    doc.delete(**opts)
+                    self.logger.info("Deleted %s", doc.cdr_id)
+                    self.alerts.append(dict(
+                        message=f"{cdr_id} has been deleted successfully.",
+                        type="success",
+                    ))
+                    for error in doc.errors:
+                        self.alerts.append(dict(
+                            message=f"{doc.cdr_id}: {error}.",
+                            type="warning",
+                        ))
+                except Exception as e:
+                    self.logger.exception(cdr_id)
+                    self.alerts.append(dict(
+                        message=f"Failure deleting {doc.cdr_id}: {e}",
+                        type="error",
+                    ))
         self.show_form()
 
-    @property
-    def buttons(self):
-        """Customize the action buttons on the banner bar."""
-        return self.SUBMIT, self.DEVMENU, self.ADMINMENU, self.LOG_OUT
+    @cached_property
+    def same_window(self):
+        """No need to open new browser tabs for this tool."""
+        return [self.SUBMIT]
 
-    @property
+    @cached_property
     def ids(self):
         """CDR IDs of documents which are to be marked as deleted."""
 
-        if not hasattr(self, "_ids"):
-            self._ids = []
-            ids = self.fields.getvalue("ids")
-            if ids:
-                for id in ids.split():
-                    try:
-                        self._ids.append(Doc.extract_id(id))
-                    except Exception:
-                        self.bail("Invalid document ID")
-        return self._ids
+        ids = []
+        invalid = []
+        for id in self.fields.getvalue("ids", "").split():
+            try:
+                ids.append(Doc.extract_id(id))
+            except Exception:
+                invalid.append(id)
+        if invalid:
+            for id in invalid:
+                self.alerts.append(dict(
+                    message=f"Invalid CDR id {id!r}.",
+                    type="warning",
+                ))
+            self.alerts.append(dict(
+                message="No deletions performed.",
+                type="warning",
+            ))
+            return []
+        return ids
 
-    @property
+    @cached_property
     def reason(self):
         """Explanation for the deletions."""
+        return self.fields.getvalue("reason", self.REASON)
 
-        if not hasattr(self, "_reason"):
-            self._reason = self.fields.getvalue("reason", self.REASON)
-        return self._reason
-
-    @property
-    def results(self):
-        """Processing results from any deletion requests."""
-
-        if not hasattr(self, "_results"):
-            self._results = None
-            if self.ids:
-                self.logger.info(" session: %r", self.session)
-                self.logger.info("    user: %r", self.session.user_name)
-                self.logger.info("validate: %r", self.validate)
-                self.logger.info("  reason: %r", self.reason)
-                B = self.HTMLPage.B
-                items = []
-                opts = dict(reason=self.reason, validate=self.validate)
-                for id in self.ids:
-                    doc = Doc(self.session, id=id)
-                    cdr_id = doc.cdr_id
-                    if doc.active_status == Doc.DELETED:
-                        message = f"{cdr_id} already deleted"
-                        self.logger.warning(message)
-                        items.append(B.LI(message, B.CLASS("error")))
-                        continue
-                    try:
-                        doc.delete(**opts)
-                        self.logger.info("Deleted %s", cdr_id)
-                        message = f"{cdr_id} deleted successfully"
-                        items.append(B.LI(message, B.CLASS("info")))
-                        for error in doc.errors:
-                            message = f"{cdr_id}: {error}"
-                            self.logger.warning(message)
-                            items.append(B.LI(message, B.CLASS("error")))
-                    except Exception as e:
-                        self.logger.exception(cdr_id)
-                        items.append(B.LI(f"{cdr_id}: {e}", B.CLASS("error")))
-                self._results = B.UL(*items)
-        return self._results
-
-    @property
+    @cached_property
     def validate(self):
         """Whether deletions should be blocked for docs that are linked."""
         return "validate" in self.fields.getlist("options")

@@ -4,6 +4,7 @@
 """
 
 import datetime
+from functools import cached_property
 from cdrcgi import Controller
 
 
@@ -100,13 +101,10 @@ class Control(Controller):
                     self._doctypes[id] = name
         return self._doctypes
 
-    @property
+    @cached_property
     def end(self):
         """Ending date for the report's date range."""
-
-        if not hasattr(self, "_end"):
-            self._end = self.fields.getvalue("end")
-        return self._end
+        return self.parse_date(self.fields.getvalue("end"))
 
     @property
     def range(self):
@@ -123,13 +121,10 @@ class Control(Controller):
             self._range = Range(start, today)
         return self._range
 
-    @property
+    @cached_property
     def start(self):
         """Starting date for the report's date range."""
-
-        if not hasattr(self, "_start"):
-            self._start = self.fields.getvalue("start")
-        return self._start
+        return self.parse_date(self.fields.getvalue("start"))
 
     @property
     def subtitle(self):
@@ -205,7 +200,7 @@ class Control(Controller):
         @property
         def start(self):
             """Starting date for the report's date range."""
-            return self.control.start
+            return str(self.control.start)
 
         @property
         def table(self):

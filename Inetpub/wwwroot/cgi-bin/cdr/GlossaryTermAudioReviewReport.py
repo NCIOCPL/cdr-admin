@@ -25,7 +25,7 @@ class Control(Controller):
     def build_tables(self):
         """Create the full or summary report, as requested by the user."""
 
-        self.subtitle = f"{self.status} {self.language} Audio Pronuciations"
+        self.subtitle = f"{self.status} {self.language} Audio Pronunciations"
         tables = [self.summary_table]
         if self.type == "full":
             tables += [audio_set.table for audio_set in self.sets]
@@ -83,7 +83,7 @@ class Control(Controller):
     @property
     def end(self):
         """Optional end to report's date range."""
-        return self.fields.getvalue("end_date")
+        return self.parse_date(self.fields.getvalue("end_date"))
 
     @property
     def language(self):
@@ -103,7 +103,7 @@ class Control(Controller):
             if self.start:
                 query.where(query.Condition("m.review_date", self.start, ">="))
             if self.end:
-                end = f"{self.end[:10]} 23:59:59"
+                end = f"{str(self.end)[:10]} 23:59:59"
                 query.where(query.Condition("m.review_date", end, "<="))
             rows = query.order("z.id").execute(self.cursor).fetchall()
             self._sets = [AudioSet(self, row) for row in rows]
@@ -112,7 +112,7 @@ class Control(Controller):
     @property
     def start(self):
         """Optional start to report's date range."""
-        return self.fields.getvalue("start_date")
+        return self.parse_date(self.fields.getvalue("start_date"))
 
     @property
     def status(self):
@@ -142,11 +142,7 @@ class Control(Controller):
                 approved += audio_set.approved
                 rejected += audio_set.rejected
                 unreviewed += audio_set.unreviewed
-            row = [
-                Reporter.Cell(approved, center=True),
-                Reporter.Cell(rejected, center=True),
-                Reporter.Cell(unreviewed, center=True),
-            ]
+            row = approved, rejected, unreviewed
             opts = dict(columns=self.STATUSES, caption="Status Totals")
             self._summary_table = Reporter.Table([row], **opts)
         return self._summary_table
@@ -189,8 +185,8 @@ class AudioSet:
                 def row(self):
                     return (
                         self.name,
-                        Reporter.Cell(str(self.date)[:19], center=True),
-                        self.user
+                        str(self.date)[:19],
+                        self.user,
                     )
             status = self.control.status[0]
             query = self.control.Query("term_audio_mp3 m", *self.FIELDS)
@@ -202,7 +198,7 @@ class AudioSet:
                 start = self.control.start
                 query.where(query.Condition("m.review_date", start, ">="))
             if self.control.end:
-                end = f"{self.control.end[:10]} 23:59:59"
+                end = f"{str(self.control.end)[:10]} 23:59:59"
                 query.where(query.Condition("m.review_date", end, "<="))
             query.order("m.term_name")
             rows = query.execute(self.control.cursor).fetchall()

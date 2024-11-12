@@ -18,7 +18,6 @@ class Control(Controller):
     LOGNAME = "update-summaryref-titles"
     COLS = "Linking ID", "Outcome"
     CAPTION = "Results"
-    CSS = "th, td { background-color: #e8e8e8; border-color: #bbb; }"
     CONFIRM = "Confirm"
 
     def populate_form(self, page):
@@ -59,10 +58,10 @@ class Control(Controller):
                     )
                 ),
                 page.B.TBODY(*rows),
+                page.B.CLASS("usa-table usa-table--borderless")
             )
             page.form.append(table)
             page.form.append(page.hidden_field("id", self.id))
-            page.add_css(self.CSS)
 
     def build_tables(self):
         """Show the linking documents we examined.
@@ -104,7 +103,7 @@ class Control(Controller):
                 self.show_report()
         except Exception as e:
             self.logger.exception("Control.run() failure")
-            bail(e)
+            self.bail(e)
         Controller.run(self)
 
     @cached_property
@@ -112,10 +111,10 @@ class Control(Controller):
         """Override buttons for the confirmation page."""
 
         if self.selected:
-            return self.SUBMENU, self.ADMINMENU, self.LOG_OUT
+            return []
         elif self.id:
-            return self.CONFIRM, self.SUBMENU, self.ADMINMENU, self.LOG_OUT
-        return self.SUBMIT, self.SUBMENU, self.ADMINMENU, self.LOGOUT
+            return [self.CONFIRM]
+        return [self.SUBMIT]
 
     @cached_property
     def cdr_id(self):
@@ -159,6 +158,11 @@ class Control(Controller):
         return (rows[0].value if rows else "").strip()
 
     @cached_property
+    def same_window(self):
+        """Stay in the same browser tab."""
+        return [self.CONFIRM, self.SUBMIT]
+
+    @cached_property
     def selected(self):
         """IDs of the documents the user wants to update."""
 
@@ -166,7 +170,6 @@ class Control(Controller):
             return [int(id) for id in self.fields.getlist("selected")]
         except Exception:
             self.bail()
-
 
     class Summary:
 
@@ -185,10 +188,14 @@ class Control(Controller):
 
             self.id = id
             self.control = control
-            opts = dict(value=id, label="", checked=True)
-            center = page.B.CLASS("center")
+            opts = dict(value=id, label="\u00a0", checked=True)
+            center = page.B.CLASS("text-center")
+            checkbox = page.checkbox("selected", **opts)
+            label = checkbox.find("label")
+            classes = label.get("class") + " margin-top-0 margin-left-2"
+            label.set("class", classes)
             self.row = page.B.TR(
-                page.B.TD(page.checkbox("selected", **opts), center),
+                page.B.TD(checkbox, center),
                 page.B.TD(self.locked_by or ""),
                 page.B.TD(str(id)),
                 page.B.TD(self.lookup(control, id, self.TITLE)),
@@ -224,6 +231,7 @@ class Control(Controller):
             query.where("c.dt_in IS NULL")
             rows = query.execute(self.control.cursor).fetchall()
             return rows[0][0] if rows else None
+
 
 class Updater(Job):
     """Global change job used to update SummaryRef titles."""

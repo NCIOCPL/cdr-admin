@@ -3,8 +3,10 @@
 """Create publishing jobs.
 """
 
-from cdrcgi import Controller, navigateTo
+from functools import cached_property
+from cdrcgi import Controller
 from cdr import PDQDTDPATH, PUBTYPES
+from cdrapi import db
 from cdrapi.docs import Doc
 from cdrapi.publishing import Job
 from os import stat
@@ -19,12 +21,6 @@ class Control(Controller):
     PUBLISH = "Publish"
     MANAGE_STATUSES = "Manage Publishing Statuses"
     READONLY_PARMS = {"PubType", "SubSetName", "GroupEmailAddrs"}
-    CSS = (
-        ".labeled-field label { width: 200px; }",
-        "fieldset { width: 575px; }",
-        ".labeled-field img { margin-left: 5px; }",
-        ".labeled-field select { width: 308px; }",
-    )
     HELP = "/images/help.gif"
 
     def populate_form(self, page):
@@ -41,11 +37,10 @@ class Control(Controller):
             page.form.append(page.hidden_field("subset", self.subset.name))
             if self.subset.user_can_select_docs:
                 fieldset = page.fieldset("Documents to Publish")
-                help = "Separate IDs with whitespace; 'CDR' prefix is optional"
-                img = page.B.IMG(src=self.HELP, title=help)
                 opts = dict(label="Enter CDR IDs", rows=3)
                 field = page.textarea("docs", **opts)
-                field.append(img)
+                help = "Separate IDs with whitespace; 'CDR' prefix is optional"
+                field.find("label").set("title", help)
                 fieldset.append(field)
                 page.form.append(fieldset)
             fieldset = page.fieldset("Job Options")
@@ -65,28 +60,25 @@ class Control(Controller):
                     opts["value"] = p.default or ""
                     field = page.text_field(p.name, **opts)
                 if help:
-                    img = page.B.IMG(src=self.HELP, title=help)
-                    field.append(img)
+                    field.find("label").set("title", help)
                 fieldset.append(field)
             user = self.session.User(self.session, id=self.session.user_id)
             email = user.email
             if " " in email or "@" not in email:
                 email = ""
-            notify = email and "Yes" or "No"
+            notify = "Yes" if email else "No"
             help = self.system.param_info["notify"].help
             opts = dict(options=yes_no, default=notify)
             field = page.select("notify", **opts)
             if help:
-                img = page.B.IMG(src=self.HELP, title=help)
-                field.append(img)
+                field.find("label").set("title", help)
             fieldset.append(field)
             label = "Address(es)"
             help = self.system.param_info["email"].help
             opts = dict(value=email, label="Address(es)")
             field = page.text_field("email", **opts)
             if help:
-                img = page.B.IMG(src=self.HELP, title=help)
-                field.append(img)
+                field.find("label").set("title", help)
             fieldset.append(field)
             label = "No Output"
             help = self.system.param_info["no-output"].help
@@ -94,11 +86,9 @@ class Control(Controller):
             opts = dict(label=label, options=yes_no, default=no)
             field = page.select("no-output", **opts)
             if help:
-                img = page.B.IMG(src=self.HELP, title=help)
-                field.append(img)
+                field.find("label").set("title", help)
             fieldset.append(field)
             page.form.append(fieldset)
-            page.add_css("\n".join(self.CSS))
 
         elif self.system:
 
@@ -142,7 +132,11 @@ class Control(Controller):
         page.add_script("jQuery(document).tooltip({show:'fold'});")
 
     def publish(self):
-        """Create the publishing job and link to its status."""
+        """Create the publishing job and link to its status.
+
+        If any problems were encountered when assembling the job's options,
+        send the user back to the form.
+        """
 
         opts = dict(
             system=self.system.name,
@@ -154,27 +148,26 @@ class Control(Controller):
             permissive=False,
             force=self.force,
         )
+        if self.alerts:
+            self.show_form()
         try:
             job_id = Job(self.session, **opts).create()
             self.logger.info("Job %d created", job_id)
+            opts = dict(id=job_id, alert=f"Job {job_id} started.")
+            self.redirect("PubStatus.py", **opts)
             legend = f"Job {job_id} started"
             url = f"PubStatus.py?id={job_id}"
             label = "Check the status of the publishing job."
             details = self.HTMLPage.B.P(self.HTMLPage.B.A(label, href=url))
         except Exception as e:
             self.logger.exception("Job creation failure")
-            legend = "Publishing Request Failed"
+            self.alerts.append(dict(
+                message=f"Publishing Request Failed: {e}",
+                type="error",
+            ))
+            self.show_form()
             details = self.HTMLPage.B.P(str(e), self.HTMLPage.B.CLASS("error"))
-        buttons = (
-            self.HTMLPage.button(self.DEVMENU),
-            self.HTMLPage.button(self.ADMINMENU),
-            self.HTMLPage.button(self.LOG_OUT),
-        )
-        opts = dict(
-            buttons=buttons,
-            subtitle=self.subset.name,
-        )
-        page = self.HTMLPage(self.TITLE, **opts)
+        page = self.HTMLPage(self.TITLE, subtitle=self.subset.name)
         fieldset = page.fieldset(legend)
         fieldset.append(details)
         page.body.append(fieldset)
@@ -186,7 +179,7 @@ class Control(Controller):
         if not self.session.can_do("USE PUBLISHING SYSTEM"):
             self.bail("You are not authorized to use the publishing system")
         elif self.request == self.MANAGE_STATUSES:
-            navigateTo("ManagePubStatus.py", self.session.name)
+            self.navigate_to("ManagePubStatus.py", self.session.name)
         elif self.request == self.PUBLISH:
             self.publish()
         elif self.request == self.SUBMIT:
@@ -194,176 +187,167 @@ class Control(Controller):
         else:
             Controller.run(self)
 
-    @property
+    @cached_property
     def buttons(self):
         """Custom button list, as this isn't a standard report."""
 
-        if not hasattr(self, "_buttons"):
-            self._buttons = [self.DEVMENU, self.ADMINMENU, self.LOG_OUT]
-            if self.subset:
-                self._buttons.insert(0, self.PUBLISH)
-            else:
-                if not self.system:
-                    self._buttons.insert(0, self.MANAGE_STATUSES)
-                self._buttons.insert(0, self.SUBMIT)
-        return self._buttons
+        if self.subset:
+            return [self.PUBLISH]
+        if self.system:
+            return [self.SUBMIT]
+        return [self.SUBMIT, self.MANAGE_STATUSES]
 
-    @property
+    @cached_property
     def docs(self):
         """Sorted sequence of documents if explicitly provided."""
 
-        if not hasattr(self, "_docs"):
-            self._docs = []
-            value = self.fields.getvalue("docs", "")
-            ids = re.findall(r"\d+", value)
-            for doc_id in sorted([int(id) for id in ids], reverse=True):
-                problem = None
-                if self.__is_meeting_recording(doc_id):
-                    problem = "meeting recording"
-                elif self.__is_module_only(doc_id):
-                    problem = "summary module"
-                if problem:
-                    self.bail(f"Attempt to publish {problem} CDR{doc_id}")
-                self._docs.append(Doc(self.session, id=doc_id))
-        return self._docs
+        docs = []
+        value = self.fields.getvalue("docs", "")
+        ids = re.findall(r"\d+", value)
+        for id in sorted([int(id) for id in ids], reverse=True):
+            doc = self.Candidate(self.session, id=id)
+            problem = None
+            if doc.is_meeting_recording:
+                problem = "meeting recording"
+            elif doc.is_module_only:
+                problem = "summary module"
+            if problem:
+                self.alerts.append(dict(
+                    message=f"Attempt to publish {problem} CDR{doc.id}.",
+                    type="error",
+                ))
+            else:
+                docs.append(doc)
+        return docs
 
-    @property
+    @cached_property
     def email(self):
         """Address where notifications about the job should be sent."""
         return self.fields.getvalue("email") or "Do not notify"
 
-    @property
+    @cached_property
     def force(self):
         """True if inclusion of documents marked Inactive is allowed."""
         return True if self.subset.name == "Hotfix-Remove" else False
 
-    @property
+    @cached_property
     def method(self):
         """Override for the form method."""
         return "post" if self.subset else "get"
 
-    @property
+    @cached_property
     def no_output(self):
         """True: writing documents to the file system should be suppressed."""
         return self.fields.getvalue("no-output") == "Yes"
 
-    @property
+    @cached_property
     def parameters(self):
         """Dictionary of options to be passed to the job creation request."""
 
-        if not hasattr(self, "_parameters"):
-            self._parameters = {}
-            for p in self.subset.parameters:
-                value = self.fields.getvalue(p.name)
-                if value:
-                    self.logger.debug("scrubbing %s value %s", p.name, value)
-                    info = self.system.param_info.get(p.name)
-                    if not info:
-                        self.bail(f"Unsupported parameter {p.name!r}")
-                    try:
-                        info.scrub(value)
-                    except Exception as e:
-                        self.bail(str(e))
-                    self._parameters[p.name] = value
-        return self._parameters
+        parameters = {}
+        for p in self.subset.parameters:
+            value = self.fields.getvalue(p.name)
+            if value:
+                self.logger.debug("scrubbing %s value %s", p.name, value)
+                info = self.system.param_info.get(p.name)
+                if not info:
+                    self.bail(f"Unsupported parameter {p.name!r}")
+                try:
+                    info.scrub(value)
+                except Exception as e:
+                    self.logger.exception("parameters")
+                    self.bail(str(e))
+                parameters[p.name] = value
+        return parameters
 
-    @property
+    @cached_property
     def subset(self):
         """Publishing subset selected by the user."""
 
-        if not hasattr(self, "_subset"):
-            self._subset = None
-            if self.system:
-                name = self.fields.getvalue("subset")
-                if name:
-                    for subset in self.system.subsets:
-                        if subset.name == name:
-                            self._subset = subset
-                            break
-                    if not self._subset:
-                        self.bail("subset missing")
-        return self._subset
+        if self.system:
+            name = self.fields.getvalue("subset")
+            if name:
+                for subset in self.system.subsets:
+                    if subset.name == name:
+                        return subset
+                self.bail("subset missing")
+        return None
 
-    @property
+    @cached_property
     def subtitle(self):
         """String displayed immediately under the main banner."""
         return self.subset.name if self.subset else self.SUBTITLE
 
-    @property
+    @cached_property
+    def same_window(self):
+        """Stay on the same browser tab until job is queued."""
+        return [self.SUBMIT]
+
+    @cached_property
     def system(self):
         """Publishing system selected by the user."""
 
-        if not hasattr(self, "_system"):
-            self._system = None
-            system_id = self.fields.getvalue("system")
-            if system_id:
-                try:
-                    self._system = self.systems[int(system_id)]
-                except Exception:
-                    self.logger.exception("Bad system ID")
-                    self.bail("Bad system ID")
-        return self._system
+        system_id = self.fields.getvalue("system")
+        if system_id:
+            try:
+                return self.systems[int(system_id)]
+            except Exception:
+                self.logger.exception("Bad system ID")
+                self.bail("Bad system ID")
+        return None
 
-    @property
+    @cached_property
     def systems(self):
         """Dictionary of objects for the known CDR (non-mailer) pub systems."""
 
-        if not hasattr(self, "_systems"):
-            self._systems = {}
-            query = self.Query("active_doc d", "d.id", "d.title")
-            query.join("doc_type t", "t.id = d.doc_type")
-            query.where("t.name = 'PublishingSystem'")
-            query.where("d.title <> 'Mailers'")
-            rows = query.execute(self.cursor).fetchall()
-            for row in rows:
-                if self.session.tier.name == "PROD":
-                    if row.title.lower() == "qcfiltersets":
-                        continue
-                system = PublishingSystem(self, row)
-                self._systems[system.id] = system
-        return self._systems
+        systems = {}
+        query = self.Query("active_doc d", "d.id", "d.title")
+        query.join("doc_type t", "t.id = d.doc_type")
+        query.where("t.name = 'PublishingSystem'")
+        query.where("d.title <> 'Mailers'")
+        rows = query.execute(self.cursor).fetchall()
+        for row in rows:
+            if self.session.tier.name == "PROD":
+                if row.title.lower() == "qcfiltersets":
+                    continue
+            system = PublishingSystem(self, row)
+            systems[system.id] = system
+        return systems
 
-    def __is_meeting_recording(self, doc_id):
-        """Is this a Media document for the recording of a board meeting?
+    class Candidate(Doc):
+        """Derived class which problems in publishing candidate docs."""
 
-        We don't allow publication of meeting recordings, which are
-        for internal use only. The publishing queries in the control
-        documents exclude those documents, but we have to make sure
-        they aren't included in user-specified document lists.
+        @cached_property
+        def is_meeting_recording(self):
+            """Is this a Media document for the recording of a board meeting?
 
-        Pass:
-            doc_id - integer for the ID of a document to be published
+            We don't allow publication of meeting recordings, which are
+            for internal use only. The publishing queries in the control
+            documents exclude those documents, but we have to make sure
+            they aren't included in user-specified document lists.
+            """
 
-        Return:
-            True if this is an internal meeting recording, otherwise False
-        """
+            query = db.Query("query_term_pub", "doc_id")
+            query.where(query.Condition("doc_id", self.id))
+            query.where("value = 'Internal'")
+            query.where("path = '/Media/@Usage'")
+            return True if query.execute(self.cursor).fetchall() else False
 
-        query = self.Query("query_term_pub", "doc_id")
-        query.where(query.Condition("doc_id", doc_id))
-        query.where("value = 'Internal'")
-        query.where("path = '/Media/@Usage'")
-        return True if query.execute(self.cursor).fetchall() else False
+        @cached_property
+        def is_module_only(self):
+            """Is this a summary which can only be used as a module?
 
-    def __is_module_only(self, doc_id):
-        """Is this a summary which can only be used as a module?
+            We don't allow publication of summary modules, which are
+            for internal use only. The publishing queries in the control
+            documents exclude those documents, but we have to make sure
+            they aren't included in user-specified document lists.
+            """
 
-        We don't allow publication of summary modules, which are
-        for internal use only. The publishing queries in the control
-        documents exclude those documents, but we have to make sure
-        they aren't included in user-specified document lists.
-
-        Pass:
-            doc_id - integer for the ID of a document to be published
-
-        Return:
-            True if this is summary module, otherwise False
-        """
-
-        query = self.Query("query_term_pub", "doc_id")
-        query.where(query.Condition("doc_id", doc_id))
-        query.where("value = 'Yes'")
-        query.where("path = '/Summary/@ModuleOnly'")
-        return True if query.execute(self.cursor).fetchall() else False
+            query = db.Query("query_term_pub", "doc_id")
+            query.where(query.Condition("doc_id", self.id))
+            query.where("value = 'Yes'")
+            query.where("path = '/Summary/@ModuleOnly'")
+            return True if query.execute(self.cursor).fetchall() else False
 
 
 class PublishingSystem:
@@ -377,8 +361,8 @@ class PublishingSystem:
             row - values from the database query
         """
 
-        self.__control = control
-        self.__row = row
+        self.control = control
+        self.row = row
 
     def __lt__(self, other):
         """Support sorting by system name.
@@ -389,58 +373,46 @@ class PublishingSystem:
 
         return self.name.lower() < other.name.lower()
 
-    @property
+    @cached_property
     def id(self):
         """CDR ID for the publishing system's control document."""
-        return self.__row.id
+        return self.row.id
 
-    @property
+    @cached_property
     def name(self):
         """String for the publishing system's name."""
-        return self.__row.title
+        return self.row.title
 
-    @property
-    def control(self):
-        """Access to the database and the current CDR login session."""
-        return self.__control
-
-    @property
+    @cached_property
     def description(self):
         """String containing the description of this system's usage."""
 
-        if not hasattr(self, "_description"):
-            node = self.doc.root.find("SystemDescription")
-            self._description = Doc.get_text(node, "").strip()
-        return self._description
+        node = self.doc.root.find("SystemDescription")
+        return Doc.get_text(node, "").strip()
 
-    @property
+    @cached_property
     def doc(self):
         """The control document for the publishing system."""
+        return Doc(self.control.session, id=self.id, version="lastp")
 
-        if not hasattr(self, "_doc"):
-            self._doc = Doc(self.control.session, id=self.id, version="lastp")
-        return self._doc
-
-    @property
+    @cached_property
     def param_info(self):
         """Dictionary of metadata about parameters, indexed by parm name."""
 
-        if not hasattr(self, "_param_info"):
-            self._param_info = {}
-            for node in self.doc.root.findall("ParmInfoSet/ParmInfo"):
-                info = self.ParamInfo(node)
-                self._param_info[info.name] = info
-        return self._param_info
+        param_info = {}
+        for node in self.doc.root.findall("ParmInfoSet/ParmInfo"):
+            info = self.ParamInfo(node)
+            param_info[info.name] = info
+        return param_info
 
-    @property
+    @cached_property
     def subsets(self):
         """Sequence of subtypes for this publishing system."""
 
-        if not hasattr(self, "_subsets"):
-            self._subsets = []
-            for node in self.doc.root.findall("SystemSubset"):
-                self._subsets.append(self.Subset(self, node))
-        return self._subsets
+        subsets = []
+        for node in self.doc.root.findall("SystemSubset"):
+            subsets.append(self.Subset(self, node))
+        return subsets
 
     class Subset:
         """Publishing job type available from this system."""
@@ -456,56 +428,41 @@ class PublishingSystem:
                 node - parsed XML node with the subset's information
             """
 
-            self.__system = system
-            self.__node = node
+            self.system = system
+            self.node = node
 
-        @property
+        @cached_property
         def control(self):
             """Access to the current CDR login session."""
             return self.system.control
 
-        @property
+        @cached_property
         def description(self):
             """String explaining how this subset is to be used."""
 
-            if not hasattr(self, "_description"):
-                node = self.__node.find("SubsetDescription")
-                self._description = Doc.get_text(node, "")
-            return self._description
+            description = Doc.get_text(self.node.find("SubsetDescription"), "")
+            return description.strip()
 
-        @property
+        @cached_property
         def name(self):
             """String for the name of the subset."""
+            return Doc.get_text(self.node.find("SubsetName"))
 
-            if not hasattr(self, "_name"):
-                self._name = Doc.get_text(self.__node.find("SubsetName"))
-            return self._name
-
-        @property
+        @cached_property
         def parameters(self):
             """Sequence of `Parameter` objects."""
 
-            if not hasattr(self, "_parameters"):
-                self._parameters = []
-                for node in self.__node.findall(self.PARAMETER):
-                    self._parameters.append(self.Parameter(self, node))
-            return self._parameters
+            parameters = []
+            for node in self.node.findall(self.PARAMETER):
+                parameters.append(self.Parameter(self, node))
+            return parameters
 
-        @property
-        def system(self):
-            """Publishing control system to which this subset belongs."""
-            return self.__system
-
-        @property
+        @cached_property
         def user_can_select_docs(self):
             """True if any specs allow the users to specify documents by id."""
 
-            if not hasattr(self, "_user_can_select_docs"):
-                self._user_can_select_docs = False
-                path = f"{self.SPECIFICATION}/SubsetSelection/UserSelect"
-                if self.__node.findall(path):
-                    self._user_can_select_docs = True
-            return self._user_can_select_docs
+            path = f"{self.SPECIFICATION}/SubsetSelection/UserSelect"
+            return True if self.node.findall(path) else False
 
         class Parameter:
             """Option which can be specified for jobs of this type."""
@@ -518,41 +475,32 @@ class PublishingSystem:
                     node - parsed XML node containing the parameter info
                 """
 
-                self.__subset = subset
-                self.__node = node
+                self.subset = subset
+                self.node = node
 
-            @property
+            @cached_property
             def default(self):
                 """Default value for the parameter."""
 
-                if not hasattr(self, "_default"):
-                    self._default = Doc.get_text(self.__node.find("ParmValue"))
-                    if not self._default:
-                        if self.name == "DrupalServer":
-                            self._default = self.hosts.get("DRUPAL")
-                return self._default
+                default = Doc.get_text(self.node.find("ParmValue"))
+                if not default and self.name == "DrupalServer":
+                    return self.hosts.get("DRUPAL")
+                return default
 
-            @property
+            @cached_property
             def hosts(self):
                 """Dictionary of host name defaults for this tier."""
+                return self.subset.control.session.tier.hosts
 
-                if not hasattr(self, "_hosts"):
-                    self._hosts = self.__subset.control.session.tier.hosts
-                return self._hosts
-
-            @property
+            @cached_property
             def info(self):
                 """Help and validation information for this parameter."""
+                return self.subset.system.param_info.get(self.name)
 
-                return self.__subset.system.param_info.get(self.name)
-
-            @property
+            @cached_property
             def name(self):
                 """String for the parameter value's name."""
-
-                if not hasattr(self, "_name"):
-                    self._name = Doc.get_text(self.__node.find("ParmName"))
-                return self._name
+                return Doc.get_text(self.node.find("ParmName"))
 
     class ParamInfo:
         """Metadata about publishing job parameters.
@@ -568,55 +516,41 @@ class PublishingSystem:
                 node - parsed XML node with the parameter meta data
             """
 
-            self.__node = node
+            self.node = node
 
-        @property
+        @cached_property
         def help(self):
             """String for the explanation of the parameter."""
 
-            if not hasattr(self, "_help"):
-                help = Doc.get_text(self.__node.find("ParmInfoHelp"))
-                self._help = help.replace("\r", "")
-            return self._help
+            help = Doc.get_text(self.node.find("ParmInfoHelp"))
+            return help.replace("\r", "")
 
-        @property
+        @cached_property
         def method(self):
             """Name of the method used to validate these values."""
+            return Doc.get_text(self.node.find("ParmInfoMethod"))
 
-            if not hasattr(self, "_method"):
-                node = self.__node.find("ParmInfoMethod")
-                self._method = Doc.get_text(node)
-            return self._method
-
-        @property
+        @cached_property
         def name(self):
             """String for the parameter's name."""
+            return Doc.get_text(self.node.find("ParmInfoName"))
 
-            if not hasattr(self, "_name"):
-                self._name = Doc.get_text(self.__node.find("ParmInfoName"))
-            return self._name
-
-        @property
+        @cached_property
         def pattern(self):
             """String for the regular expression used for validation."""
+            return Doc.get_text(self.node.find("ParmInfoPattern"))
 
-            if not hasattr(self, "_pattern"):
-                node = self.__node.find("ParmInfoPattern")
-                self._pattern = Doc.get_text(node)
-            return self._pattern
-
-        @property
+        @cached_property
         def values(self):
             """Strings for the parameter's valid values."""
 
-            if not hasattr(self, "_values"):
-                self._values = []
-                path = "ParmInfoValidValues/ParmInfoValidValue"
-                for node in self.__node.findall(path):
-                    value = Doc.get_text(node, "").strip()
-                    if value:
-                        self._values.append(value)
-            return self._values
+            values = []
+            path = "ParmInfoValidValues/ParmInfoValidValue"
+            for node in self.node.findall(path):
+                value = Doc.get_text(node, "").strip()
+                if value:
+                    values.append(value)
+            return values
 
         def scrub(self, value):
             """Make sure the parameter's value hasn't been tampered with.
@@ -647,7 +581,6 @@ class PublishingSystem:
 
         def _integer(self, value):
             """Verify that the value is an integer string."""
-
             return value.isdigit()
 
         def _job_date(self, value):
@@ -684,10 +617,11 @@ class PublishingSystem:
 
 
 if __name__ == "__main__":
-    "Don't execute the script if loaded as a module."""
+    """Don't execute the script if loaded as a module."""
 
     control = Control()
     try:
         control.run()
     except Exception as e:
+        control.logger.exception("publishing failed")
         control.bail(str(e))

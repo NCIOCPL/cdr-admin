@@ -3,6 +3,7 @@
 """Interface for managing the mappings to string from external sources.
 """
 
+from functools import cached_property
 from cdrcgi import Controller
 from cdrapi.docs import Doc
 from datetime import datetime
@@ -24,24 +25,47 @@ class Control(Controller):
     DELETION_BLOCKED = "Deletion request blocked because the value is mapped"
     DELETE = "DELETE FROM external_map WHERE id = ?"
     TYPE_NOT_MAPPABLE = "{} mappings can't link to {} document CDR{:d}"
+    CSS = """\
+.mapped-to { width: 5rem; margin-top: 0; }
+#tabular-form { width: 80%; margin: 5rem auto 1rem; }
+#tabular-form caption { text-align: center; font-size: 1.2rem; }
+#tabular-form th { text-align: center; font-weight: bold; }
+#tabular-form.usa-form .usa-button { margin-top: 0; }
+#tabular-form .usa-checkbox__label { margin-top: 0; }
+tfoot td { color: green; font-size: .9em; font-style: italic; }
+.usa-table tfoot td { text-align: center; border-bottom: none; }
+.usa-form td a:visited { color: white; }
+"""
 
-    def run(self):
-        """Provide routing for our custom actions."""
+    def build_tables(self):
+        """Show the selected mappings (if any) under the filter form."""
 
-        try:
-            if self.request == self.SAVE:
-                self.save()
-            elif self.request == self.FILTER:
-                self.show_report()
-        except Exception as e:
-            self.logger.exception("failure")
-            self.bail(str(e))
-        Controller.run(self)
+        page = self.form_page
+        filter_opts = json.dumps(self.filter_opts)
+        self.populate_form(page)
+        page.form.append(page.button(self.FILTER))
+        page.form.set("target", "")
+        opts = dict(action=self.script, method="POST", id="tabular-form")
+        form = page.B.FORM(page.B.CLASS("usa-form"), **opts)
+        if self.table is not None:
+            form.append(self.table)
+            page.add_css(self.CSS)
+            form.append(page.button(self.SAVE))
+        else:
+            message = "No mappings found matching the filtering criteria."
+            page.add_alert(message, type="warning")
+        form.append(page.hidden_field(self.FILTER_OPTS, filter_opts))
+        form.append(page.hidden_field(self.SESSION, self.session))
+        page.main.append(form)
+        page.send()
 
-    def populate_form(self, page, filter_opts=""):
-        """Add the fields for refining the selection of mappings."""
+    def populate_form(self, page):
+        """Add the fields for refining the selection of mappings.
 
-        page.form.append(page.hidden_field(self.FILTER_OPTS, filter_opts))
+        Required positional argument:
+          page - instance of the cdrcgi.HTMLPage class
+        """
+
         fieldset = page.fieldset("Select Mappings")
         options = [(0, "All")] + self.usages
         opts = dict(options=options, default=self.usage)
@@ -60,21 +84,25 @@ class Control(Controller):
             checked=self.include_unmappable,
         )
         fieldset.append(page.checkbox("options", **opts))
-        page.add_css("""\
-fieldset > ul { margin-top: 5px; }
-#error-report ul * { color: red; }
-#change-report ul * { color: green; }""")
-        page.add_script(f"""\
-function view_doc(id) {{
-    let url = "QcReport.py?DocId=" + id + "&Session={self.session.name}" +
-        "&DocVersion=-1";
-    let name = window.open(url, "view-" + id);
-}}""")
         page.form.append(fieldset)
+
+    def run(self):
+        """Provide routing for our custom actions."""
+
+        try:
+            if self.request == self.SAVE:
+                self.save()
+            elif self.request == self.FILTER:
+                self.show_report()
+        except Exception as e:
+            self.logger.exception("failure")
+            self.bail(str(e))
+        Controller.run(self)
 
     def save(self):
         """Make the requested changes and display the page again."""
 
+        # Collect the values from the tabular form at the bottom of the page.
         mappings = {}
         for mapping in self.original_mappings:
             mappings[mapping.id] = mapping
@@ -86,9 +114,9 @@ function view_doc(id) {{
                     doc_id = Doc.extract_id(self.fields[name].value)
                 mapping_id = Doc.extract_id(name)
                 doc_ids[mapping_id] = doc_id
-        bogus = [int(b) for b in self.fields.getlist("bogus")]
-        delete_requests = [int(d) for d in self.fields.getlist("delete")]
-        mappable = [int(m) for m in self.fields.getlist("mappable")]
+        bogus = {int(b) for b in self.fields.getlist("bogus")}
+        delete_requests = {int(d) for d in self.fields.getlist("delete")}
+        mappable = {int(m) for m in self.fields.getlist("mappable")}
         page = self.form_page
 
         # Handle the requests to delete some of the mappings.
@@ -145,7 +173,7 @@ function view_doc(id) {{
                     else:
                         diff = f"Mapping changed from {old_id} to {new_id}"
                         diffs.append(diff)
-                else:
+                elif old_id:
                     diffs.append(f"Mapping to CDR{old_id} removed")
             if mapping.id in bogus:
                 if new_id:
@@ -167,7 +195,7 @@ function view_doc(id) {{
 
             # If we found any problems, we won't save any changes.
             if problems:
-                errors[mapping.id] = [page.B.LI(p) for p in problems]
+                errors[mapping.id] = problems
 
             # Update the mapping row, remembering any failures.
             elif diffs:
@@ -189,7 +217,7 @@ function view_doc(id) {{
                     self.logger.info("Updating mapping %d with %s", *args)
                     self.cursor.execute(self.UPDATE, values)
                     self.conn.commit()
-                    changes[mapping.id] = [page.B.LI(diff) for diff in diffs]
+                    changes[mapping.id] = diffs
                 except Exception as e:
                     self.logger.exception("Updating mapping %d", mapping.id)
                     errors[mapping.id] = [f"Update failure: {e}"]
@@ -197,131 +225,84 @@ function view_doc(id) {{
         # Show the page, including a report of successful updates and failures.
         self.show_results(page, mappings, errors, True)
         self.show_results(page, mappings, changes)
+        if not changes and not errors:
+            page.add_alert("No changes found to be saved.", type="warning")
         self.show_report()
 
     def show_results(self, page, mappings, results, errors=False):
         """Display messages describing what happened with the Save request."""
 
-        if results:
-            if errors:
-                legend = "The following errors were encountered"
+        alert_type = "error" if errors else "success"
+        what = "Error(s) in" if errors else "Change(s) to"
+        for mapping_id, items in results.items():
+            mapping = f"{what} {mappings[mapping_id]}"
+            if len(items) == 1:
+                message = f"{mapping}: {items[0]}."
+                page.add_alert(message, type=alert_type)
             else:
-                legend = "The following changes were performed"
-            fieldset = page.fieldset(legend)
-            fieldset.set("id", "error-report" if errors else "change-report")
-            ul = page.B.UL()
-            for mapping_id, items in results.items():
-                mapping = mappings[mapping_id]
-                ul.append(page.B.LI(f"{mapping}", page.B.UL(*items)))
-            fieldset.append(ul)
-            fieldset.set("style", "width: 800px")
-            page.form.append(fieldset)
+                items = [page.B.LI(item) for item in items]
+                opts = dict(type=alert_type, extra=page.B.UL(*items))
+                page.add_alert(f"{mapping}:", **opts)
 
-    def build_tables(self):
-        """Create and show the selected mapping, as well as the filter form."""
-
-        B = self.HTMLPage.B
-        rows = []
-        cbox = "checkbox"
-        for mapping in self.mappings:
-            mid = str(mapping.id)
-            doc_id = str(mapping.doc_id or "")
-            id_field = B.INPUT(name=f"cdrid-{mapping.id}", value=doc_id)
-            if doc_id:
-                view_button = B.BUTTON("View", type="button", name="view")
-                view_button.set("value", doc_id)
-                view_button.set("onclick", f"view_doc({doc_id})")
-            else:
-                view_button = ""
-            delete_field = B.INPUT(name="delete", type=cbox, value=mid)
-            bogus_field = B.INPUT(name="bogus", type=cbox, value=mid)
-            mappable_field = B.INPUT(name="mappable", type=cbox, value=mid)
-            if mapping.bogus:
-                bogus_field.set("checked")
-            if mapping.mappable:
-                mappable_field.set("checked")
-            cols = [
-                B.TD(mapping.value),
-                B.TD(id_field),
-                B.TD(view_button),
-                B.TD(delete_field, " Delete?"),
-                B.TD(bogus_field, " Bogus?"),
-                B.TD(mappable_field, " Mappable"),
-            ]
-            if not self.usage:
-                cols.insert(0, B.TD(mapping.usage))
-            rows.append(B.TR(*cols))
-        headers = [
-            B.TH("Variant String"),
-            B.TH("Mapped To", colspan="2"),
-            B.TH("Flags", colspan="3"),
-        ]
-        if not self.usage:
-            headers.insert(0, B.TH("Usage"))
-        table = B.TABLE(
-            B.E("header", B.TR(*headers)),
-            B.TBODY(*rows)
-        )
-        elapsed = datetime.now() - self.started
-        message = f"Fetched {len(rows):d} mapping(s) in {elapsed}"
-        footnote = B.P(message, B.CLASS("footnote center"))
-        self.populate_form(self.form_page, json.dumps(self.filter_opts))
-        self.form_page.add_css("body, td, th { background: #f4f4f4; }")
-        self.form_page.form.append(table)
-        self.form_page.form.append(footnote)
-        self.form_page.send()
-
-    @property
+    @cached_property
     def buttons(self):
-        """Override the available commands."""
-
-        if self.request in (self.SAVE, self.FILTER):
-            return self.FILTER, self.SAVE, self.ADMINMENU, self.LOG_OUT
-        return self.FILTER, self.ADMINMENU, self.LOG_OUT
+        """Override the available commands for the filtering form."""
+        return [self.FILTER]
 
     @property
-    def mappings(self):
-        """Sorted sequence of mapping matching the filtering parameters."""
+    def doc_id(self):
+        """Used to show mappings only to a single CDR document."""
+        return self.filter_opts.get("doc_id")
 
-        if not hasattr(self, "_mappings"):
-            self._mappings = Mapping.get_mappings(self, **self.filter_opts)
-        return self._mappings
+    @cached_property
+    def filter_opts(self):
+        """Current setting of the filtering form fields."""
 
-    @property
-    def only_unmapped(self):
-        """Has the user asked that we only show unmapped values?"""
-        return self.ONLY_UNMAPPED in self.options
+        opts = self.fields.getvalue(self.FILTER_OPTS)
+        if opts:
+            return json.loads(opts)
+        try:
+            usage = int(self.fields.getvalue("usage"))
+        except Exception:
+            usage = None
+        return dict(
+            max=self.fields.getvalue("max", "100"),
+            usage=usage,
+            doc_id=self.fields.getvalue("doc_id"),
+            pattern=self.fields.getvalue("value_pattern"),
+            include_unmappable=self.WITH_UNMAPPABLE in self.options,
+            only_unmapped=self.ONLY_UNMAPPED in self.options,
+        )
 
     @property
     def include_unmappable(self):
         """Has the user said we should include unmappable values?"""
-        return self.WITH_UNMAPPABLE in self.options
+        return True if self.filter_opts.get("include_unmappable") else False
+
+    @cached_property
+    def mappings(self):
+        """Sorted sequence of mapping matching the filtering parameters."""
+        return Mapping.get_mappings(self, **self.filter_opts)
 
     @property
+    def max(self):
+        """Throttle for the number of mappings to display."""
+        return self.filter_opts.get("max", "100")
+
+    @property
+    def only_unmapped(self):
+        """Has the user asked that we only show unmapped values?"""
+        return True if self.filter_opts.get("only_unmapped") else False
+
+    @cached_property
     def original_mappings(self):
-        """Filtering options round-trip from the previous display."""
+        """Mappings before changes are applied."""
+        return Mapping.get_mappings(self, **self.filter_opts)
 
-        if not hasattr(self, "_original_mappings"):
-            opts = self.original_filter_opts
-            if opts is None:
-                self.bail()
-            self._original_mappings = Mapping.get_mappings(self, **opts)
-        return self._original_mappings
-
-    @property
-    def filter_opts(self):
-        """Current setting of the filtering form fields."""
-
-        if not hasattr(self, "_filter_opts"):
-            self._filter_opts = dict(
-                max=self.max,
-                usage=self.usage,
-                doc_id=self.doc_id,
-                pattern=self.pattern,
-                include_unmappable=self.include_unmappable,
-                only_unmapped=self.only_unmapped,
-            )
-        return self._filter_opts
+        opts = self.original_filter_opts
+        if opts is None:
+            self.bail()
+        return Mapping.get_mappings(self, **opts)
 
     @property
     def options(self):
@@ -329,61 +310,87 @@ function view_doc(id) {{
         return self.fields.getlist("options")
 
     @property
-    def original_filter_opts(self):
-        """Options used to create the mappings display for the previous page.
-
-        This lets us recreate those mappings for determining which mappings
-        were display when the user made the changes to be saved by the current
-        Save Changes request. If we didn't round trip these, the user might
-        change the form's values *and* the mappings values in the table below,
-        and then click the Save Changes button, and we wouldn't have a baseline
-        for finding out what had changed.
-        """
-
-        if not hasattr(self, "_original_filter_opts"):
-            opts = self.fields.getvalue(self.FILTER_OPTS)
-            self._original_filter_opts = json.loads(opts) if opts else None
-        return self._original_filter_opts
-
-    @property
-    def usages(self):
-        """All mapping types in the system (for the filtering picklist)."""
-
-        if not hasattr(self, "_usages"):
-            fields = "id", "name"
-            query = self.Query("external_map_usage", *fields).order(2)
-            self._usages = [tuple(row) for row in query.execute(self.cursor)]
-        return self._usages
-
-    @property
-    def usage(self):
-        """Which mapping type has the users selected (if any)?"""
-
-        if not hasattr(self, "_usage"):
-            try:
-                self._usage = int(self.fields.getvalue("usage"))
-            except Exception:
-                self._usage = None
-        return self._usage
-
-    @property
     def pattern(self):
         """Optional string for filtering by mapped values.
 
-        Will likely contain at least one SQL wildcard.
+        Usually includes wildcards.
         """
-
-        return self.fields.getvalue("value_pattern")
-
-    @property
-    def doc_id(self):
-        """Used to show mappings only to a single CDR document."""
-        return self.fields.getvalue("doc_id")
+        return self.filter_opts.get("pattern")
 
     @property
-    def max(self):
-        """Throttle for the number of mappings to display."""
-        return self.fields.getvalue("max", "100")
+    def same_window(self):
+        """Avoid opening new browser tabs."""
+        return self.buttons
+
+    @cached_property
+    def table(self):
+        """Table showing the mapping matching the user's selections."""
+
+        if not self.mappings:
+            return None
+        B = self.HTMLPage.B
+        rows = []
+        url = f"QcReport.py?Session={self.session}&DocVersion=-1"
+        headers = [
+            B.TH("Variant String"),
+            B.TH("Mapped To", colspan="2"),
+            B.TH("Flags", colspan="3"),
+        ]
+        if not self.usage:
+            headers.insert(0, B.TH("Usage"))
+        for mapping in self.mappings:
+            mid = str(mapping.id)
+            doc_id = str(mapping.doc_id or "")
+            id_field_id = f"cdrid-{mapping.id}"
+            id_field = B.INPUT(name=id_field_id, id=id_field_id, value=doc_id)
+            id_field.set("class", "usa-input mapped-to")
+            if doc_id:
+                opts = dict(href=f"{url}&DocId={doc_id}", target="_blank")
+                view_button = B.A("View", B.CLASS("usa-button"), **opts)
+            else:
+                view_button = ""
+            opts = dict(label="Delete?", value=mid)
+            delete = self.HTMLPage.checkbox("delete", **opts)
+            bogus = self.HTMLPage.checkbox("bogus", label="Bogus?", value=mid)
+            opts = dict(label="Mappable?", value=mid)
+            mappable = self.HTMLPage.checkbox("mappable", **opts)
+            if mapping.bogus:
+                bogus.find("input").set("checked")
+            if mapping.mappable:
+                mappable.find("input").set("checked")
+            cols = [
+                B.TD(mapping.value),
+                B.TD(id_field),
+                B.TD(view_button),
+                B.TD(delete),
+                B.TD(bogus),
+                B.TD(mappable)
+            ]
+            if not self.usage:
+                cols.insert(0, B.TD(mapping.usage))
+            rows.append(B.TR(*cols))
+        elapsed = datetime.now() - self.started
+        footnote = f"Fetched {len(rows):d} mapping(s) in {elapsed}"
+        return B.TABLE(
+            B.CAPTION("Mappings"),
+            B.THEAD(B.TR(*headers)),
+            B.TBODY(*rows),
+            B.TFOOT(B.TR(B.TD(footnote, colspan=str(len(cols))))),
+            B.CLASS("usa-table usa-table--borderless")
+        )
+
+    @cached_property
+    def usage(self):
+        """Which mapping type has the users selected (if any)?"""
+        return self.filter_opts.get("usage")
+
+    @cached_property
+    def usages(self):
+        """All mapping types in the system (for the filtering picklist)."""
+
+        fields = "id", "name"
+        query = self.Query("external_map_usage", *fields).order(2)
+        return [tuple(row) for row in query.execute(self.cursor)]
 
 
 class Mapping:
@@ -415,69 +422,24 @@ class Mapping:
         """Make the mappings sortable."""
         return (self.usage, self.value) < (other.usage, other.value)
 
-    @property
+    @cached_property
     def allowed_doctypes(self):
         """Which document types are allowed for this mapping's usage?"""
 
-        if not hasattr(self, "_allowed_doctypes"):
-            if self.usage not in Mapping.ALLOWED_DOCTYPES:
-                query = self.control.Query("external_map_type t", "t.doc_type")
-                query.join("external_map_usage u", "u.id = t.usage")
-                query.where(query.Condition("u.name", self.usage))
-                rows = query.execute(self.control.cursor).fetchall()
-                allowed = set([row.doc_type for row in rows])
-                Mapping.ALLOWED_DOCTYPES[self.usage] = allowed
-                self._allowed_doctypes = allowed
-            else:
-                self._allowed_doctypes = Mapping.ALLOWED_DOCTYPES[self.usage]
-        return self._allowed_doctypes
+        if self.usage not in Mapping.ALLOWED_DOCTYPES:
+            query = self.control.Query("external_map_type t", "t.doc_type")
+            query.join("external_map_usage u", "u.id = t.usage")
+            query.where(query.Condition("u.name", self.usage))
+            rows = query.execute(self.control.cursor).fetchall()
+            allowed = set([row.doc_type for row in rows])
+            Mapping.ALLOWED_DOCTYPES[self.usage] = allowed
+            return allowed
+        return Mapping.ALLOWED_DOCTYPES[self.usage]
 
     @property
     def action(self):
         """String naming permission needed for saving mapping information."""
         return self.__row.action
-
-    @property
-    def control(self):
-        """Access to database queries and logging."""
-        return self.__control
-
-    @property
-    def id(self):
-        """The unique integer ID for the mapping."""
-        return self.__row.id
-
-    @property
-    def value(self):
-        """The string being mapped."""
-        return self.__row.value
-
-    @property
-    def usage(self):
-        """The string identifying the mapping's type."""
-        return self.__row.usage
-
-    @property
-    def doc_id(self):
-        """The ID of the CDR document being mapped (if any)."""
-        return self.__row.doc_id or None
-
-    @property
-    def mappable(self):
-        """Boolean indicating whether this string is mappable.
-
-        In theory, the value should be one to which we can find
-        (or create) a CDR document, but after considerable research
-        we have given up trying to find out enough information
-        about the entity the string represents, and we don't want
-        to spend any more time on searching further. This flag
-        isn't as useful as it was when we were curating information
-        about clinical trials, and we had to maintain information
-        about persons, places, organizations, etc., connected with
-        the documents for the clinical trials.
-        """
-
-        return self.__row.mappable == "Y"
 
     @property
     def bogus(self):
@@ -501,6 +463,48 @@ class Mapping:
         """
 
         return self.__row.bogus == "Y"
+
+    @property
+    def control(self):
+        """Access to database queries and logging."""
+        return self.__control
+
+    @property
+    def doc_id(self):
+        """The ID of the CDR document being mapped (if any)."""
+        return self.__row.doc_id or None
+
+    @property
+    def id(self):
+        """The unique integer ID for the mapping."""
+        return self.__row.id
+
+    @property
+    def mappable(self):
+        """Boolean indicating whether this string is mappable.
+
+        In theory, the value should be one to which we can find
+        (or create) a CDR document, but after considerable research
+        we have given up trying to find out enough information
+        about the entity the string represents, and we don't want
+        to spend any more time on searching further. This flag
+        isn't as useful as it was when we were curating information
+        about clinical trials, and we had to maintain information
+        about persons, places, organizations, etc., connected with
+        the documents for the clinical trials.
+        """
+
+        return self.__row.mappable == "Y"
+
+    @property
+    def usage(self):
+        """The string identifying the mapping's type."""
+        return self.__row.usage
+
+    @property
+    def value(self):
+        """The string being mapped."""
+        return self.__row.value
 
     @classmethod
     def get_mappings(cls, control, **opts):

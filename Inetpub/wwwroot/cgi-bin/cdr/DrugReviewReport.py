@@ -127,6 +127,7 @@ Content-length: {len(book_bytes):d}
             ),
             merge=dict(align="center", bold=True),
         )
+
         class Styles:
             def __init__(self, book, styles):
                 for name in styles:

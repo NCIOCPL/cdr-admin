@@ -7,7 +7,8 @@ pronunciations by the user requesting a specific word stem from
 the Glossary Term name or Term Pronunciation." (request 2643)
 """
 
-from cdrcgi import Controller
+from functools import cached_property
+from cdrcgi import Controller, BasicWebPage
 from cdrapi.docs import Doc
 
 
@@ -27,28 +28,34 @@ class Control(Controller):
 
         fieldset = page.fieldset("Enter a term or pronunciation word stem")
         fieldset.append(page.text_field("term_stem"))
-        fieldset.append(page.text_field("pron_stem"))
+        opts = dict(label="Pronunciation Stem")
+        fieldset.append(page.text_field("pron_stem", **opts))
         page.form.append(fieldset)
 
-    def build_tables(self):
+    def show_report(self):
         """Return the single row for this report."""
-        return self.table
+        """Overridden because the table is too wide for the standard layout."""
 
-    @property
+        report = BasicWebPage()
+        report.wrapper.append(report.B.H1(self.subtitle))
+        report.wrapper.append(self.table.node)
+        report.wrapper.append(self.footer)
+        report.send()
+
+    @cached_property
     def caption(self):
         """Caption string(s) for the report's table."""
 
-        if not hasattr(self, "_caption"):
-            name = self.fields.getvalue("term_stem")
-            pron = self.fields.getvalue("pron_stem")
-            self._caption = []
-            if name:
-                self._caption.append(f"Name Stem: {name}")
-            if pron:
-                self._caption.append(f"Pronunciation Stem: {pron}")
-        return self._caption
+        name = self.fields.getvalue("term_stem")
+        pron = self.fields.getvalue("pron_stem")
+        caption = []
+        if name:
+            caption.append(f"Name Stem: {name}")
+        if pron:
+            caption.append(f"Pronunciation Stem: {pron}")
+        return caption
 
-    @property
+    @cached_property
     def columns(self):
         """Column header definitions for the report."""
 
@@ -60,59 +67,56 @@ class Control(Controller):
             self.Reporter.Column("Comments", width="500px"),
         )
 
-    @property
+    @cached_property
     def pron_stem(self):
         """Substring for matching glossary term pronunciations."""
 
-        if not hasattr(self, "_pron_stem"):
-            self._pron_stem = self.fields.getvalue("pron_stem", "").strip()
-            if self._pron_stem and "%" not in self._pron_stem:
-                self._pron_stem = f"%{self._pron_stem}%"
-        return self._pron_stem
+        pron_stem = self.fields.getvalue("pron_stem", "").strip()
+        if pron_stem and "%" not in pron_stem:
+            return f"%{pron_stem}%"
+        return pron_stem
 
-    @property
+    @cached_property
     def term_stem(self):
         """Substring for matching glossary term names."""
 
-        if not hasattr(self, "_term_stem"):
-            self._term_stem = self.fields.getvalue("term_stem", "").strip()
-            if self._term_stem and "%" not in self._term_stem:
-                self._term_stem = f"%{self._term_stem}%"
-        return self._term_stem
+        term_stem = self.fields.getvalue("term_stem", "").strip()
+        if term_stem and "%" not in term_stem:
+            return f"%{term_stem}%"
+        return term_stem
 
-    @property
+    @cached_property
     def rows(self):
         """Table rows for the report."""
+        return [term.row for term in self.terms]
 
-        if not hasattr(self, "_rows"):
-            self._rows = [term.row for term in self.terms]
-        return self._rows
-
-    @property
+    @cached_property
     def table(self):
         """This report has a single table."""
 
-        if not hasattr(self, "_table"):
-            opts = dict(caption=self.caption, columns=self.columns)
-            self._table = self.Reporter.Table(self.rows, **opts)
-        return self._table
+        opts = dict(caption=self.caption, columns=self.columns)
+        return self.Reporter.Table(self.rows, **opts)
 
-    @property
+    @cached_property
     def terms(self):
         """Terms matching the word stem."""
 
-        if not hasattr(self, "_terms"):
-            query = self.Query("query_term", "doc_id")
-            if self.term_stem:
-                query.where(f"path = '{self.NAME_PATH}'")
-                query.where(query.Condition("value", self.term_stem, "LIKE"))
-            if self.pron_stem:
-                query.where(f"path = '{self.PRON_PATH}'")
-                query.where(query.Condition("value", self.pron_stem, "LIKE"))
-            self._terms = []
-            for row in query.execute(self.cursor).fetchall():
-                self._terms.append(Term(self, row.doc_id))
-        return self._terms
+        query = self.Query("query_term", "doc_id")
+        if self.term_stem:
+            query.where(f"path = '{self.NAME_PATH}'")
+            query.where(query.Condition("value", self.term_stem, "LIKE"))
+        if self.pron_stem:
+            query.where(f"path = '{self.PRON_PATH}'")
+            query.where(query.Condition("value", self.pron_stem, "LIKE"))
+        terms = []
+        for row in query.execute(self.cursor).fetchall():
+            terms.append(Term(self, row.doc_id))
+        return terms
+
+    @cached_property
+    def wide_css(self):
+        """Give the report some extra space."""
+        return self.Reporter.Table.WIDE_CSS
 
 
 class Term:
@@ -133,8 +137,8 @@ class Term:
             control - access to the database and reporting
         """
 
-        self.__control = control
-        self.__id = id
+        self.control = control
+        self.id = id
 
     def make_span(self, node):
         """Create a wrapper for the contents of a report table cell.
@@ -184,71 +188,43 @@ class Term:
             span.set("class", span_class)
         return span
 
-    @property
+    @cached_property
     def comment(self):
         """Node for the first comment found for the English term name."""
+        return self.doc.root.find("TermName/Comment")
 
-        if not hasattr(self, "_comment"):
-            self._comment = self.doc.root.find("TermName/Comment")
-        return self._comment
-
-    @property
-    def control(self):
-        """Access to the database and reporting."""
-        return self.__control
-
-    @property
+    @cached_property
     def doc(self):
         """The `Doc` object for this glossary term name."""
+        return Doc(self.control.session, id=self.id)
 
-        if not hasattr(self, "_doc"):
-            self._doc = Doc(self.control.session, id=self.id)
-        return self._doc
-
-    @property
-    def id(self):
-        """Document ID for the glossary term name document."""
-        return self.__id
-
-    @property
+    @cached_property
     def name(self):
         """Node for the document's English name."""
+        return self.doc.root.find("TermName/TermNameString")
 
-        if not hasattr(self, "_name"):
-            self._name = self.doc.root.find("TermName/TermNameString")
-        return self._name
-
-    @property
+    @cached_property
     def pronunciation(self):
         """Node for the document's English pronunciation."""
+        return self.doc.root.find("TermName/TermPronunciation")
 
-        if not hasattr(self, "_pron"):
-            self._pron = self.doc.root.find("TermName/TermPronunciation")
-        return self._pron
-
-    @property
+    @cached_property
     def resource(self):
         """Node for the document's English pronunciation."""
+        return self.doc.root.find("TermName/PronunciationResource")
 
-        if not hasattr(self, "_resource"):
-            path = "TermName/PronunciationResource"
-            self._resource = self.doc.root.find(path)
-        return self._resource
-
-    @property
+    @cached_property
     def row(self):
         """Row for the report table."""
 
-        if not hasattr(self, "_row"):
-            Cell = self.control.Reporter.Cell
-            self._row = (
-                Cell(self.id, center=True),
-                Cell(self.make_span(self.name)),
-                Cell(self.make_span(self.pronunciation)),
-                Cell(self.make_span(self.resource)),
-                Cell(self.make_span(self.comment)),
-            )
-        return self._row
+        Cell = self.control.Reporter.Cell
+        return (
+            Cell(self.id, center=True),
+            Cell(self.make_span(self.name)),
+            Cell(self.make_span(self.pronunciation)),
+            Cell(self.make_span(self.resource)),
+            Cell(self.make_span(self.comment)),
+        )
 
 
 if __name__ == "__main__":

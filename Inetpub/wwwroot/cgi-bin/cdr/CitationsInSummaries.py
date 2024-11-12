@@ -5,14 +5,12 @@
 
 from functools import cached_property
 from cdrcgi import Controller, Reporter, Excel
-from cdrapi.docs import Doc
-from cdrapi.settings import Tier
 from cdrbatch import CdrBatch
 from CdrLongReports import CitationsInSummaries
 
 
 class Control(Controller):
-    SUBTITLE = "Citations Linked From Summaries"
+    SUBTITLE = "Citations In Summaries"
     COLS = (
         Reporter.Column("Citation ID", width="60px"),
         Reporter.Column("Citation Title", width="1000px"),
@@ -88,7 +86,7 @@ function check_options(setting) {
 
         # Add a second block for options on the "quick" report.
         fieldset = page.fieldset("Report Limits", id="limit-block")
-        fieldset.set("class", "hidden")
+        fieldset.set("class", "hidden usa-fieldset")
         for name, display, value in self.REPORT_LIMITS:
             opts = dict(label=display, value=value)
             fieldset.append(page.text_field(name, **opts))
@@ -119,6 +117,8 @@ function check_options(setting) {
             self.logger.info("elapsed time for report: %s", self.elapsed)
             report.excel.send()
         else:
+            if not self.session.can_do("RUN LONG REPORT"):
+                self.bail("Not authorized to run batch reports")
             if not self.email:
                 self.bail("Missing required email address.")
             try:
@@ -126,9 +126,8 @@ function check_options(setting) {
             except Exception as e:
                 self.logger.exception("Failure queuing job")
                 self.bail(f"Unable to queue job: {e}")
-            args = self.TITLE, self.subtitle, self.script, self.SUBMENU
-            job.show_status_page(self.session, *args)
             self.logger.info("elapsed time for report: %s", self.elapsed)
+            job.show_status_page(self.session)
 
     @cached_property
     def debug(self):

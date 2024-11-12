@@ -1,1843 +1,1037 @@
-#-----------------------------------------------------------------------------
-#
-# Transform a CDR document using a QC XSL/T filter and send it back to
-# the browser.
-#
-# BZIssue::545
-# BZIssue::1119 - Query mod to avoid picking up PDQKey for orgs
-# BZIssue::1054 - @@..@@ parameters for BoardMember QC report
-# BZIssue::1050 - UI for running QC report from the menus
-# BZIssue::1054 - Label change ("Date Received" -> "Date Response Received")
-# BZIssue::1415 - Support list of glossary terms for HP summaries
-# BZIssue::1516 - @@..@@ parameters for Org QC report
-# BZIssue::1531 - Modifications to allow PublishPreview QC reports
-# BZIssue::1545 - Enhance org links in person QC reports
-# BZIssue::1555 - Form enhancement for controlling board markup selection
-# BZIssue::1653 - Added option for Media QC Report
-# BZIssue::1657 - Support Editorial Board/Advisory Board markup (summaries)
-# BZIssue::1707 - Default displayBoard variable for patient summaries
-# BZIssue::1744 - Added new summary report types (patbu and patrs)
-# BZIssue::1868 - Audience filtering for GlossaryTerm redline/strikeout reports
-# BZIssue::1939 - Redline/strikeout in Miscellaneous doc QA reports
-# BZIssue::2053 - Added filter set for DrugInfoSummary (DIS) docs
-# BZIssue::2920 - Internal/external comment display in summaries
-# BZIssue::3067 - Support insertion/deletion markup for DIS docs
-# BZIssue::3699 - Support new glossary term document types (concept and name)
-# BZIssue::4248 - Truncate long version comments; DIS report mods
-# BZIssue::4329 - Handle case where no comment exists for a version
-# BZIssue::3035 - Redline/strikeout report for old GlossaryTerm docs
-# BZIssue::4395 - Control image display in Summary QC report
-# BZIssue;:4478 - Glossary Term Name with Concept QC report
-# BZIssue::4562 - Added checkbox to suppress display of Reference sections
-# BZIssue::4751 - Modify BU Report to display LOERef
-# BZIssue::4672 - Changes to LinkedDoc Report
-# BZIssue::4781 - Have certain links to unpublished docs ignored
-# BZIssue::4967 - [Summary] Modification to QC Reports to Show/Hide
-#                 Certain Comments
-# BZIssue::5006 - Minor Revisions to QC Report Interfaces - Comments Options
-# BZIssue::5065 - [Summaries] 2 More Patient Summary QC Report Display Options
-# BZIssue::5159 - [Summaries] Changes to HP & Patient QC Report Interfaces
-#                 and Display Options
-# BZIssue::5229 - [CTGov] Missing Information In CTGov Protocol Full QC Report
-# BZIssue::5249 - Standard wording in Patient QC report not displaying in green
-# BZIssue::OCECDR-3630 - Patient Summary QC Reports Missing Reference Section
-# JIRA::OCECDR-3800 - Address security vulnerabilities
-# JIRA::OCECDR-3919 - Repair the ability to run publish preview for
-#                     DrugInformationSummary. Turn off document version
-#                     selection for DrugInformationSummary.
-# JIRA::OCECDR-4191 - Summary Publish Preview should use current working doc
-# JIRA::OCECDR-4190 - Let user pick version for DIS QC report
-#
-#----------------------------------------------------------------------
-
-import cdr
-import cdrcgi
-import os
-import re
-from cdrapi import db
-from cdrapi.users import Session
-from html import escape as html_escape
-
-#----------------------------------------------------------------------
-# Dynamically create the title of the menu section (request #809).
-#----------------------------------------------------------------------
-def getSectionTitle(repType):
-    if not repType:
-        return "QC Report"
-    elif repType == "bu":
-        return "HP Bold/Underline QC Report"
-    elif repType == "but":
-        return "HP Bold/Underline QC Report (Test)"
-    elif repType == "rs":
-        return "HP Redline/Strikeout QC Report"
-    elif repType == "rst":
-        return "HP Redline/Strikeout QC Report (Test)"
-    elif repType == "nm":
-        return "QC Report (No Markup)"
-    elif repType == "pat":
-        return "PT Redline/Strikeout QC Report"
-    elif repType == "patrs":
-        return "PT Redline/Strikeout QC Report"
-    elif repType == "patbu":
-        return "PT Bold/Underline QC Report"
-    elif repType == "pp":
-        return "Publish Preview Report"
-    elif repType == "img":
-        return "Media QC Report"
-    elif repType == "gtnwc":
-        return "Glossary Term Name With Concept Report"
-    else:
-        return "QC Report (Unrecognized Type)"
-
-#----------------------------------------------------------------------
-# Map for finding the filters for a given document type.
-#----------------------------------------------------------------------
-filters = cdr.FILTERS
-
-#----------------------------------------------------------------------
-# Get the parameters from the request.
-#----------------------------------------------------------------------
-repTitle = "CDR QC Report"
-fields   = cdrcgi.FieldStorage() or cdrcgi.bail("No Request Found", repTitle)
-debug    = fields.getvalue("debug") and True or False
-if debug:
-    os.environ["CDR_LOGGING_LEVEL"] = "DEBUG"
-    cdr.LOGGER.setLevel("DEBUG")
-cdr.LOGGER.debug("QcReport.py called with %s", dict(fields))
-# cdrcgi.log_fields(fields, program='QcReport.py')
-docId    = fields.getvalue(cdrcgi.DOCID) or None
-session  = cdrcgi.getSession(fields) or cdrcgi.bail("Not logged in")
-action   = cdrcgi.getRequest(fields)
-qcParams = fields.getvalue('paramset') or '0'
-title    = "CDR Administration"
-repType  = fields.getvalue("ReportType") or None
-section  = "QC Report"
-SUBMENU  = "Reports Menu"
-buttons  = ["Submit", SUBMENU, cdrcgi.MAINMENU, "Log Out"]
-header   = cdrcgi.header(title, title, getSectionTitle(repType),
-                         "QcReport.py", buttons, method = 'GET',
-                         stylesheet = """
-  <style type = 'text/css'>
-    fieldset            { margin-bottom: 10px; }
-    /* fieldset.docversion { width: 860px; */
-    fieldset.docversion { width: 75%;
-                          margin-left: auto;
-                          margin-right: auto;
-                          margin-bottom: 0;
-                          display: block; }
-    fieldset.wrapper    { width: 520px;
-                          margin-left: auto;
-                          margin-right: auto;
-                          display: block; }
-    *.gogreen         { width: 95%;
-                        border: 1px solid green;
-                          background: #99FF66; }
-    *.gg              { border: 1px solid green;
-                        background: #99FF66;
-                        color: #006600; }
-    *.comgroup          { background: #C9C9C9;
-                          margin-bottom: 8px; }
-    *.radio-button    { margin-left: 40px; }
-    label:hover       { background-color: lightyellow; }
-  </style>
-
-  <script language = 'JavaScript'>
-     function dispInternal() {
-         var checks  = ['ext', 'adv', 'allcomment', 'nocomment']
-         if (document.getElementById('int').checked &&
-             !document.getElementById('perm').checked) {
-             var optionson = ['ai', 'se', 'sa', 'dr']
-             var optionsoff = ['ae', 'dp']
-             for (var i in optionson) {
-                 document.getElementById(optionson[i]).checked = true;
-             }
-             for (var i in optionsoff) {
-                 document.getElementById(optionsoff[i]).checked = false;
-             }
-             for (var j in checks) {
-                 document.getElementById(checks[j]).checked = false;
-             }
-         }
-         else if (document.getElementById('int').checked &&
-                  document.getElementById('perm').checked) {
-             var optionson = ['ai', 'se', 'sa', 'dr', 'dp']
-             var optionsoff = ['ae']
-             for (var i in optionson) {
-                 document.getElementById(optionson[i]).checked = true;
-             }
-             for (var i in optionsoff) {
-                 document.getElementById(optionsoff[i]).checked = false;
-             }
-
-             for (var j in checks) {
-                 document.getElementById(checks[j]).checked = false;
-             }
-         }
-         else if (!document.getElementById('int').checked &&
-                  document.getElementById('perm').checked) {
-             var optionson = ['ai', 'ae', 'se', 'sa', 'dp']
-             var optionsoff = ['dr']
-             for (var i in optionson) {
-                 document.getElementById(optionson[i]).checked = true;
-             }
-             for (var i in optionsoff) {
-                 document.getElementById(optionsoff[i]).checked = false;
-             }
-
-             for (var j in checks) {
-                 document.getElementById(checks[j]).checked = false;
-             }
-         }
-     }
-
-
-     function dispPermanent() {
-         var checks  = ['ext', 'adv', 'allcomment', 'nocomment']
-         if (document.getElementById('perm').checked &&
-             !document.getElementById('int').checked) {
-             var optionson = ['ai', 'ae', 'se', 'sa', 'dp']
-             var optionsoff = ['dr']
-             for (var i in optionson) {
-                 document.getElementById(optionson[i]).checked = true;
-             }
-             for (var i in optionsoff) {
-                 document.getElementById(optionsoff[i]).checked = false;
-             }
-             for (var j in checks) {
-                 document.getElementById(checks[j]).checked = false;
-             }
-         }
-         else if (document.getElementById('perm').checked &&
-                  document.getElementById('int').checked) {
-             var optionson = ['ai', 'se', 'sa', 'dr', 'dp']
-             var optionsoff = ['ae']
-             for (var i in optionson) {
-                 document.getElementById(optionson[i]).checked = true;
-             }
-             for (var i in optionsoff) {
-                 document.getElementById(optionsoff[i]).checked = false;
-             }
-
-             for (var j in checks) {
-                 document.getElementById(checks[j]).checked = false;
-             }
-         }
-         else if (!document.getElementById('perm').checked &&
-                  document.getElementById('int').checked) {
-             var optionson = ['ai', 'se', 'sa', 'dr']
-             var optionsoff = ['ae', 'dp']
-             for (var i in optionson) {
-                 document.getElementById(optionson[i]).checked = true;
-             }
-             for (var i in optionsoff) {
-                 document.getElementById(optionsoff[i]).checked = false;
-             }
-
-             for (var j in checks) {
-                 document.getElementById(checks[j]).checked = false;
-             }
-         }
-     }
-
-
-     function dispExternal() {
-         var checks  = ['int', 'perm', 'allcomment', 'nocomment']
-         if (document.getElementById('ext').checked &&
-             !document.getElementById('adv').checked) {
-             var optionson = ['ae', 'se', 'dp', 'dr']
-             var optionsoff = ['ai', 'sa']
-             for (var i in optionson) {
-                 document.getElementById(optionson[i]).checked = true;
-             }
-             for (var i in optionsoff) {
-                 document.getElementById(optionsoff[i]).checked = false;
-             }
-             for (var j in checks) {
-                 document.getElementById(checks[j]).checked = false;
-             }
-         }
-         else if (document.getElementById('ext').checked &&
-                  document.getElementById('adv').checked) {
-             var optionson = ['ae', 'se', 'dp', 'dr']
-             var optionsoff = ['ai', 'sa']
-             for (var i in optionson) {
-                 document.getElementById(optionson[i]).checked = true;
-             }
-             for (var i in optionsoff) {
-                 document.getElementById(optionsoff[i]).checked = false;
-             }
-             for (var j in checks) {
-                 document.getElementById(checks[j]).checked = false;
-             }
-         }
-         else if (!document.getElementById('ext').checked &&
-                  document.getElementById('adv').checked) {
-             var optionson = ['ai', 'ae', 'sa', 'dp', 'dr']
-             var optionsoff = ['se']
-             for (var i in optionson) {
-                 document.getElementById(optionson[i]).checked = true;
-             }
-             for (var i in optionsoff) {
-                 document.getElementById(optionsoff[i]).checked = false;
-             }
-             for (var j in checks) {
-                 document.getElementById(checks[j]).checked = false;
-             }
-         }
-     }
-
-
-     function dispAdvisory() {
-         var checks  = ['int', 'perm', 'allcomment', 'nocomment']
-         if (document.getElementById('adv').checked &&
-             !document.getElementById('ext').checked) {
-             var optionson = ['ai', 'ae', 'sa', 'dp', 'dr']
-             var optionsoff = ['se']
-             for (var i in optionson) {
-                 document.getElementById(optionson[i]).checked = true;
-             }
-             for (var i in optionsoff) {
-                 document.getElementById(optionsoff[i]).checked = false;
-             }
-             for (var j in checks) {
-                 document.getElementById(checks[j]).checked = false;
-             }
-         }
-         else if (document.getElementById('adv').checked &&
-                  document.getElementById('ext').checked) {
-             var optionson = ['ae', 'se', 'sa', 'dp', 'dr']
-             var optionsoff = ['ai']
-             for (var i in optionson) {
-                 document.getElementById(optionson[i]).checked = true;
-             }
-             for (var i in optionsoff) {
-                 document.getElementById(optionsoff[i]).checked = false;
-             }
-             for (var j in checks) {
-                 document.getElementById(checks[j]).checked = false;
-             }
-         }
-         else if (!document.getElementById('adv').checked &&
-                  document.getElementById('ext').checked) {
-             var optionson = ['ae', 'se', 'dp', 'dr']
-             var optionsoff = ['ai', 'sa']
-             for (var i in optionson) {
-                 document.getElementById(optionson[i]).checked = true;
-             }
-             for (var i in optionsoff) {
-                 document.getElementById(optionsoff[i]).checked = false;
-             }
-             for (var j in checks) {
-                 document.getElementById(checks[j]).checked = false;
-             }
-         }
-     }
-
-
-     function dispAll() {
-         var optionson = ['ai', 'ae', 'se', 'sa', 'dp', 'dr']
-         var checks  = ['int', 'perm', 'ext', 'adv', 'nocomment']
-         if (document.getElementById('allcomment').checked) {
-             for (var i in optionson) {
-                 document.getElementById(optionson[i]).checked = true;
-             }
-             for (var j in checks) {
-                 document.getElementById(checks[j]).checked = false;
-             }
-         }
-     }
-     function dispNone() {
-         var optionson = ['ai', 'ae', 'se', 'sa', 'dp', 'dr']
-         var checks  = ['int', 'perm', 'ext', 'adv', 'allcomment']
-         if (document.getElementById('nocomment').checked) {
-             for (var i in optionson) {
-                 document.getElementById(optionson[i]).checked = false;
-             }
-             for (var j in checks) {
-                 document.getElementById(checks[j]).checked = false;
-             }
-         }
-     }
-     function showOptions(obj) {
-         var el = document.getElementById(obj);
-         if (el.style.display == 'none') {
-             el.style.display = 'block';
-         }
-         else {
-             el.style.display = 'none';
-         }
-     }
-     function selectImageVersion(obj) {
-         // Display the radio button for selecting the version of image
-         // to use if the checkbox gets selected.
-
-         var checkBox = document.getElementById(obj);
-         var radioBtn = document.getElementById('pub-image');
-         if (checkBox.checked == true) {
-             radioBtn.style.display = 'block';
-         }
-         else {
-             radioBtn.style.display = 'none';
-         }
-     }
-     function checkGreen() {
-         var optgreen = ['dispImg', 'dispKP', 'dispLearnMore']
-         for (var k in optgreen) {
-           //  if (document.getElementById(optgreen[k]).checked == false)
-             if (document.getElementById('allGreen').checked == false) {
-                 document.getElementById(optgreen[k]).checked = false;
-             }
-             else {
-                 document.getElementById(optgreen[k]).checked = true;
-             }
-         }
-     }
-  </script>
-""")
-docType  = fields.getvalue("DocType")    or None
-if docType: cdrcgi.valParmVal(docType, val_list=cdr.getDoctypes(session))
-docTitle = fields.getvalue("DocTitle")   or None
-version  = fields.getvalue("DocVersion") or None
-if version: cdrcgi.valParmVal(version, regex=cdrcgi.VP_SIGNED_INT)
-glossary = fields.getvalue("Glossaries") or None
-images   = fields.getvalue("Images")     or None
-pubImages = fields.getvalue("PubImages") or 'Y'
-citation = fields.getvalue("CitationsHP") \
-             or fields.getvalue("CitationsPat") or None
-loe      = fields.getvalue("LOEs")       or None
-smdata   = fields.getvalue("SMD")        or None
-qd       = fields.getvalue("QD")         or None
-kpbox    = fields.getvalue("Keypoints")  or None
-learnmore= fields.getvalue("LearnMore")  or None
-modMarkup= fields.getvalue("ModuleMarkup")     or None
-qcOnly   = fields.getvalue("QCOnlyMod")  or None
-sumRefs  = fields.getvalue("SummaryRefs") or None
-
-standardWording      = fields.getvalue("StandardWording") or None
-audInternComments    = fields.getvalue("AudInternalComments")  or None
-audExternComments    = fields.getvalue("AudExternalComments")  or None
-durPermanentComments = fields.getvalue("DurPermanentComments") or None
-durRegularComments   = fields.getvalue("DurRegularComments")   or None
-srcAdvisoryComments  = fields.getvalue("SrcAdvisoryComments")  or None
-srcEditorComments    = fields.getvalue("SrcEditorComments")    or None
-
-grp1Internal         = fields.getvalue("internal") or None
-grp1Permanent        = fields.getvalue("permanent") or None
-grp2External         = fields.getvalue("external") or None
-grp2Advisory         = fields.getvalue("advisory") or None
-
-displayBoard  = fields.getvalue('Editorial-board') and 'editorial-board_' or ''
-displayBoard += fields.getvalue('Advisory-board')  and 'advisory-board'   or ''
-displayAudience = fields.getvalue('Patient') and 'patient_' or ''
-displayAudience +=fields.getvalue('HP')      and 'hp'       or ''
-glossaryDefinition = fields.getvalue('GlossaryDefinition')
-
-# insRevLvls  = fields.getvalue("revLevels")  or None
-insRevLvls  = fields.getvalue("insRevLevels")  or None
-delRevLvls  = fields.getvalue("delRevLevels")  or None
-if not insRevLvls:
-    insRevLvls = fields.getvalue('publish') and 'publish|' or ''
-    insRevLvls += fields.getvalue('approved') and 'approved|' or ''
-    insRevLvls += fields.getvalue('proposed') and 'proposed' or ''
-
-if not docId and not docType:
-    cdrcgi.bail("No document specified", repTitle)
-
-if docId:
-    digits = re.sub('[^\d]+', '', docId)
-    intId  = int(digits)
-
-#----------------------------------------------------------------------
-# Do some parameter scrubbing for OCECDR-3800.
-#----------------------------------------------------------------------
-if docType and re.search("\\W", docType):
-    cdrcgi.bail("Invalid document type parameter")
-if repType and re.search("\\W", repType):
-    cdrcgi.bail("Invalid report type parameter")
-# The version number -1 for the CWD is deprecated
-if version and re.search("\\W", version) and int(version) not in (-1, 0):
-    cdrcgi.bail("Invalid document version parameter")
-
-# ---------------------------------------------------------------
-# Passing a single parameter to the filter to decide if only the
-# internal, external, all, or none of the audience comments
-# should be displayed.
-# ---------------------------------------------------------------
-if not audInternComments and not audExternComments:
-    audienceComments = 'N'  # No comments
-elif audInternComments and not audExternComments:
-    audienceComments = 'I'  # Internal comments only
-elif not audInternComments and audExternComments:
-    audienceComments = 'E'  # External comments only (default)
-else:
-    audienceComments = 'A'  # All comments
-
-# ---------------------------------------------------------------
-# The source of a comment can be editorial or advisory
-# ---------------------------------------------------------------
-if not srcAdvisoryComments and not srcEditorComments:
-    sourceComments = 'N'  # No comments
-elif srcAdvisoryComments and not srcEditorComments:
-    sourceComments = 'V'  # Advisory board comments only
-elif not srcAdvisoryComments and srcEditorComments:
-    sourceComments = 'E'  # Editorial board comments only (default)
-else:
-    sourceComments = 'A'  # All comments
-
-# ---------------------------------------------------------------
-# The duration of a comment can be normal or permanent
-# ---------------------------------------------------------------
-if not durPermanentComments and not durRegularComments:
-    durationComments = 'N'  # No comments
-elif durPermanentComments and not durRegularComments:
-    durationComments = 'P'  # Permanent comments only
-elif not durPermanentComments and durRegularComments:
-    durationComments = 'R'  # External comments only (default)
-else:
-    durationComments = 'A'  # All comments
-
-# ---------------------------------------------------------------
-# In the case that two comment types should be combined (internal
-# and permanent/external and advisory) we need to submit an
-# additional parameter to the filters.
-# ---------------------------------------------------------------
-if grp1Internal and grp1Permanent:
-    includeExtPerm = 'Y'
-else:
-    includeExtPerm = 'N'
-
-if grp2External and grp2Advisory:
-    includeIntAdv  = 'Y'
-else:
-    includeIntAdv  = 'N'
-
-#----------------------------------------------------------------------
-# Handle navigation requests.
-#----------------------------------------------------------------------
-if action == cdrcgi.MAINMENU:
-    cdrcgi.navigateTo("Admin.py", session)
-elif action == SUBMENU:
-    cdrcgi.navigateTo("Reports.py", session)
-
-#----------------------------------------------------------------------
-# Handle request to log out.
-#----------------------------------------------------------------------
-if action == "Log Out":
-    cdrcgi.logout(session)
-
-#----------------------------------------------------------------------
-# If we have a document type but no doc ID or title, ask for the title.
-#----------------------------------------------------------------------
-if not docId and not docTitle and not glossaryDefinition:
-    extra = ""
-    fieldName = 'DocTitle'
-    label = ["", ""]
-    if docType:
-        extra += "<INPUT TYPE='hidden' NAME='DocType' VALUE='%s'>" % docType
-        if docType == 'PDQBoardMemberInfo':
-           label = ['Board Member Name',
-                    'Board Member CDR ID']
-        elif docType == 'GlossaryTermConcept':
-           label = ('Glossary Definition', 'CDR ID')
-           fieldName = 'GlossaryDefinition'
-        else:
-           label = ['Document Title',
-                    'Document CDR ID']
-
-    if repType:
-        extra += "\n   "
-        extra += "<INPUT TYPE='hidden' NAME='ReportType' VALUE='%s'>" % repType
-    form = """\
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-   %s
-   <TABLE>
-    <TR>
-     <TD ALIGN='right'><B>%s:&nbsp;</B><BR/>(use %% as wildcard)</TD>
-     <TD><INPUT SIZE='60' NAME='%s'></TD>
-    </TR>
-    <TR>
-     <TD> </TD>
-     <TD>... or ...</TD>
-    </TR>
-    <TR>
-     <TD ALIGN='right'><B>%s:&nbsp;</B></TD>
-     <TD><INPUT SIZE='60' NAME='DocId'></TD>
-    </TR>
-   </TABLE>
-""" % (cdrcgi.SESSION, session, extra, label[0], fieldName, label[1])
-    cdrcgi.sendPage(header + form + """\
-  </FORM>
- </BODY>
-</HTML>
-""")
-
-#----------------------------------------------------------------------
-# Set up a database connection and cursor.
-#----------------------------------------------------------------------
-try:
-    conn = db.connect(user='CdrGuest', timeout=300)
-    cursor = conn.cursor()
-except Exception as e:
-    cdrcgi.bail(f"Database connection failure: {e}")
-
-#----------------------------------------------------------------------
-# More than one matching title; let the user choose one.
-#----------------------------------------------------------------------
-def showTitleChoices(choices):
-    form = """\
-   <H3>More than one matching document found; please choose one.</H3>
-"""
-    for choice in choices:
-        form += """\
-   <INPUT TYPE="radio" id="%d" NAME="DocId" VALUE="CDR%010d">
-   <label for="%d">[CDR%06d] %s</label><BR>
-""" % (choice[0], choice[0], choice[0], choice[0], 
-       html_escape(choice[1]))
-    cdrcgi.sendPage(header + form + """\
-   <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-   <INPUT TYPE='hidden' NAME='DocType' VALUE='%s'>
-   <INPUT TYPE='hidden' NAME='ReportType' VALUE='%s'>
-  </FORM>
- </BODY>
-</HTML>
-""" % (cdrcgi.SESSION, session, docType or '', repType or ''))
-
-# ---------------------------------------------------------------------
-# Adding a line to add on/off checkbox options
-# ---------------------------------------------------------------------
-def addCheckbox(inputLabels, inputName, inputID='', checked=0):
-    isChecked = checked and "checked='1'" or ""
-    showImages = ''
-
-    # Adding on-click trigger when 'Images' are selected so that the
-    # user can decide to include publishable versions of images or
-    # non-publishable versions.
-    # ---------------------------------------------------------------
-    if inputName == 'Images':
-       showImages = 'onclick="selectImageVersion(\'displayImages\')"'
-
-    cbHtml = """\
-      <input name='%s' type='checkbox' id='%s' %s
-             %s>&nbsp;
-      <label for='%s'>%s</label>
-      <br>
-""" % (inputName, inputID, showImages, isChecked, inputID,
-       inputLabels[inputName])
-    return cbHtml
-
-# ---------------------------------------------------------------------
-# Adding a set of radio buttons
-# Users want to be able to display either the last publishable version
-# of an image or the last version (if exists).
-# The default is to display the last publishable version of the image.
-# ---------------------------------------------------------------------
-def addImageRadioBtn(inputLabels, inputName, inputID=''):
-    id1 = 'pubYes'
-    id2 = 'pubNo'
-    cbHtml = """\
-      <div id="pub-image" class="radio-button" style="display:none;">
-       <input type='radio' name='%s' id='%s'
-              value="Y" checked>&nbsp;
-       <label for='%s'>%s</label>
-       <br>
-       <input type='radio' name='%s' id='%s'
-              value="N" >&nbsp;
-       <label for='%s'>%s</label>
-       <br>
-      </div>
-""" % (inputName, id1, id1, inputLabels['PubImages'][id1],
-       inputName, id2, id2, inputLabels['PubImages'][id2])
-    return cbHtml
-
-#----------------------------------------------------------------------
-# If we have a document title (or glossary definition) but not a
-# document ID, find the ID.
-#----------------------------------------------------------------------
-if not docId:
-    lookingFor = 'title'
-    try:
-        if docType == 'GlossaryTermConcept':
-            lookingFor = 'definition'
-            cursor.execute("""\
-                SELECT d.id, d.title
-                  FROM document d
-                  JOIN query_term q
-                    ON d.id = q.doc_id
-                 WHERE q.path IN ('/GlossaryTermConcept/TermDefinition' +
-                                  '/DefinitionText',
-                                  '/GlossaryTermConcept' +
-                                  '/TranslatedTermDefinition/DefinitionText')
-                   AND q.value LIKE ?""", "%" + glossaryDefinition + "%")
-        elif docType:
-            cursor.execute("""\
-                SELECT document.id, document.title
-                  FROM document
-                  JOIN doc_type
-                    ON doc_type.id = document.doc_type
-                 WHERE doc_type.name = ?
-                   AND document.title LIKE ?""", (docType, docTitle + '%'))
-        else:
-            # How can we get here???
-            cursor.execute("""\
-                SELECT id, title
-                  FROM document
-                 WHERE title LIKE ?""", docTitle + '%')
-        rows = cursor.fetchall()
-        if not rows:
-            cdrcgi.bail("Unable to find document with %s %s" %
-                        (lookingFor, repr(docTitle)))
-        if len(rows) > 1:
-            showTitleChoices(rows)
-        intId = rows[0][0]
-        docId = "CDR%010d" % intId
-    except Exception as e:
-        cdrcgi.bail(f"Failure looking up document {lookingFor}: {e}")
-
-#----------------------------------------------------------------------
-# We have a document ID.  Check added at William's request.
-#----------------------------------------------------------------------
-elif docType:
-    cursor.execute("""\
-        SELECT t.name
-          FROM doc_type t
-          JOIN document d
-            ON d.doc_type = t.id
-         WHERE d.id = ?""", intId)
-    rows = cursor.fetchall()
-    if not rows:
-        cdrcgi.bail("CDR%d not found" % intId)
-    elif rows[0][0].upper() != docType.upper():
-        cdrcgi.bail("CDR%d has document type %s" % (intId, rows[0][0]))
-
-#----------------------------------------------------------------------
-# Let the user pick the version for most Summary or Glossary reports.
-# OCECDR-4190: let the user pick the version for drug information summaries.
-#
-# Note: The QC report "Glossary Term Name with Concept" called from 
-#       within XMetaL is running Filter.py instead of QcReport.py!!!
-#       The CDR Admin interface is calling QcReport.py. This affects
-#       the reportType "GlossaryTermName:gtnwc"
-#----------------------------------------------------------------------
-letUserPickVersion = False
-if not version:
-    if docType in ('Summary', 'GlossaryTermName'):
-        if repType and repType not in ('pp', 'gtnwc'):
-            letUserPickVersion = True
-    if docType == "DrugInformationSummary":
-        letUserPickVersion = True
-if letUserPickVersion:
-    try:
-        cursor.execute("""\
-            SELECT num,
-                   comment,
-                   dt
-              FROM doc_version
-             WHERE id = ?
-          ORDER BY num DESC""", intId)
-        rows = cursor.fetchall()
-    except Exception as e:
-        cdrcgi.bail(f"Failure retrieving document versions: {e}")
-    form = """\
-  <INPUT TYPE='hidden' NAME='%s' VALUE='%s'>
-  <INPUT TYPE='hidden' NAME='DocType' VALUE='%s'>
-  <INPUT TYPE='hidden' NAME='DocId' VALUE='CDR%010d'>
-""" % (cdrcgi.SESSION, session, docType, intId)
-
-    if debug:
-        form += '  <input type="hidden" name="debug" value="yes, please">\n'
-
-    # Include the ReportType so the "DocumentVersion" screen can differentiate
-    # the specific report type to run.
-    form += """\
-  <INPUT TYPE='hidden' NAME='ReportType' VALUE='%s'>
-""" % (repType or "")
-
-    form += """\
-  <fieldset class='docversion'>
-   <legend>&nbsp;Select document version&nbsp;</legend>
-  <div style="width: 100%; text-align: center;">
-  <div style="margin: 0 auto;">
-  <SELECT NAME='DocVersion'>
-   <OPTION VALUE='0' SELECTED='1'>Current Working Version</OPTION>
+#!/usr/bin/env python
+"""Prepare a document for comprehensive reivew.
 """
 
-    # Limit display of version comment to 120 chars (if exists)
-    # ---------------------------------------------------------
-    for row in rows:
-        form += """\
-   <OPTION VALUE='%d'>[V%d %s] %s</OPTION>
-""" % (row[0], row[0], str(row[2])[:10],
-       not row[1] and "[No comment]" or html_escape(row[1][:120]))
-        selected = ""
-    form += "</SELECT></div></div>"
-    form += """
-  </fieldset>
-"""
-    if docType in ("Summary", "DrugInformationSummary", "GlossaryTermName"):
-        form += """\
-  <BR>
-  <fieldset class="wrapper">
-   <legend>&nbsp;Select Insertion/Deletion markup to be displayed
-           (one or more)&nbsp;</legend>
-"""
-        # The Board Markup does not apply to the Patient Version Summaries
-        # or the DrugInfoSummary or GlossaryTerm reports
-        # ----------------------------------------------------------------
-        if docType == 'Summary':
-            if repType not in ("pat", "patbu", "patrs"):
-                form += """\
-     <fieldset>
-      <legend>&nbsp;Board Markup&nbsp;</legend>
-      <input name='Editorial-board' type='checkbox' id='eBoard'
-                   checked='1'>
-      <label for='eBoard'>Editorial board markup</label>
-      <br>
-      <input name='Advisory-board' type='checkbox' id='aBoard'>
-      <label for='aBoard'>Advisory board markup</label>
-     </fieldset>
-"""
-        # Display the check boxed for the Revision-level Markup
-        # XXX WHAT IS THIS <TD> TAG DOING???
-        # -----------------------------------------------------
-    ### <td valign="top">
-        form += """\
-     <fieldset>
-      <legend>&nbsp;Revision-level Markup&nbsp;</legend>
-      <input name='publish' type='checkbox' id='pup'>
-      <label for='pup'>With publish attribute</label>
-      <br>
-      <input name='approved' type='checkbox' id='app'
-                   checked='1'>
-      <label for='app'>With approved attribute</label>
-      <br>
-      <input name='proposed' type='checkbox' id='prop'>
-      <label for='prop'>With proposed attribute</label>
-     </fieldset>
-  </fieldset>
-"""
+from functools import cached_property
+from json import dumps
+from os import environ
+from types import SimpleNamespace
+from lxml import html
+from cdr import FILTERS
+from cdrapi.docs import Doc
+from cdrcgi import Controller, HTMLPage
 
-    # Display the check boxes for the HP or Patient version sections
-    # --------------------------------------------------------------
-    if docType == 'GlossaryTermName':
-        form += """\
-     <table>
-      <tr>
-       <td class="colheading">Display Audience Definition</td>
-      </tr>
-      <tr>
-       <td>
-        <INPUT TYPE="checkbox" NAME="HP"
-                         CHECKED='1'>&nbsp;&nbsp; Health Professional
-       </td>
-      </tr>
-      <tr>
-       <td>
-        <INPUT TYPE="checkbox" NAME="Patient"
-                         CHECKED='1'>&nbsp;&nbsp; Patient<BR>
-       </td>
-      </tr>
-    </table>
-"""
 
-# Start - Misc Print Options block
-# ------------------------------------
-    checkboxLabels = { 'CitationsPat':'Display Reference section',
-                       'CitationsHP':'Display HP Reference section',
-                       'Glossaries':'Display glossary terms at end of report',
-                       'Images':'Display images ...',
-                       'Keypoints':'Display Key Point boxes',
-                       'LearnMore':
-                            'Display To Learn More section',
-                       'LOEs':
-                            'Display Level of Evidence terms',
-                       'StandardWording':
-                            'Display standard wording with mark-up',
-                       'ModuleMarkup':
-                            'Display Modules Shaded',
-                       'QCOnlyMod':
-                            'Display QC-only Modules (Board Members QC Report)',
-                       'SMD':
-                            'Display Section Meta Data',
-                       'SummaryRefs':
-                            'Display Summary Ref and Fragment Ref Links'
-                 }
+class Control(Controller):
+    """Top-level logic for the report."""
 
-    radioBtnLabels = { 'PubImages':{'pubYes':'... use publishable version',
-                                    'pubNo':'... use non-publishable version'}
-                 }
+    SUBTITLE = "QC Report"
+    LOGNAME = "qc-report"
+    METHOD = "GET"
+    TITLES_BY_REPORT_TYPE = dict(
+        bu="HP Bold/Underline QC Report",
+        but="HP Bold/Underline QC Report (Test)",
+        rs="HP Redline/Strikeout QC Report",
+        rst="HP Redline/Strikeout QC Report (Test)",
+        nm="QC Report (No Markup)",
+        pat="PT Redline/Strikeout QC Report",
+        patrs="PT Redline/Strikeout QC Report",
+        patbu="PT Bold/Underline QC Report",
+        pp="Publish Preview Report",
+        img="Media QC Report",
+        gtnwc="Glossary Term Name With Concept Report",
+    )
+    TITLES_BY_DOCTYPE = dict(
+        GlossaryTermName="Glossary Term Name QC Report",
+        GlossaryTermConcept="Glossary Term Concept QC Report",
+        PDQBoardMemberInfo="PDQ Board Member Information QC Report",
+        DrugInformationSummary="Drug Information Summary QC Report",
+        Media="Media Document QC Report",
+        Summary="Summary QC Report",
+        MiscellaneousDocument="Miscellaneous Document QC Report",
+    )
+    UNRECOGNIZED_TYPE = "QC Report (Unrecognized Type)"
+    GTC = "GlossaryTermConcept"
+    GTC_DEFINITION_PATHS = f"/{GTC}/%TermDefinition/DefinitionText"
+    TITLE_LABELS = dict(
+        PDQBoardMemberInfo="Board Member Name",
+        GlossaryTermConcept="Glossary Definition",
+    )
+    MARKUP_INSTRUCTIONS = (
+        "Select Insertion/Deletion Markup to be displayed (one or more)."
+    )
+    MARKUP_BOARD_OPTIONS = (
+        ("markup-editorial", "Editorial board markup"),
+        ("markup-advisory", "Advisory board markup"),
+    )
+    MARKUP_LEVEL_OPTIONS = (
+        ("markup-publish", "With publish attribute"),
+        ("markup-approved", "With approved attribute"),
+        ("markup-proposed", "With proposed attribute"),
+    )
+    MISCELLANEOUS_OPTIONS = (
+        ("glossary", "Display glossary terms at end of report"),
+        ("hp-reference", "Display HP Reference section"),
+        ("images", "Display images"),
+        ("publishable-images", "Use publishable images"),
+        ("keypoints", "Display Key Point boxes"),
+        ("std-wording", "Display standard wording with mark-up"),
+        ("pat-cites", "Display Reference section"),
+        ("more", "Display To Learn More section"),
+        ("loes", "Display Level of Evidence terms"),
+        ("shade-modules", "Display Modules Shaded"),
+        ("qc-only-mods", "Display QC-only Modules (Board Members QC Report)"),
+        ("section-meta", "Display Section Meta Data"),
+        ("summary-refs", "Display Summary Ref and Fragment Ref Links"),
+    )
+    COMMENT_OPTIONS = (
+        (
+            ("com-int", "Internal Comments (excluding permanent comments)"),
+            ("com-perm", "Permanent Comments (internal & external)"),
+        ),
+        (
+            ("com-ext", "External Comments"),
+            ("com-adv", "Advisory Board Comments (internal & external)"),
+        ),
+        (
+            ("com-all", "All Comments"),
+            ("com-none", "No Comments"),
+        ),
+    )
+    DETAILED_COMMENT_OPTIONS = (
+        (
+            "Audience (txt color)",
+            (
+                ("com-aud-int", "Internal"),
+                ("com-aud-ext", "External"),
+            ),
+            dict(YY="A", YN="I", NY="E", NN="N"),
+        ),
+        (
+            "Source (txt spacing)",
+            (
+                ("com-src-ed", "Not Advisory"),
+                ("com-src-adv", "Advisory"),
+            ),
+            dict(YY="A", YN="E", NY="V", NN="N"),
+        ),
+        (
+            "Duration (background)",
+            (
+                ("com-dur-perm", "Permanent"),
+                ("com-dur-temp", "Non-permanent"),
+            ),
+            dict(YY="A", YN="P", NY="R", NN="N"),
+        ),
+    )
+    GLOSSARY_DEFINITION_OPTIONS = (
+        ("glossary-definitions-hp", "Health Professional"),
+        ("glossary-definitions-patient", "Patient"),
+    )
+    DEFAULT_OPTIONS = {
+        "com-aud-int",
+        "com-aud-ext",
+        "com-dur-perm",
+        "com-dur-temp",
+        "com-int",
+        "com-ext",
+        "com-src-adv",
+        "com-src-ed",
+        "glossary-definitions-hp",
+        "glossary-definitions-patient",
+        "hp-reference",
+        "keypoints",
+        "markup-approved",
+        "markup-editorial",
+        "more",
+        "pat-cites",
+        "publishable-images",
+    }
+    HP_ONLY_OPTIONS = {"hp-reference", "loes"}
+    HP_ONLY_DEFAULTS = {"com-ext", "com-adv", "com-aud-ext", "com-dur-perm"}
+    PATIENT_ONLY_OPTIONS = {"keypoints", "std-wording", "pat-cites", "more"}
+    PATIENT_ONLY_DEFAULTS = {"com-int", "com-aud-int", "com-src-adv"}
+    HIDDEN_OPTIONS = {"publishable-images"}
+    HIDDEN_FOR_PATIENT = {"com-adv"}
+    IMAGE_VERSIONS = "pub", "unpub"
 
-    # Display the Misc. Print Options check boxes for Patients
-    # --------------------------------------------------------
-    if docType == 'Summary':
-        if repType == 'pat' or repType == 'patbu' or repType == 'patrs':
-            form += """\
-         <p>
-         <fieldset>
-          <legend>&nbsp;Misc Print Options&nbsp;</legend>
-    """
+    def populate_form(self, page: HTMLPage):
+        """Create cascading forms as needed.
 
-            form += addCheckbox(checkboxLabels, 'Glossaries',
-                                inputID='displayGlossaries')
-            form += addCheckbox(checkboxLabels, 'Images',
-                                inputID='displayImages', checked=0)
-            form += addImageRadioBtn(radioBtnLabels, 'PubImages',
-                                inputID='displayPubImages')
-            form += addCheckbox(checkboxLabels, 'Keypoints',
-                                inputID='displayKeypoints', checked=1)
-            form += addCheckbox(checkboxLabels, 'StandardWording',
-                                inputID='displayStandardWording')
-            form += addCheckbox(checkboxLabels, 'CitationsPat',
-                                inputID='displayCitations', checked=1)
-            form += addCheckbox(checkboxLabels, 'LearnMore',
-                                inputID='displayLearnMore', checked=1)
-            form += addCheckbox(checkboxLabels, 'ModuleMarkup',
-                                inputID='displayModuleMarkup')
-            form += addCheckbox(checkboxLabels, 'QCOnlyMod',
-                                inputID='displayQCOnlyMod', checked=0)
-            form += addCheckbox(checkboxLabels, 'SMD',
-                                inputID='displaySectMetaData', checked=0)
-            form += addCheckbox(checkboxLabels, 'SummaryRefs',
-                                inputID='displaySummaryRefs', checked=0)
-
-        # End - Misc Print Options block
-        # ------------------------------
-            form += """\
-             </fieldset>
+        Required positional argument:
+          page - instance of the cdrcgi.HTMLPage class
         """
 
-    # Display the Comment display checkbox
-    # Patient Summaries display the Internal Comments by default
-    # Internal Option Grid:  X  X  O
-    #                        O  X  X
-    # HP Summaries display the External Comments by default
-    # External Option Grid:  O  X  X
-    #                        X  O  X
-    # -----------------------------------------------------------
-    if docType == 'Summary':
-        form += """\
-     <p>
-     <fieldset>
-      <legend>&nbsp;Select Comment Types to be displayed&nbsp;</legend>
-      <div class='comgroup'>
-      <input name='internal' type='checkbox' id='int'
-"""
-        if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
-            form += """\
-"""
+        # Skip the form if we already have everything we need.
+        if self.ready:
+            return self.show_report()
+
+        # Separate out the work to draw the complex "version" form.
+        if self.version_needed:
+            page.form.append(page.hidden_field("DocId", self.doc.id))
+            self.show_version_form(page)
+
+        # Ask the user to choose from multiple title fragment matches.
+        elif self.titles:
+            fieldset = page.fieldset("Choose Document")
+            for id, title in self.titles:
+                opts = dict(label=title, value=id)
+                fieldset.append(page.radio_button("DocId", **opts))
+            page.form.append(fieldset)
+
+        # Otherwise, ask for an ID or a title fragment.
         else:
-            form += """\
-                   CHECKED="1"
-"""
-        form += """\
-                   onclick='javascript:dispInternal()'>
-      <label for='int'>Internal Comments (excluding permanent comments)</label>
-      <br>
-      <input name='permanent' type='checkbox' id='perm'
-                   onclick='javascript:dispPermanent()'>
-      <label for='perm'>Permanent Comments (internal & external)</label>
-      </div>
-"""
-        # The users don't want the option for advisory-board comments
-        # displayed for the patient summaries because these summaries
-        # are never reviewed by the advisory board.
-        # In order to keep the code unchanged I'm just removing the
-        # option displayed but not those options that are actually
-        # being checked by the JavaScript functions.
-        # -----------------------------------------------------------
-        # XXX
-        if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
-            form += """\
-      <div class='comgroup'>
-      <input name='external' type='checkbox' id='ext'
-                   CHECKED="1"
-                   onclick='javascript:dispExternal()'>
-      <label for='ext'>External Comments (excluding advisory comments)</label>
-      <br>
-      <input name='advisory' type='checkbox' id='adv'
-                   onclick='javascript:dispAdvisory()'>
-      <label for='adv'>Advisory Board Comments (internal & external)</label>
-      </div>
-"""
-        else:
-            form += """\
-      <div class='comgroup'>
-      <input name='external' type='checkbox' id='ext'
-                   onclick='javascript:dispExternal()'>
-      <label for='ext'>External Comments</label>
-       <!-- I need the element as a hidden field so that I can use the same
-            javascript functions for HP and Patient version -->
-       <input name='advisory' type='hidden' id='adv'
-                   onclick='javascript:dispAdvisory()'>
-       </div>
-      </div>
-"""
+            fieldset = page.fieldset("Title or Document ID")
+            opts = dict(
+                label=self.TITLE_LABELS.get(self.doctype, "Document Title"),
+                value=self.fragment,
+                tooltip="Use % as wildcard.",
+            )
+            fieldset.append(page.text_field("DocTitle", **opts))
+            label = "Document CDR ID"
+            if self.doctype == "PDQBoardMemberInfo":
+                label = "Board Member CDR ID"
+            opts = dict(label=label, value=self.id)
+            fieldset.append(page.text_field("DocId", **opts))
+            page.form.append(fieldset)
 
-        form += """\
-      <div class='comgroup'>
-      <input name='all' type='checkbox' id='allcomment'
-                   onclick='javascript:dispAll()'>
-      <label for='allcomment'>All Comments</label>
-      <br>
-      <input name='no' type='checkbox' id='nocomment'
-                   onclick='javascript:dispNone()'>
-      <label for='nocomment'>No Comments</label>
-     </div>
-     Click <a onclick="showOptions('hide');" title='More options'
-              style="color: blue; text-decoration: underline;">here</a>
-     for individual options ...
-     </fieldset>
-     <fieldset id='hide' style="display: none;">
-     <table>
-      <tr>
-       <td class="colheading"
-           colspan="3">Display Comments and Responses
-                       (mark comment type to be displayed)</td>
-      </tr>
-      <tr>
-       <td>
-        <table>
-      <tr>
-       <td class="subheading">Audience (txt color)</td>
-      </tr>
-      <tr>
-       <td>
-        <INPUT TYPE    = "checkbox"
-               NAME    = "AudInternalComments"
-"""
+        # Carry forward information we've gathered along the way.
+        if self.report_type:
+            page.form.append(page.hidden_field("ReportType", self.report_type))
+        if self.doctype:
+            page.form.append(page.hidden_field("DocType", self.doctype))
+        if self.loglevel == "DEBUG":
+            page.form.append(page.hidden_field("debug", True))
 
-        if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
-            form += """\
-"""
-        else:
-            form += """\
-               CHECKED = "1"
-"""
+    def show_report(self):
+        """Custom reporting handled by the filters."""
 
-        form += """\
-               ID      = "ai">&nbsp; Internal
-       </td>
-      </tr>
-      <tr>
-       <td>
-        <INPUT TYPE    = "checkbox"
-               NAME    = "AudExternalComments"
-"""
+        if not self.ready:
+            return self.show_form()
+        args = self.doc.id, self.doc.version, self.doctype, self.parameters
+        self.logger.info("QC for %s version %s type %s with parms %s", *args)
+        if self.report_type == "pp":
+            params = dict(ReportType="pp", DocId=self.doc.id)
+            if self.doctype == "Summary":
+                params["Version"] = "cwd"
+            return self.redirect("PublishPreview.py", **params)
+        if self.doctype == "Summary":
+            self.logger.info("packing params")
+            params = dict(
+                DocId=self.doc.id,
+                DocType=self.doctype,
+                parmstring="yes",
+                parmid=self.parameter_set_id,
+            )
+            if self.report_type:
+                params["ReportType"] = self.report_type
+            if self.version_integer:
+                params["DocVersion"] = self.version_integer
+            self.logger.info("packed params=%s", params)
+            return self.redirect("QCforWord.py", **params)
+        self.send_page(self.html_page)
 
-        if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
-            form += """\
-               CHECKED = "1"
-"""
-        else:
-            form += """\
-"""
+    def show_version_form(self, page: HTMLPage):
+        """Ask the user to choose a version and some report options.
 
-        form += """\
-               ID      = "ae">&nbsp; External
-       </td>
-       </tr>
-       </table>
-       </td>
-       <td>
-        <table>
-      <tr>
-       <td class="subheading">Source (txt spacing)</td>
-      </tr>
-         <tr>
-       <td>
-        <INPUT TYPE    = "checkbox"
-               NAME    = "SrcEditorComments"
-               CHECKED = "1"
-               ID      = "se">&nbsp; Not Advisory
-       </td>
-      </tr>
-      <tr>
-       <td>
-        <INPUT TYPE    = "checkbox"
-               NAME    = "SrcAdvisoryComments"
-"""
-
-        if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
-            form += """\
-"""
-        else:
-            form += """\
-               CHECKED = "1"
-"""
-
-        form += """\
-               ID      = "sa">&nbsp; Advisory
-       </td>
-       </tr>
-       </table>
-       </td>
-       <td>
-        <table>
-      <tr>
-       <td class="subheading">Duration (background)</td>
-      </tr>
-         <tr>
-       <td>
-        <INPUT TYPE    = "checkbox"
-               NAME    = "DurPermanentComments"
-"""
-
-        if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
-            form += """\
-               CHECKED = "1"
-"""
-        else:
-            form += """\
-"""
-
-        form += """\
-               ID      = "dp">&nbsp; Permanent
-       </td>
-      </tr>
-      <tr>
-       <td>
-        <INPUT TYPE    = "checkbox"
-               NAME    = "DurRegularComments"
-               CHECKED = "1"
-               ID      = "dr">&nbsp; Non-permanent
-       </td>
-       </tr>
-       </table>
-       </td>
-      </tr>
-     </table>
-     </fieldset>
-"""
-
-    # Display the Misc. Print Options check boxes for HP
-    # --------------------------------------------------
-    if docType == 'Summary':
-        if repType != 'pat' and repType != 'patbu' and repType != 'patrs':
-            form += """\
-         <p>
-         <fieldset>
-          <legend>&nbsp;Misc Print Options&nbsp;</legend>
-    """
-
-            form += addCheckbox(checkboxLabels, 'Glossaries',
-                                inputID='displayGlossaries')
-            form += addCheckbox(checkboxLabels, 'CitationsHP',
-                                inputID='displayCitations', checked=1)
-            form += addCheckbox(checkboxLabels, 'Images',
-                                inputID='displayImages', checked=0)
-            form += addImageRadioBtn(radioBtnLabels, 'PubImages',
-                                inputID='displayPubImages')
-            form += addCheckbox(checkboxLabels, 'LOEs',
-                                inputID='displayLOEs')
-            form += addCheckbox(checkboxLabels, 'ModuleMarkup',
-                                inputID='displayModuleMarkup', checked=0)
-            form += addCheckbox(checkboxLabels, 'QCOnlyMod',
-                                inputID='displayQCOnlyMod', checked=0)
-            form += addCheckbox(checkboxLabels, 'SMD',
-                                inputID='displaySectMetaData', checked=0)
-            form += addCheckbox(checkboxLabels, 'SummaryRefs',
-                                inputID='displaySummaryRefs', checked=0)
-
-        # End - Misc Print Options block
-        # ------------------------------
-            form += """\
-             </fieldset>
+        Required positional argument:
+          page - instance of the HTMLPage class
         """
 
-    # Display the Quick&Dirty option checkbox
-    # ---------------------------------------
-    if docType == 'Summary':
-        form += """\
-  <p>
-     <fieldset>
-      <legend>&nbsp;911 Options&nbsp;</legend>
-      &nbsp;<input name='QD' type='checkbox' id='dispQD'>&nbsp;
-      <label for='dispQD'>Run Quick &amp; Dirty report</label>
-      <br>
-     </fieldset>"""
-#    form += """
-#     </table>"""
+        # Ask the user to pick a version.
+        legend = f"Select Document Version For CDR{self.doc.id}"
+        fieldset = page.fieldset(legend)
+        opts = dict(label="", options=self.versions, default="0")
+        fieldset.append(page.select("DocVersion", **opts))
+        page.form.append(fieldset)
 
-    cdrcgi.sendPage(header + form + """
- </BODY>
-</HTML>
-""")
+        # Adjust available options and defaults appropriately.
+        defaults = set(self.DEFAULT_OPTIONS)
+        if self.patient:
+            defaults -= self.HP_ONLY_DEFAULTS
+            skip = self.HP_ONLY_OPTIONS
+        else:
+            defaults -= self.PATIENT_ONLY_DEFAULTS
+            skip = self.PATIENT_ONLY_OPTIONS
+        self.logger.debug("option defaults=%s", defaults)
 
-#----------------------------------------------------------------------
-# Determine the document type.
-#----------------------------------------------------------------------
-if not docType:
-    try:
-        cursor.execute("""\
-            SELECT name
-              FROM doc_type
-              JOIN document
-                ON document.doc_type = doc_type.id
-             WHERE document.id = ?""", (intId,))
-        row = cursor.fetchone()
-        if not row:
-            cdrcgi.bail("Unable to find document type for %s" % docId)
-        docType = row[0]
-    except Exception as e:
-            cdrcgi.bail(f"Unable to find document type for {docId}: {e}")
-
-    #----------------------------------------------------------------------
-    # Determine the report type if the document is a summary.
-    # The resulting text output is given as a string similar to this:
-    #      "Treatment Patients KeyPoint KeyPoint KeyPoint"
-    # which will be used to set the propper report type for patient or HP
-    #
-    # In the past there used to be new (including KeyPoints) and old (not
-    # including KeyPoints) summaries and the old versions had to use HP
-    # QC report filters.
-    #----------------------------------------------------------------------
-    if docType == 'Summary':
-        inspectSummary = cdr.filterDoc(session,
-                  """<?xml version="1.0" ?>
-<xsl:transform version="1.1" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
- <xsl:template          match = "Summary">
-  <xsl:apply-templates select = "SummaryMetaData/SummaryAudience"/>
- </xsl:template>
-
- <xsl:template          match = "SummaryAudience">
-  <xsl:value-of        select = "."/>
-  <xsl:text> </xsl:text>
- </xsl:template>
-</xsl:transform>""", inline = 1, docId = docId, docVer = version or None)
-
-        if "Patients" in inspectSummary[0]:
-            repType = 'pat'
-
-
-#----------------------------------------------------------------------
-# Get count of links to a person document from protocols and summaries.
-# Returns a list of 4 numbers:
-#  * Count of linking active, approved, or temporarily closed protocols
-#  * Count of linking closed or completed protocols
-#  * Count of linking health professional summaries
-#  * Count of linking patient summaries
-#----------------------------------------------------------------------
-def getDocsLinkingToPerson(docId):
-    counts = [0, 0, 0, 0, 0]
-    statusValues = [ ('Active',
-                      'Approved-not yet active',
-                      'Temporarily Closed'),
-                     ('Closed',
-                      'Completed')
-                   ]
-
-    try:
-        #cursor.callproc('cdr_get_count_of_links_to_persons', docId)
-        parms = (docId,)
-        cursor.execute("{CALL cdr_get_count_of_links_to_persons (?)}", parms)
-        for row in cursor.fetchall():
-            if row[1] in statusValues[0]:        counts[0] += row[0]
-            if row[1] in statusValues[1]:        counts[1] += row[0]
-        cursor.nextset()
-        for row in cursor.fetchall():
-            if row[1] == 'Health professionals': counts[2] += row[0]
-            if row[1] == 'Patients':             counts[3] += row[0]
-
-        # Test for CTGov documents linking here
-        # -------------------------------------
-        cursor.execute("""\
-            SELECT COUNT(DISTINCT doc_id)
-              FROM query_term
-             WHERE int_val = ?
-               AND path LIKE '/CTGovProtocol/%/@cdr:ref'""", docId)
-        counts[4] = cursor.fetchall()[0][0]
-
-    except Exception as e:
-        cdrcgi.bail(f"Failure retrieving link counts: {e}")
-    return counts
-
-#----------------------------------------------------------------------
-# Plug in mailer information from database.
-#----------------------------------------------------------------------
-def fixMailerInfo(doc):
-    mailerDateSent         = "No mailers sent for this document"
-    mailerResponseReceived = "N/A"
-    mailerTypeOfChange     = "N/A"
-    try:
-        cursor.execute("""\
-            SELECT MAX(doc_id)
-              FROM query_term
-             WHERE path = '/Mailer/Document/@cdr:ref'
-               AND int_val = ?""", intId)
-        row = cursor.fetchone()
-        if row and row[0]:
-            mailerId = row[0]
-            cursor.execute("""\
-                SELECT date_sent.value,
-                       response_received.value,
-                       change_type.value
-                  FROM query_term date_sent
-       LEFT OUTER JOIN query_term response_received
-                    ON response_received.doc_id = date_sent.doc_id
-                   AND response_received.path = '/Mailer/Response/Received'
-       LEFT OUTER JOIN query_term change_type
-                    ON change_type.doc_id = date_sent.doc_id
-                   AND change_type.path = '/Mailer/Response/ChangesCategory'
-                 WHERE date_sent.path = '/Mailer/Sent'
-                   AND date_sent.doc_id = ?""", mailerId)
-            row = cursor.fetchone()
-            if not row:
-                mailerDateSent = "Unable to retrieve date mailer was sent"
+        # Ask about board markup for HP Summaries.
+        instructions = page.B.P(page.B.EM(self.MARKUP_INSTRUCTIONS))
+        if self.fields.getvalue("accordions"):
+            accordion = page.accordion("markup-options")
+            accordion.payload.append(instructions)
+            page.form.append(accordion.wrapper)
+        else:
+            page.form.append(instructions)
+        if self.doc.doctype.name == "Summary" and not self.patient:
+            fieldset = page.fieldset("Board Markup")
+            for value, label in self.MARKUP_BOARD_OPTIONS:
+                checked = value in defaults
+                opts = dict(value=value, label=label, checked=checked)
+                fieldset.append(page.checkbox("options", **opts))
+            if self.fields.getvalue("accordions"):
+                accordion.payload.append(fieldset)
             else:
-                mailerDateSent = row[0]
-                if row[1]:
-                    mailerResponseReceived = row[1]
-                    if row[2]:
-                        mailerTypeOfChange = row[2]
+                page.form.append(fieldset)
+
+        # Ask about markup levels to be included.
+        fieldset = page.fieldset("Revision-level Markup")
+        for value, label in self.MARKUP_LEVEL_OPTIONS:
+            checked = value in defaults
+            opts = dict(value=value, label=label, checked=checked)
+            fieldset.append(page.checkbox("options", **opts))
+        if self.fields.getvalue("accordions"):
+            accordion.payload.append(fieldset)
+        else:
+            page.form.append(fieldset)
+
+        # Options specific to GlossaryTermName documents come next.
+        # XXX Commented out, because unless I'm misreading the original
+        #     code, there was no logical path which results in display
+        #     of the "version" form for GTN documents.
+        # if self.doc.doctype.name == "GlossaryTermName":
+        #     fieldset = page.fieldset("Display Audience Definition")
+        #     for value, label in self.GLOSSARY_DEFINITION_OPTIONS:
+        #         checked = value in defaults
+        #         opts = dict(value=value, label=label, checked=checked)
+        #         fieldset.append(page.checkbox("options", **opts))
+        #     page.form.append(fieldset)
+
+        # Show the miscellaneous options here for patient summaries.
+        if self.doc.doctype.name == "Summary" and self.patient:
+            self.show_miscellaneous_options(page, defaults, skip)
+
+        # Let the user choose which comment types should be displayed.
+        if self.doc.doctype.name == "Summary":
+            fieldset = page.fieldset("Select Comment Types to be displayed")
+            for subset in self.COMMENT_OPTIONS:
+                div = page.B.DIV(page.B.CLASS("comgroup"))
+                for value, label in subset:
+                    if self.patient and value in self.HIDDEN_FOR_PATIENT:
+                        continue
+                    if value not in skip:
+                        if not self.patient and value == "com-ext":
+                            label = f"{label} (excluding advisory comments)"
+                        checked = value in defaults
+                        opts = dict(value=value, label=label, checked=checked)
+                        div.append(page.checkbox("options", **opts))
+                fieldset.append(div)
+            fieldset.append(
+                page.B.BUTTON(
+                    "Show Individual Options",
+                    page.B.CLASS("usa-button"),
+                    id="show-options",
+                    onclick="toggle_alternate_comment_options()",
+                    type="button",
+                )
+            )
+            if self.fields.getvalue("accordions"):
+                accordion = page.accordion("comment-options")
+                accordion.payload.append(fieldset)
+                page.form.append(accordion.wrapper)
+            else:
+                page.form.append(fieldset)
+
+            # Show another set showing the same (sometimes conflicting) info.
+            fieldset = page.fieldset("Display Comments and Responses")
+            fieldset.set("id", "alternate-comment-options")
+            fieldset.set("class", "usa-fieldset hidden")
+            fieldset.append(page.B.P("Mark comment types to be displayed."))
+            wrapper = page.B.DIV(page.B.CLASS("grid-row grid-gap"))
+            for header, options, _ in self.DETAILED_COMMENT_OPTIONS:
+                column = page.B.DIV(
+                    page.B.DIV(
+                        header,
+                        page.B.CLASS("subheading")
+                    )
+                )
+                for value, label in options:
+                    checked = value in defaults
+                    opts = dict(value=value, label=label, checked=checked)
+                    column.append(page.checkbox("options", **opts))
+                wrapper.append(column)
+            fieldset.append(wrapper)
+            if self.fields.getvalue("accordions"):
+                accordion.payload.append(fieldset)
+            else:
+                page.form.append(fieldset)
+
+        # Show the miscellaneous options here for HP summaries.
+        if self.doc.doctype.name == "Summary" and not self.patient:
+            self.show_miscellaneous_options(page, defaults, skip)
+
+        # Add some extra styling and scripting.
+        opts = dict(href="/stylesheets/QCReport.css", rel="stylesheet")
+        page.head.append(page.B.LINK(**opts))
+        page.head.append(page.B.SCRIPT(src="/js/QCReport.js"))
+        if self.fields.getvalue("accordions"):
+            page.add_css("#submit-button-submit { margin-top: 2.5rem; }")
+
+    def show_miscellaneous_options(self, page, defaults, skip):
+        """Ask which parts of the document should be shown.
+
+        This is hoisted out because of a requirement that this block
+        of options be shown on a different part of the form depending
+        on whether the document is a patient or HP summary. No idea
+        why this odd requirement exists, but we handle it.
+
+        Required positional argument:
+          page - instance of the HTMLPage class
+          defaults - which options are selected by default
+          skip - values which should not be included
+        """
+
+        fieldset = page.fieldset("Miscellaneous Print Options")
+        for value, label in self.MISCELLANEOUS_OPTIONS:
+            self.logger.debug("value=%s label=%s", value, label)
+            if value not in skip:
+                checked = value in defaults
+                opts = dict(value=value, label=label, checked=checked)
+                self.logger.debug("opts=%s", opts)
+                checkbox = page.checkbox("options", **opts)
+                if value in self.HIDDEN_OPTIONS:
+                    checkbox.set("class", "hidden")
+                    checkbox.set("id", "pub-images")
+                fieldset.append(checkbox)
+        if self.fields.getvalue("accordions"):
+            accordion = page.accordion("print-options")
+            accordion.payload.append(fieldset)
+            page.form.append(accordion.wrapper)
+        else:
+            page.form.append(fieldset)
+
+        # Let the user choose a version which is less likely to fail.
+        fieldset = page.fieldset("911 Options", id="qc-option-fieldset")
+        opts = dict(value="qd", label="Run Quick & Dirty report")
+        fieldset.append(page.checkbox("options", **opts))
+        if self.fields.getvalue("accordions"):
+            accordion.payload.append(fieldset)
+        else:
+            page.form.append(fieldset)
+
+    @cached_property
+    def comment_options(self):
+        """Filter paramaters controlling comment display."""
+
+        comment_options = SimpleNamespace()
+        for label, options, values in self.DETAILED_COMMENT_OPTIONS:
+            name = label.split()[0].lower()
+            key = ""
+            for option in options:
+                key += "Y" if option in self.options else "N"
+            setattr(comment_options, name, values[key])
+        if "com-int" in self.options and "com-perm" in self.options:
+            comment_options.external_permanent = "Y"
+        else:
+            comment_options.external_permanent = "N"
+        if "com-ext" in self.options and "com-adv" in self.options:
+            comment_options.internal_advisory = "Y"
+        else:
+            comment_options.internal_advisory = "N"
+        return comment_options
+
+    @cached_property
+    def doc(self):
+        """The document selected for the report.
+
+        As a side effect, alerts are registered here to show the user
+        useful information.
+        """
+
+        id = self.id
+        if not id:
+            if not self.fragment:
+                if self.request:
+                    message = "CDR ID or title is required."
+                    self.alerts.append(dict(message=message, type="error"))
+                return None
+            elif not self.titles:
+                message = f"No matches found for {self.fragment!r}."
+                self.alerts.append(dict(message=message, type="warning"))
+                return None
+            elif len(self.titles) > 1:
+                message = f"Multiple matches found for {self.fragment!r}."
+                self.alerts.append(dict(message=message, type="info"))
+                return None
+            id = self.titles[0][0]
+        opts = dict(id=id)
+        if self.version_integer:
+            opts["version"] = self.version_integer
+        doc = Doc(self.session, **opts)
+        doc_id = f"CDR{doc.id}"
+        if self.version_integer:
+            doc_id = f"{doc_id}V{doc.version}"
+        try:
+            doctype = doc.doctype.name
+            if self.doctype and doctype != self.doctype:
+                message = f"CDR{doc.id} is a {doctype} document."
+                self.alerts.append(dict(message=message, type="warning"))
+                return None
+            if doctype != "Media" and doctype not in FILTERS:
+                message = f"{doctype} documents are unsupported."
+                self.alerts.append(dict(message=message, type="warning"))
+                return None
+        except Exception:
+            message = f"Document {id} not found."
+            self.logger.exception(message)
+            self.alerts.append(dict(message=message, type="error"))
+            return None
+        self.logger.info("Loaded %s document %s", doctype, doc_id)
+        return doc
+
+    @cached_property
+    def doctype(self):
+        """Acceptable document types optionally supplied by the user."""
+        return self.fields.getvalue("DocType")
+
+    @cached_property
+    def filters(self):
+        """XSL/T filter used to transform our document."""
+
+        key = self.doc.doctype.name
+        self.logger.info("filters(): self.report_type=%r", self.report_type)
+        if self.report_type:
+            key = f"{key}:{self.report_type}"
+            if "qd" in self.options:
+                key += "qd"
+        self.logger.info("Using %s filters", key)
+        return FILTERS.get(key)
+
+    @cached_property
+    def fragment(self):
+        """Portion of a title used for selecting the report's document."""
+        return self.fields.getvalue("DocTitle")
+
+    @cached_property
+    def html_page(self):
+        """Transformed document for the report."""
+
+        parms = dict(self.parameters)
+        try:
+            result = self.doc.filter(*self.filters, parms=parms)
+        except Exception as e:
+            self.logger.exception("Filtering failure")
+            return self.bail(f"Filtering failure: {e}")
+        page = str(result.result_tree).replace("@@DOCID@@", self.doc.cdr_id)
+        for placeholder in self.value_map:
+            page = page.replace(placeholder, self.value_map[placeholder])
+        return page
+
+    @cached_property
+    def id(self):
+        """CDR document ID provided by the user."""
+        return self.fields.getvalue("DocId")
+
+    @cached_property
+    def loglevel(self):
+        """If requested, crank up the logging."""
+
+        debug = True if self.fields.getvalue("debug") else False
+        if debug:
+            environ["CDR_LOGGING_LEVEL"] = "DEBUG"
+            return "DEBUG"
+        return self.LOGLEVEL
+
+    @cached_property
+    def markup_options(self):
+        """Filter parameter for which levels of revision markup to apply."""
+
+        markup_options = SimpleNamespace()
+        names = [option[0] for option in self.MARKUP_LEVEL_OPTIONS]
+        levels = [n.split("-")[1] for n in names if n in self.options]
+        markup_options.levels = "|".join(levels)
+        names = [option[0] for option in self.MARKUP_BOARD_OPTIONS]
+        board_types = []
+        for name in names:
+            if name in self.options:
+                board_type = name.split("-")[1] + "-board"
+                board_types.append(board_type)
+        markup_options.boards = "_".join(board_types)
+        return markup_options
+
+    @cached_property
+    def options(self):
+        """Names of options which have been selected by the user."""
+        return set(self.fields.getlist("options"))
+
+    @cached_property
+    def parameters(self):
+        """Parameters passed to the XSL/T filters."""
+
+        parms = [
+            ["DisplayGlossaryTermList", self.yn_flags.glossary],
+            ["DisplayImages", self.yn_flags.images],
+            ["DisplaySummaryRefList", self.yn_flags.summary_refs],
+            ["DisplayCitations", self.yn_flags.citations],
+            ["DisplayLOETermList", self.yn_flags.loes],
+        ]
+        if "images" in self.options:
+            parms.append([
+                "DisplayPubImages",
+                self.yn_flags.publishable_images
+            ])
+        if self.patient:
+            parms += [
+                ["ShowStandardWording", self.yn_flags.std_wording],
+                ["ShowKPBox", self.yn_flags.keypoints],
+                ["ShowLearnMoreSection", self.yn_flags.more],
+            ]
+        if self.markup_options.levels:
+            parms.append(["insRevLevels", self.markup_options.levels])
+        if self.doctype in ("DrugInformationSummary", "Media"):
+            parms.append(["isQC", "Y"])
+        if self.doctype == "DrugInformationSummary":
+            parms.append(["DisplayComments", "A"])
+        if self.doctype == "Summary":
+            parms += [
+                ["isQC", "Y"],
+                ["DisplayComments", self.comment_options.audience],
+                ["DurationComments", self.comment_options.duration],
+                ["SourceComments", self.comment_options.source],
+                ["IncludeExtPerm", self.comment_options.external_permanent],
+                ["IncludeIntAdv", self.comment_options.internal_advisory],
+                ["DisplayModuleMarkup", self.yn_flags.shade_modules],
+                ["DisplaySectMetaData", self.yn_flags.section_metadata],
+                ["DisplayQcOnlyMod", self.yn_flags.qc_only],
+                ["displayBoard", self.markup_options.boards],
+            ]
+        if self.doctype and self.doctype.startswith("GlossaryTerm"):
+            parms += [
+                ["isQC", "Y"],
+                ["DisplayComments", self.comment_options.audience],
+                ["displayBoard", "editorial-board_"],
+                # XXX Unused, as far as I can tall.
+                # ["displayAudience", display_audience],
+            ]
+        if self.doctype == "MiscellaneousDocument":
+            parms += [
+                ["isQC", "Y"],
+                ["insRevLevels", "approved|"],
+                ["displayBoard", "editorial-board_"],
+            ]
+        if self.report_type in ("bu", "but"):
+            parms.append(["delRevLevels", "Y"])
+        return parms
+
+    @cached_property
+    def parameter_set_id(self):
+        """Primary key for the row in the url_parm_set table."""
+
+        query = "INSERT INTO url_parm_set (longURL) VALUES (?)"
+        self.logger.info("dumping")
+        parms = dumps(sorted(self.parameters))
+        self.logger.info("dumped")
+        self.logger.info("filter parms=%s", parms)
+        path = f"dumped-filter-parms-{self.timestamp}.json"
+        with open(path, "w", encoding="utf-8") as fp:
+            fp.write(parms)
+        self.cursor.execute(query, parms)
+        self.conn.commit()
+        self.cursor.execute("SELECT @@IDENTITY AS id")
+        return self.cursor.fetchall()[0].id
+
+    @cached_property
+    def patient(self):
+        """True if we're handling one of the patient report types."""
+        return self.report_type and self.report_type.startswith("pat")
+
+    @cached_property
+    def ready(self):
+        """True if we have everything we need for the report."""
+
+        self.logger.info("QcReport.py called with %s", self.fields)
+        if self.alerts:
+            return False
+        return True if self.doc and not self.version_needed else False
+
+    @cached_property
+    def report_type(self):
+        """Optional variant of the QC report.
+
+        The original report only defaulted the report type for patient
+        summaries when the user didn't pass the DocType=Summary
+        parameter in the URL. That inconsistency seems wrong.
+        """
+
+        report_type = self.fields.getvalue("ReportType")
+        if report_type:
+            return report_type
+        doctype = self.doctype or self.doc and self.doc.doctype.name or None
+        if not doctype:
+            return None
+        match doctype:
+            case "Media":
+                return "img"
+            case "MiscellaneousDocument":
+                return "rs"
+            case "Summary":
+                if self.doc:
+                    path = "SummaryMetaData/SummaryAudience"
+                    if Doc.get_text(self.doc.root.find(path)) == "Patient":
+                        return "pat"
+        return None
+
+    @cached_property
+    def subtitle(self):
+        """Title for the form (not used in the report output)."""
+
+        if self.report_type:
+            title = self.TITLES_BY_REPORT_TYPE.get(self.report_type)
+            return title or self.UNRECOGNIZED_TYPE
+        title = self.TITLES_BY_DOCTYPE.get(self.doctype)
+        return title or "QC Report"
+
+    @cached_property
+    def titles(self):
+        """Sequence of (id, title) tuples matching the user's fragment."""
+
+        if not self.fragment:
+            return None
+        fragment = f"{self.fragment}%"
+        query = self.Query("document d", "d.id", "d.title").order("d.title")
+        if self.doctype == "GlossaryTermConcept":
+            query.join("query_term q", "q.doc_id = d.id")
+            query.where(f"q.path LIKE '{self.GTC_DEFINITION_PATHS}'")
+            query.where(query.Condition("q.value", fragment, "LIKE"))
+        elif self.doctype:
+            query.join("doc_type t", "t.id = d.doc_type")
+            query.where(query.Condition("t.name", self.doctype))
+        if self.doctype != "GlossaryTermConcept":
+            query.where(query.Condition("d.title", fragment, "LIKE"))
+        query.log()
+        return query.execute(self.cursor).fetchall()
+
+    @cached_property
+    def value_map(self):
+        """Replacements for placeholders in the serialized report."""
+        return Substitutions(self).value_map
+
+    @cached_property
+    def version(self):
+        """Version of the document to use for the report."""
+
+        version = self.fields.getvalue("DocVersion", "").strip()
+        if version:
+            try:
+                version_int = int(version)
+                if version_int < 0:
+                    self.logger.warning("Version %s (deprecated)")
+                return version
+            except Exception:
+                message = f"Invalid version {version} discarded."
+                self.alerts.append(dict(message=message, type="warning"))
+                return None
+
+    @cached_property
+    def version_integer(self):
+        """Integer for the version if integer > 0 else None."""
+
+        if not self.version:
+            return None
+        version = int(self.version)
+        return version if version > 0 else None
+
+    @cached_property
+    def version_needed(self):
+        """True if we need a version but don't have it yet."""
+
+        if not self.doc or self.version is not None:
+            return False
+        if self.doctype == "DrugInformationSummary":
+            return True
+        if self.doctype != "Summary":
+            return False
+        return self.report_type not in ("pp", "gtnwc")
+
+    @cached_property
+    def versions(self):
+        """Values for the picklist on the version form."""
+
+        versions = [("0", "Current Working Version")]
+        for version in self.doc.list_versions():
+            saved = str(version.saved)
+            comment = (version.comment or "").strip() or "[No comment]"
+            label = f"[V{version.number} {saved[:10]}] {comment[:120]}"
+            versions.append((version.number, label))
+        return versions
+
+    @cached_property
+    def yn_flags(self):
+        """Convert Boolean options to "Y" or "N" strings."""
+
+        class Flags:
+            def __init__(self, options):
+                self.options = options
+
+            def __getattr__(self, name):
+                if name == "citations":
+                    if "hp-reference" in self.options:
+                        return "Y"
+                    return "Y" if "pat-cites" in self.options else "N"
+                if name not in self.options:
+                    name = name.replace("_", "-")
+                return "Y" if name in self.options else "N"
+
+        return Flags(self.options)
+
+
+class Substitutions:
+    """Replacements for placeholders added by the filters."""
+
+    MEMBER_PATH = "/Summary/SummaryMetaData/PDQBoard/BoardMember/@cdr:ref"
+    AUDIENCE_PATH = "/Summary/SummaryMetaData/SummaryAudience"
+
+    def __init__(self, control):
+        """Save the caller's argument.
+
+        Pass:
+            control - access to the report information and the database
+        """
+
+        self.__control = control
+
+    @cached_property
+    def board_member_person_id(self):
+        """ID of Person document linked with a PDQBoardMemberInfo doc."""
+
+        if not hasattr(self, "_board_member_person_id"):
+            self._board_member_person_id = None
+            if self.doctype == "PDQBoardMemberInfo":
+                path = "/PDQBoardMemberInfo/BoardMemberName/@cdr:ref"
+                query = self.control.Query("query_term", "int_val")
+                query.where(f"path = '{path}'")
+                query.where(query.Condition("doc_id", self.doc.id))
+                rows = query.execute(self.control.cursor).fetchall()
+                if not rows:
+                    self.control.bail("Person document not found")
+                self._board_member_person_id = rows[0][0]
+        return self._board_member_person_id
+
+    @cached_property
+    def control(self):
+        """Access to the report information and the database."""
+        return self.__control
+
+    @cached_property
+    def doc(self):
+        """Subject of the QC report."""
+        return self.control.doc
+
+    @cached_property
+    def doctype(self):
+        """String for the document type's name."""
+        return self.doc.doctype.name
+
+    @cached_property
+    def hp_summaries(self):
+        """Are there health professional summaries linking to this document?"""
+
+        if self.doctype not in ("Person", "Organization"):
+            return ""
+        audience = "Health Professionals"
+        return "Yes" if self.links_from_summaries(audience) else "No"
+
+    def links_from_summaries(self, audience):
+        """How many summaries for this audience link to our document?
+
+        Pass:
+            audience - "Patients" or "Health Professionals"
+
+        Return:
+            integer for the number of linking summaries
+        """
+
+        query = self.control.Query("query_term p", "COUNT(*) n")
+        query.join("query_term a", "a.doc_id = p.doc_id")
+        query.where(f"p.path = '{self.MEMBER_PATH}'")
+        query.where(f"a.path = '{self.AUDIENCE_PATH}'")
+        query.where(query.Condition("p.int_val", self.doc.id))
+        query.where(query.Condition("a.value", audience))
+        return query.execute(self.control.cursor).fetchall()[0].n
+
+    @cached_property
+    def mailer_info(self):
+        """Information about the last mailer sent to a person."""
+
+        class MailerInfo:
+            def __init__(self):
+                self.resp_received = self.change = "N/A"
+                self.sent = "No mailers sent for this document"
+
+        info = MailerInfo()
+        if self.doctype == "Person":
+            query = self.control.Query("query_term", "MAX(doc_id) id")
+            query.where("path = '/Mailer/Document/@cdr:ref'")
+            query.where(query.Condition("int_val", self.doc.id))
+            row = query.execute(self.control.cursor).fetchone()
+            query.log()
+            if row and row.id:
+                mailer_id = row.id
+                fields = "s.value s", "r.value r", "c.value c"
+                query = self.control.Query("query_term s", *fields)
+                query.outer("query_term r", "r.doc_id = s.doc_id",
+                            "r.path = '/Mailer/Response/Received'")
+                query.outer("query_term c", "c.doc_id = s.doc_id")
+                query.where("s.path = '/Mailer/Sent'")
+                query.where(query.Condition("s.doc_id", mailer_id))
+                rows = query.execute(self.control.cursor).fetchall()
+                if rows:
+                    row = rows[0]
+                    info.sent = row.s
+                    if row.r:
+                        info.resp_received = row.r
+                        if row.c:
+                            info.change = row.c
+                        else:
+                            info.change = "Unable to retrieve change type"
                     else:
-                        mailerTypeOfChange = "Unable to retrieve change type"
+                        info.resp_received = "Response not yet received"
                 else:
-                    mailerResponseReceived = "Response not yet received"
-    except Exception as e:
-        cdrcgi.bail(f"Failure retrieving mailer info for {docId}: {e}")
+                    info.sent = "Unable to retrieve date mailer was sent"
+        return info
 
-    doc = re.sub("@@MAILER_DATE_SENT@@",         mailerDateSent,         doc)
-    doc = re.sub("@@MAILER_RESPONSE_RECEIVED@@", mailerResponseReceived, doc)
-    doc = re.sub("@@MAILER_TYPE_OF_CHANGE@@",    mailerTypeOfChange,     doc)
-    return doc
+    @cached_property
+    def org_doc_links(self):
+        """Do organization document link to this one?"""
 
-#----------------------------------------------------------------------
-# Plug in pieces that XSL/T can't get to for a Person QC report.
-#----------------------------------------------------------------------
-def fixPersonReport(doc):
-    cursor.execute("SELECT COUNT(*) FROM external_map WHERE doc_id = ?",
-                   intId)
-    row    = cursor.fetchone()
-    doc    = fixMailerInfo(doc)
-    counts = getDocsLinkingToPerson(intId)
-    #cdrcgi.bail("doctype = %s" % docType)
-    # ---------------------------------------------------------
-    # Suppress replacing the strings if this function is called
-    # for the Organization docType
-    # ---------------------------------------------------------
-    if docType != 'Organization':
-       doc    = re.sub("@@ACTIVE_APPR0VED_TEMPORARILY_CLOSED_PROTOCOLS@@",
-                    counts[0] and "Yes" or "No", doc)
-       doc    = re.sub("@@CLOSED_COMPLETED_PROTOCOLS@@",
-                    counts[1] and "Yes" or "No", doc)
+        if self.doctype != "Organization":
+            return ""
+        query = self.control.Query("query_term", "COUNT(*) AS n")
+        query.where("path LIKE '/Organization/%/@cdr:ref'""")
+        query.where(query.Condition("int_val", self.doc.id))
+        count = query.execute(self.control.cursor).fetchone().n
+        return "Yes" if count else "No"
 
-    doc    = re.sub("@@HEALTH_PROFESSIONAL_SUMMARIES@@",
-                    counts[2] and "Yes" or "No", doc)
-    doc    = re.sub("@@PATIENT_SUMMARIES@@",
-                    counts[3] and "Yes" or "No", doc)
-    doc    = re.sub("@@IN_EXTERNAL_MAP_TABLE@@",
-                    (row[0] > 0) and "Yes" or "No", doc)
-    doc    = re.sub("@@CTGOV_PROTOCOLS@@",
-                    (counts[4]) and "Yes" or "No", doc)
-    doc    = re.sub("@@SESSION@@",
-                    session, doc)
-    return doc
+    @cached_property
+    def patient_summaries(self):
+        """Are there patient summaries linking to this document?"""
 
-# #----------------------------------------------------------------------
-# # Plug in last update info for CTGovProtocol.
-# #----------------------------------------------------------------------
-# def fixCTGovProtocol(doc):
-#     cursor.execute("""\
-#     SELECT TOP 1 t.dt, u.name
-#       FROM audit_trail t
-#       JOIN action a
-#         ON a.id = t.action
-#       JOIN usr u
-#         ON u.id = t.usr
-#      WHERE a.name = 'MODIFY DOCUMENT'
-#        AND u.name <> 'CTGovImport'
-#        AND t.document = ?
-#   ORDER BY t.dt DESC""", intId)
-#     row = cursor.fetchone()
-#     if row:
-#         doc = doc.replace("@@UPDATEDBY@@", row[1])
-#         doc = doc.replace("@@UPDATEDDATE@@", row[0][:10])
-#     else:
-#         doc = doc.replace("@@UPDATEDBY@@", "&nbsp;")
-#         doc = doc.replace("@@UPDATEDDATE@@", "&nbsp;")
-#     #cdrcgi.bail("NPI=" + noPdqIndexing)
-#     return doc.replace("@@NOPDQINDEXING@@", noPdqIndexing)
+        if self.doctype not in ("Person", "Organization"):
+            return ""
+        return "Yes" if self.links_from_summaries("Patients") else "No"
+
+    @cached_property
+    def person_doc_links(self):
+        """Do person document link to this one?"""
+
+        if self.doctype != "Organization":
+            return ""
+        query = self.control.Query("query_term", "COUNT(*) AS n")
+        query.where("path LIKE '/Person/%/@cdr:ref'""")
+        query.where(query.Condition("int_val", self.doc.id))
+        count = query.execute(self.control.cursor).fetchone().n
+        return "Yes" if count else "No"
+
+    @cached_property
+    def summaries_reviewed(self):
+        """List of the summaries reviewed by a PDQ board member."""
+
+        if not self.board_member_person_id:
+            return "None"
+        fields = "t.value AS title", "a.value AS audience"
+        query = self.control.Query("query_term t", *fields).unique()
+        query.order("t.value", "a.value")
+        query.join("query_term a", "a.doc_id = t.doc_id")
+        query.join("query_term m", "m.doc_id = t.doc_id")
+        query.join("active_doc d", "d.id = t.doc_id")
+        query.join("pub_proc_doc ppd", "ppd.doc_id = t.doc_id")
+        query.join("pub_proc p", "p.id = ppd.pub_proc")
+        query.where("t.path = '/Summary/SummaryTitle'")
+        query.where(f"a.path = '{self.AUDIENCE_PATH}'")
+        query.where(f"m.path = '{self.MEMBER_PATH}'")
+        query.where(query.Condition("m.int_val", self.board_member_person_id))
+        query.where("p.status = 'Success'")
+        query.where("p.pub_subset = 'Summary-PDQ Editorial Board'")
+        rows = query.execute(self.control.cursor).fetchall()
+        if not rows:
+            return "None"
+        dl = self.control.HTMLPage.B.DL()
+        for row in rows:
+            summary = f"{row.title}; {row.audience}"
+            dl.append(self.control.HTMLPage.B.LI(summary))
+        return html.tostring(dl, encoding="unicode", pretty_print=True)
+
+    @cached_property
+    def summary_date_sent(self):
+        """Date of the last summary mailer for a PDQ board member."""
+
+        if not self.summary_job_id:
+            return ""
+        query = self.control.Query("pub_proc", "completed")
+        query.where(query.Condition("id", self.summary_job_id))
+        completed = query.execute(self.control.cursor).fetchone().completed
+        return str(completed)[:10]
+
+    @cached_property
+    def summary_job_id(self):
+        """Last summary mailer job for a PDQ board member."""
+
+        if self.board_member_person_id:
+            person_id = self.board_member_person_id
+            query = self.control.Query("pub_proc p", "MAX(p.id) AS id")
+            query.join("query_term j", "j.int_val = p.id")
+            query.join("query_term t", "t.doc_id = j.doc_id")
+            query.join("query_term r", "r.doc_id = j.doc_id")
+            query.where("j.path = '/Mailer/JobId'")
+            query.where("t.path = '/Mailer/Type'")
+            query.where("r.path = '/Mailer/Recipient/@cdr:ref'")
+            query.where("t.value = 'Summary-PDQ Editorial Board'")
+            query.where("p.status = 'Success'")
+            query.where(query.Condition("r.int_val", person_id))
+            row = query.execute(self.control.cursor).fetchone()
+            if row and row.id:
+                return str(row.id)
+        return ""
+
+    @cached_property
+    def summary_mailer_sent(self):
+        """Rows for summaries in a board member's last mailer batch."""
+
+        if not self.summary_job_id:
+            return ""
+        person_id = self.board_member_person_id
+        fields = "t.value AS title", "r.value as response"
+        query = self.control.Query("query_term t", *fields).order("t.value")
+        query.join("query_term d", "d.int_val = t.doc_id")
+        query.join("query_term j", "j.doc_id = d.doc_id")
+        query.join("query_term p", "p.doc_id = d.doc_id")
+        query.outer("query_term r", "r.doc_id = d.doc_id",
+                    "r.path = '/Mailer/Response/Received'")
+        query.where("t.path = '/Summary/SummaryTitle'")
+        query.where("d.path = '/Mailer/Document/@cdr:ref'")
+        query.where("j.path = '/Mailer/JobId'")
+        query.where("p.path = '/Mailer/Recipient/@cdr:ref'")
+        query.where(query.Condition("p.int_val", person_id))
+        query.where(query.Condition("j.int_val", self.summary_job_id))
+        rows = query.execute(self.control.cursor).fetchall()
+        segments = []
+        B = self.control.HTMLPage.B
+        for row in rows:
+            tr = B.TR(B.TD(B.B("Summary")), B.TD(row.title))
+            segments.append(html.tostring(tr, encoding="unicode"))
+            value = row.response or "Not Received"
+            tr = B.TR(B.TD(B.B("Date Response Received")), B.TD(value))
+            segments.append(html.tostring(tr, encoding="unicode"))
+        return "\n".join(segments)
+
+    @cached_property
+    def value_map(self):
+        """Everything which needs to be replaced in the document."""
+
+        return {
+            "@@ACTIVE_APPR0VED_TEMPORARILY_CLOSED_PROTOCOLS@@": "No",
+            "@@CLOSED_COMPLETED_PROTOCOLS@@": "No",
+            "@@CTGOV_PROTOCOLS@@": "No",
+            "@@HEALTH_PROFESSIONAL_SUMMARIES@@": self.hp_summaries,
+            "@@IN_EXTERNAL_MAP_TABLE@@": "No",
+            "@@MAILER_DATE_SENT@@": self.mailer_info.sent,
+            "@@MAILER_RESPONSE_RECEIVED@@": self.mailer_info.resp_received,
+            "@@MAILER_TYPE_OF_CHANGE@@": self.mailer_info.change,
+            "@@ORG_DOC_LINKS@@": self.org_doc_links,
+            "@@PATIENT_SUMMARIES@@": self.patient_summaries,
+            "@@PERSON_DOC_LINKS@@": self.person_doc_links,
+            "@@SESSION@@": self.control.session.name,
+            "@@SUMMARIES_REVIEWED@@": self.summaries_reviewed,
+            "@@SUMMARY_DATE_SENT@@": self.summary_date_sent or "N/A",
+            "@@SUMMARY_JOB_ID@@": self.summary_job_id or "N/A",
+            "@@SUMMARY_MAILER_SENT@@": self.summary_mailer_sent,
+        }
 
 
-#----------------------------------------------------------------------
-# Plug in pieces that XSL/T can't get to for an Organization QC report.
-#----------------------------------------------------------------------
-def fixOrgReport(doc):
-    counts = [0, 0, 0, 0]
-    # -----------------------------------------------------------------
-    # Database query to count all protocols that link to this
-    # organization split by Active and Closed protocol status.
-    # -----------------------------------------------------------------
+if __name__ == "__main__":
+    control = Control()
     try:
-        cursor.execute("""\
-        SELECT count(prot.doc_id) AS prot_count,
-               CASE WHEN prot.value = 'Completed'               THEN 'Closed'
-                    WHEN prot.value = 'Temporarily closed'      THEN 'Active'
-                    WHEN prot.value = 'Approved-not yet active' THEN 'Active'
-                    ELSE prot.value END as status
-          FROM query_term prot
-          JOIN query_term org
-            ON prot.doc_id = org.doc_id
-         WHERE prot.path ='/InScopeProtocol/ProtocolAdminInfo/CurrentProtocolStatus'
-           AND prot.value in ('Active', 'Temporarily closed',
-                              'Approved-not yet active', 'Closed', 'Completed')
-           AND org.int_val = ?
-           AND org.path like '%@cdr:ref'
-         GROUP BY prot.value""", intId)
+        control.run()
     except Exception as e:
-        cdrcgi.bail(f"Failure retrieving Protocol info for {intId:d}: {e}")
-
-    # -------------------------------------------------------
-    # Assign protocol count to counts list items
-    # -------------------------------------------------------
-    rows = cursor.fetchall()
-    for row in rows:
-        if row[1] == 'Active':        counts[0] += row[0]
-        if row[1] == 'Closed':        counts[1] += row[0]
-
-    # Test for Person documents linking here
-    # --------------------------------------
-    cursor.execute("""\
-        SELECT COUNT(DISTINCT doc_id)
-          FROM query_term
-         WHERE int_val = ?
-           AND path LIKE '/Person/%/@cdr:ref'""", intId)
-    counts[2] = cursor.fetchall()[0][0]
-
-    # Test for Organization documents linking here
-    # --------------------------------------------
-    cursor.execute("""\
-        SELECT COUNT(DISTINCT doc_id)
-          FROM query_term
-         WHERE int_val = ?
-           AND path LIKE '/Organization/%/@cdr:ref'""", intId)
-    counts[3] = cursor.fetchall()[0][0]
-
-    # -----------------------------------------------------------------
-    # Substitute @@...@@ strings with Yes/No based on the count
-    # from the query.  If counts[] = 0 ==> "No", "Yes" otherwise
-    # -----------------------------------------------------------------
-    doc    = re.sub("@@ACTIVE_APPR0VED_TEMPORARILY_CLOSED_PROTOCOLS@@",
-                    counts[0] and "Yes" or "No", doc)
-    doc    = re.sub("@@CLOSED_COMPLETED_PROTOCOLS@@",
-                    counts[1] and "Yes" or "No", doc)
-    doc    = re.sub("@@PERSON_DOC_LINKS@@",
-                    counts[2] and "Yes" or "No", doc)
-    doc    = re.sub("@@ORG_DOC_LINKS@@",
-                    counts[3] and "Yes" or "No", doc)
-
-    return doc
-
-#----------------------------------------------------------------------
-# Plug in pieces that XSL/T can't get to for an BoardMember QC report.
-#----------------------------------------------------------------------
-def fixBoardMemberReport(doc):
-    counts = [0, 0]
-    # -----------------------------------------------------------------
-    # Database query to get the person ID for the BoardMember
-    # -----------------------------------------------------------------
-    try:
-        cursor.execute("""\
-SELECT int_val
-  FROM query_term
- WHERE doc_id = ?
-   AND path = '/PDQBoardMemberInfo/BoardMemberName/@cdr:ref'""", intId)
-
-    except Exception as e:
-        cdrcgi.bail(f"Failure retrieving Person ID for {intId:d}: {e}")
-
-    row = cursor.fetchone()
-    if not row:
-        cdrcgi.bail('Unable to select Person ID for CDR%s' % intId)
-    else:
-        personId = row[0]
-
-    # -----------------------------------------------------------------
-    # Database query to select all summaries reviewed by this member
-    # and the batch job ID of the latest mailer submitted
-    # and replace the result with the @@SUMMARIES_REVIEWED@@ parameter.
-    # -----------------------------------------------------------------
-    try:
-        cursor.execute("""\
-SELECT person.doc_id, summary.value, audience.value, max(ppd.pub_proc) as jobid
-  FROM query_term person
-  JOIN query_term summary
-    ON person.doc_id = summary.doc_id
-  JOIN query_term audience
-    ON summary.doc_id = audience.doc_id
-  JOIN document doc
-    ON person.doc_id = doc.id
-  JOIN pub_proc_doc ppd
-    ON doc.id = ppd.doc_id
-  JOIN pub_proc pp
-    ON pp.id = ppd.pub_proc
- WHERE person.int_val = ?
-   AND person.path = '/Summary/SummaryMetaData/PDQBoard/BoardMember/@cdr:ref'
-   AND summary.path = '/Summary/SummaryTitle'
-   AND audience.path = '/Summary/SummaryMetaData/SummaryAudience'
-   AND doc.active_status = 'A'
-   AND pp.status = 'Success'
-   AND pp.pub_subset = 'Summary-PDQ Editorial Board'
- GROUP BY summary.value, person.doc_id, audience.value""", personId)
-
-    except Exception as e:
-        cdrcgi.bail(f"Failure retrieving Summary info for CDR{intId:d}: {e}")
-
-    # -------------------------------------------------------
-    # Display the summaries reviewed by this person.
-    # -------------------------------------------------------
-    rows = cursor.fetchall()
-
-    if rows:
-       html = """
-           <DL>"""
-       for row in rows:
-           html += """
-            <LI>%s; %s</LI>""" % (row[1], row[2])
-       html += """
-           </DL>
-"""
-    else:
-       html = "None"
-
-    # -----------------------------------------------------------------
-    # Substitute @@...@@ strings with Yes/No based on the count
-    # from the query.  If counts[] = 0 ==> "No", "Yes" otherwise
-    # -----------------------------------------------------------------
-    doc    = re.sub("@@SUMMARIES_REVIEWED@@", html, doc)
-
-    # ------------------------------------------------------------------
-    # Database query to select mailer information
-    # From the previous query we know the summary IDs, person ID and
-    # Job ID that containted these mailers.  We are using this
-    # information to build this query to extract the response received
-    # from the mailer docs.
-    # If the person is not linked to a summary we're setting the batchId
-    # to zero, otherwise the query would fail.
-    # ------------------------------------------------------------------
-    if rows:
-       batchId = row[3]
-       summaryIds = '('
-       for row in rows:
-          summaryIds += repr(row[0]) + ', '
-       summaryIds = summaryIds[:-2] + ')'
-    else:
-       batchId = 0
-       summaryIds = '(0)'
-
-    # XXX Where's the path clause for query_term summary???
-    query = """
-SELECT mailer.doc_id, mailer.int_val, summary.value, response.value,
-       title.value
-  FROM query_term mailer
-  JOIN query_term summary
-    ON mailer.doc_id = summary.doc_id
-  LEFT OUTER
-  JOIN query_term response
-    ON mailer.doc_id = response.doc_id
-   AND response.path = '/Mailer/Response/Received'
-  JOIN query_term title
-    ON title.doc_id = summary.int_val
-  JOIN query_term person
-    ON mailer.doc_id = person.doc_id
- WHERE mailer.int_val = %d
-   AND mailer.path = '/Mailer/JobId'
-   AND summary.int_val in %s
-   AND title.path = '/Summary/SummaryTitle'
-   AND person.int_val = %s
- ORDER BY title.value""" % (batchId, summaryIds, personId)
-
-    try:
-        cursor.execute(query)
-    except Exception as e:
-        message = f"Failure retrieving Mailer info for batch ID {batchId}: {e}"
-        cdrcgi.bail(message)
-
-    rows = cursor.fetchall()
-
-    # ----------------------------------------------------------------
-    # Display the Summary Mailer information
-    # ----------------------------------------------------------------
-    html = ''
-    for row in rows:
-        html += """
-      <TR>
-       <TD xsl:use-attribute-sets = "cell1of2">
-        <B>Summary</B>
-       </TD>
-       <TD xsl:use-attribute-sets = "cell2of2">
-        %s
-       </TD>
-      </TR>
-      <TR>
-       <TD xsl:use-attribute-sets = "cell1of2">
-        <B>Date Response Received</B>
-       </TD>
-       <TD xsl:use-attribute-sets = "cell2of2">
-        %s
-       </TD>
-      </TR>
-""" % (html_escape(row[4]), row[3])
-    doc = re.sub("@@SUMMARY_MAILER_SENT@@", html, doc)
-
-    # -----------------------------------------------------------------
-    # Database query to select the time of the mailers send
-    # -----------------------------------------------------------------
-    try:
-        query = """\
-SELECT completed
-  FROM pub_proc
- WHERE id = %d""" % batchId
-        cursor.execute(query)
-
-    except Exception as e:
-        message = f"Failure retrieving Mailer Date for batch {batchId:d}: {e}"
-        cdrcgi.bail(message)
-
-    row = cursor.fetchone()
-    # -----------------------------------------------------------------
-    # Substitute @@...@@ strings for job ID and date send
-    # If the person is not linked to a summary we won't find an entry
-    # in the pub_proc table.  The batchId will have been set to zero
-    # in this case.
-    # -----------------------------------------------------------------
-    if row:
-       dateSent = str(row[0])[:10]
-       html = "%s" % (dateSent)
-       doc    = re.sub("@@SUMMARY_DATE_SENT@@", html, doc)
-       html = "%s" % (batchId)
-       doc    = re.sub("@@SUMMARY_JOB_ID@@", html, doc)
-    else:
-       doc    = re.sub("@@SUMMARY_DATE_SENT@@", "N/A", doc)
-       doc    = re.sub("@@SUMMARY_JOB_ID@@", "N/A", doc)
-
-    return doc
-
-# --------------------------------------------------------------------
-# If we want to see the publish preview report call the PublishPreview
-# script.
-# OCECDR-4191: Summary Publish Preview should always show CWD
-# --------------------------------------------------------------------
-if repType == "pp":
-    args = { "ReportType": "pp", "DocId": docId }
-    if docType == "Summary":
-        args["Version"] = "cwd"
-    cdrcgi.navigateTo("PublishPreview.py", session, **args)
-
-#----------------------------------------------------------------------
-# Filter the document.
-#----------------------------------------------------------------------
-if repType: docType += ":%s" % repType
-if qd: docType += 'qd'
-
-# ---------------------------------------------------------------------
-# The next two lines are needed to run the Media and Miscellaneaous QC
-# reports from within XMetaL since the repType argument is not passed
-# by the macro
-# Note: The Misc. Document report should always be displayed with
-#       markup if it exists.
-# ---------------------------------------------------------------------
-if docType == 'Media':                 docType += ":img"
-if docType == 'MiscellaneousDocument': docType += ":rs"
-
-# -1 is deprecated but some scripts may still use it
-if version in ("-1", "0"): version = None
-
-# Display error message if no filter exist for current docType
-# ------------------------------------------------------------
-if docType not in filters:
-    user_name = Session(session).user_name
-    message = "QcReport - Filter for document type '%s' does not exist (%s)."
-    cdr.LOGGER.info(message, docType, user_name)
-    doc = cdr.getDoc(session, docId, version = version or "Current",
-                     getObject = 1)
-    if isinstance(doc, (str, bytes)):
-        cdrcgi.bail(doc)
-    html = """\
-<html>
- <head>
-  <title>%s</title>
- </head>
- <body>
-  <h3 style="color: red;">Filter for document type
-    <b>'%s'</b> does not exist.</h3>
-  <p>Document follows (view source to preview XML!):</p>
-  <pre>%s</pre>
- </body>
-</html>""" % (html_escape(doc.ctrl['DocTitle'].decode("utf-8")), docType,
-              html_escape(doc.xml.decode('utf-8')))
-    cdrcgi.sendPage(html)
-
-filterParm = []
-
-# Setting the markup display level based on the selected check
-# boxes.
-# # The DrugInfoSummaries are displayed without having to select the
-# # display type, therefore we need to set the revision level manually
-# ------------------------------------------------------------------
-if insRevLvls:
-    filterParm = [['insRevLevels', insRevLvls]]
-# else:
-#     if docType == 'DrugInformationSummary':
-#         filterParm = [['insRevLevels', 'publish|approved|proposed']]
-
-# Allow certain QC reports to succeed even without valid GlossaryLink
-# -------------------------------------------------------------------
-if docType == 'DrugInformationSummary' or docType == 'Media:img':
-    filterParm.append(['isQC', 'Y'])
-
-# Force the display of comments for DIS.  All comments should be
-# displayed and all attributes should be ignored.
-# ---------------------------------------------------------------
-if docType == 'DrugInformationSummary':
-    filterParm.append(['DisplayComments', 'A' ])
-
-# Supply the summary comments and board display parameters
-# --------------------------------------------------------
-if docType.startswith('Summary'):
-    filterParm.append(['isQC', 'Y'])
-    filterParm.append(['DisplayComments', audienceComments ])
-    filterParm.append(['DurationComments', durationComments ])
-    filterParm.append(['SourceComments', sourceComments ])
-    filterParm.append(['IncludeExtPerm', includeExtPerm ])
-    filterParm.append(['IncludeIntAdv', includeIntAdv ])
-    filterParm.append(['DisplayModuleMarkup', modMarkup and 'Y' or 'N'])
-    filterParm.append(['DisplaySectMetaData', smdata and 'Y' or 'N'])
-    filterParm.append(['DisplayQcOnlyMod', qcOnly and 'Y' or 'N'])
-
-    # Patient Summaries are displayed like editorial board markup
-    # -----------------------------------------------------------
-    if repType == 'pat' or repType == 'patrs' or repType == 'patbu':
-        displayBoard += 'editorial-board_'
-    filterParm.append(['displayBoard', displayBoard])
-
-# Need to set the displayBoard parameter or all markup will be dropped
-# --------------------------------------------------------------------
-if docType.startswith('GlossaryTerm'):
-    filterParm.append(['isQC', 'Y'])
-    filterParm.append(['DisplayComments', audienceComments ])
-                       # audienceComments and 'Y' or 'N'])
-    filterParm.append(['displayBoard', 'editorial-board_'])
-    filterParm.append(['displayAudience', displayAudience])
-
-# Need to set the displayBoard and revision level parameter or all
-# markup will be dropped
-# --------------------------------------------------------------------
-if docType.startswith('MiscellaneousDocument'):
-    filterParm.append(['isQC', 'Y'])
-    filterParm.append(['insRevLevels', 'approved|'])
-    filterParm.append(['displayBoard', 'editorial-board_'])
-
-if repType == "bu" or repType == "but":
-    filterParm.append(['delRevLevels', 'Y'])
-
-# Added GlossaryTermList to HP documents, not just patient.
-filterParm.append(['DisplayGlossaryTermList',
-                       glossary and "Y" or "N"])
-filterParm.append(['DisplayImages',
-                       images and "Y" or "N"])
-filterParm.append(['DisplaySummaryRefList',
-                       sumRefs and "Y" or "N"])
-if images:
-    filterParm.append(['DisplayPubImages', pubImages ])
-filterParm.append(['DisplayCitations',
-                       citation and "Y" or "N"])
-filterParm.append(['DisplayLOETermList',
-                       loe and "Y" or "N"])
-
-if repType == 'pat' or repType == 'patrs' or repType == 'patbu':
-    filterParm.append(['ShowStandardWording',
-                       standardWording and "Y" or "N"])
-    filterParm.append(['ShowKPBox',
-                       kpbox and "Y" or "N"])
-    filterParm.append(['ShowLearnMoreSection',
-                       learnmore and "Y" or "N"])
-
-# ----------------------------------------------------------------
-# Saving QC report parameters in DB table
-# ----------------------------------------------------------------
-def saveParms(parms):
-    parms.sort()
-    try:
-        cursor.execute("""\
-     INSERT INTO url_parm_set( longURL)
-            VALUES (?)""", (repr(parms),))
-        conn.commit()
-        cursor.execute("""\
-     SELECT max(id) from url_parm_set""")
-        row = cursor.fetchone()
-
-    except Exception as e:
-        cdrcgi.bail(f"Failure inserting parms: {e}")
-
-    return row[0]
-
-
-# Before filtering the document write the parameters to a DB
-# table to access parameters for Word converstion
-# ----------------------------------------------------------------
-parmId = saveParms(filterParm)
-
-docParms = ""
-if docType.startswith('Summary'):
-    docParms = "parmstring=yes&parmid=%s" % parmId
-
-try:
-    doc = cdr.filterDoc(session, filters[docType], docId = docId,
-                        docVer = version or None, parm = filterParm)
-except Exception as e:
-    cdrcgi.bail("filtering error: {}".format(e))
-
-if isinstance(doc, (str, bytes)):
-    cdrcgi.bail(doc)
-doc = doc[0]
-
-if docType == "CTGovProtocol":
-    if isinstance(doc, bytes):
-        doc = str(doc, "utf-8")
-    if isinstance(doc, str) and "undefined/lastp" in doc:
-        # cdrcgi.bail("CTGovProtocol QC Report cannot be run until "
-        #             "PDQIndexing block has been completed")
-        filterParm.append(['skipPdqIndexing', 'Y'])
-        doc = cdr.filterDoc(session, filters[docType], docId = docId,
-                            docVer = version or None, parm = filterParm)
-        noPdqIndexing = """
-   <br>
-   <br>
-   <h1 style='color: red'>*** PDQ INDEXING BLOCK HAS BEEN OMITTED
-                              TO AVOID BROKEN LINK FAILURES ***</h1>
-"""
-    else:
-        noPdqIndexing = ""
-
-# Perform any required macro substitions
-doc = re.sub("@@DOCID@@", docId, doc)
-if docType == 'Person':
-    doc = fixPersonReport(doc)
-elif docType == 'Organization':
-    # -----------------------------------------------------
-    # We call the fixPersonReport for Organizations too
-    # since Person and Orgs have the Record Info and
-    # Most Recent Mailer Info in common.
-    # The resulting document goes through the fixOrgReport
-    # module to resolve the protocol link entries
-    # -----------------------------------------------------
-    doc = fixPersonReport(doc)
-    doc = fixOrgReport(doc)
-# elif docType == 'CTGovProtocol':
-#     doc = fixCTGovProtocol(doc)
-elif docType == 'PDQBoardMemberInfo':
-    doc = fixBoardMemberReport(doc)
-# cdrcgi.bail("docType = %s" % docType)
-
-# If not already changed to unicode by a fix.. routine, change it
-if isinstance(doc, bytes):
-    doc = str(doc, 'utf-8')
-
-# cdrcgi.bail('%s - %s' % (docParms, type(docParms)))
-#----------------------------------------------------------------------
-# Send it.
-#----------------------------------------------------------------------
-args = docId, version, docType, docParms
-cdr.LOGGER.info("QC for %s version %s type %s with parms %s", *args)
-cdrcgi.sendPage(doc, parms=docParms, docId=docId,
-                     docType=docType, docVer=version)
+        control.logger.exception("Failed")
+        control.bail(e)

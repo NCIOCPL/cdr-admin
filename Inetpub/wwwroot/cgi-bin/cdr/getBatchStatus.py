@@ -21,7 +21,7 @@ both to display a form and to read its contents.
 """
 
 from cdrbatch import getJobStatus, STATUSES
-from cdrcgi import Controller, navigateTo
+from cdrcgi import Controller
 from lxml import html
 
 
@@ -55,7 +55,7 @@ class Control(Controller):
             if self.id or self.name or self.age or self.status:
                 self.request = self.SUBMIT
         elif self.request == self.BACK:
-            return navigateTo(self.script, self.session.name)
+            return self.navigate_to(self.script, self.session.name)
         elif self.request == self.REFRESH:
             self.request = self.SUBMIT
         Controller.run(self)
@@ -64,13 +64,16 @@ class Control(Controller):
         """Override to add hidden fields and a couple of extra buttons."""
 
         page = self.report.page
-        buttons = page.form.find("header/h1/span")
-        buttons.insert(0, page.button(self.BACK))
-        buttons.insert(0, page.button(self.REFRESH))
         page.form.append(page.hidden_field("jobId", self.id))
         page.form.append(page.hidden_field("jobName", self.name))
         page.form.append(page.hidden_field("jobAge", self.age))
         page.form.append(page.hidden_field("jobStatus", self.status))
+        page.form.append(page.button(self.REFRESH))
+        table = self.report.page.form.find("table")
+        report_footer = self.report.page.main.find("p")
+        report_footer.addprevious(table)
+        css = ".report .usa-table { width: 90%; margin: 3rem auto 1.25rem; }"
+        self.report.page.add_css(css)
         self.report.send()
 
     def build_tables(self):
@@ -133,6 +136,11 @@ class Control(Controller):
     @property
     def status(self):
         return self.fields.getvalue("jobStatus")
+
+    @property
+    def same_window(self):
+        """Stay in the same browser tab for refresh."""
+        return [self.REFRESH]
 
 
 if __name__ == "__main__":

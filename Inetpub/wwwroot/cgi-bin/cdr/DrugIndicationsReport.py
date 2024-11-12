@@ -5,7 +5,7 @@ This script actually generates four different reports (with one of those
 having two options), based on the parameters chosen at run time.
 """
 
-from cdrcgi import Controller, Reporter, bail
+from cdrcgi import Controller, Reporter
 from cdrapi import db
 
 
@@ -57,7 +57,7 @@ class Control(Controller):
             opts["checked"] = False
         page.form.append(fieldset)
         fieldset = page.fieldset("Select Report Grouping")
-        fieldset.set("class", "hideable")
+        fieldset.set("class", "hideable usa-fieldset")
         opts["checked"] = True
         for value, label in self.GROUPINGS:
             opts["value"] = value
@@ -66,7 +66,7 @@ class Control(Controller):
             opts = dict(checked=False)
         page.form.append(fieldset)
         fieldset = page.fieldset("Select Approved Indication(s)")
-        fieldset.set("class", "hideable")
+        fieldset.set("class", "hideable usa-fieldset")
         options = [("all", "All indications")] + self.all_indications
         opts = dict(
             default="all",
@@ -99,10 +99,10 @@ jQuery(function() {
         """
 
         B = self.report.page.B
-        div = B.DIV(style="margin: 10px auto; width: 600px")
-        self.report.page.body.append(div)
+        div = B.DIV()
+        self.report.page.form.append(div)
         div.append(B.H3(self.caption))
-        dl = B.DL(style="margin: 5px auto; width: 1000px")
+        dl = B.DL()
         div.append(dl)
         for indication in sorted(self.indications, key=str.lower):
             dl.append(B.DT(indication))
@@ -164,7 +164,7 @@ jQuery(function() {
         if not hasattr(self, "_grouping"):
             self._grouping = self.fields.getvalue("grouping")
             if self._grouping not in [g[0] for g in self.GROUPINGS]:
-                bail()
+                self.bail()
         return self._grouping
 
     @property
@@ -180,8 +180,13 @@ jQuery(function() {
             for indication in self._indication:
                 if indication != "all":
                     if indication not in self.all_indications:
-                        bail()
+                        self.bail()
         return self._indication
+
+    @property
+    def no_results(self):
+        """One variation has no tables."""
+        return None
 
     @property
     def indication_table(self):
@@ -239,7 +244,7 @@ jQuery(function() {
         if not hasattr(self, "_type"):
             self._type = self.fields.getvalue("type")
             if self._type not in [t[0] for t in self.TYPES]:
-                bail()
+                self.bail()
         return self._type
 
 
@@ -272,7 +277,7 @@ class Drug:
 
         if not hasattr(self, "_brand_span"):
             brands = ", ".join(self.brands)
-            self._brand_span = Reporter.Table.B.SPAN(f"({brands})")
+            self._brand_span = Reporter.Table.B.SPAN(f" ({brands})")
             self._brand_span.set("class", "emphasis")
         return self._brand_span
 

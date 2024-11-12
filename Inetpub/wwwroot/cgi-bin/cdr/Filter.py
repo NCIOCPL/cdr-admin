@@ -6,7 +6,7 @@
 from functools import cached_property
 from lxml import etree
 from cdrapi.docs import Doc, FilterSet
-from cdrcgi import Controller, DOCID
+from cdrcgi import Controller
 from cdr import DEFAULT_DTD, PDQDTDPATH, expandFilterSets, getFilterSet
 
 
@@ -18,39 +18,199 @@ class Control(Controller):
      3. Show all of the filter sets which contain the specified filters.
     """
 
+    SUBTITLE = "CDR Document Filtering"
     LOGNAME = "filter"
     FILTER = "Submit Filter Request"
     VALIDATE = "Filter and Validate"
     QCSETS = "QC Filter Sets"
-    TITLE = "CDR Filtering"
-    CSS = ".action-buttons a { padding-left: 2px; padding-right: 2px; }"
+    SCRIPT = "/js/filter.js"
+    CSS = (
+        ".action-buttons { text-wrap: nowrap; }",
+        ".action-buttons .usa-button { margin-top: 0; }",
+        ".usa-form a:visited { color: white; }",
+    )
 
     def build_tables(self):
         """Return the single table used for this report."""
         return self.table
 
-    def run(self):
-        """Override the base class version: the form is static HTML."""
+    def populate_form(self, page):
+        """Replace the static CdrFilter.html with page with dynamic menus.
 
-        if self.table:
-            self.show_report()
-        elif self.filter_specs:
-            self.send_page(self.filtered_xml, self.text_type)
-        else:
-            self.bail("No filters specified")
+        Required positional argument:
+          page - instance of the HTMLPage class
+        """
+
+        # Add fields for selecting the document to be filtered.
+        fieldset = page.fieldset("Document")
+        opts = dict(value="62902", label="Doc ID")
+        fieldset.append(page.text_field("DocId", **opts))
+        opts = dict(value="lastp", label="Doc Version")
+        fieldset.append(page.text_field("DocVer", **opts))
+        page.form.append(fieldset)
+
+        # Let the user configure miscellaneous options for the filtering.
+        fieldset = page.fieldset("Miscellaneous Options")
+        opts = dict(value="pdqCG.dtd", label="DTD")
+        fieldset.append(page.text_field("newdtd", **opts))
+        page.form.append(fieldset)
+
+        # Start with a single filter field, to which the user can add more.
+        fieldset = page.fieldset("Filter(s)", id="filters")
+        legend = fieldset.find("legend")
+        add_button = page.B.SPAN(
+            page.B.IMG(
+                page.B.CLASS("clickable"),
+                src="/images/add.gif",
+                onclick="add_filter_field();",
+                title="Add another filter"
+            ),
+            page.B.CLASS("filter-button")
+        )
+        legend.append(add_button)
+        opts = dict(
+            value="name:Passthrough Filter",
+            widget_id="filter-1",
+            label="",
+            wrapper_classes="filter",
+        )
+        fieldset.append(page.text_field("filter", **opts))
+        page.form.append(fieldset)
+
+        # Control parameters implied by report type.
+        fieldset = page.fieldset("Report")
+        checkboxes = (
+            ("ispp", "Publish Preview", False),
+            ("isqc", "QC Report", True),
+        )
+        for id, label, checked in checkboxes:
+            opts = dict(widget_id=id, label=label, checked=checked)
+            fieldset.append(page.checkbox(id, value="true", **opts))
+        page.form.append(fieldset)
+
+        # Ask which type of QC report is wanted (if applicable).
+        fieldset = page.fieldset("Summary Markup")
+        buttons = (
+            ("Y", "rsmarkup", "Redline/Strikeout, New Patient", True),
+            ("N", "bu", "Bold/Underline", False),
+        )
+        for value, id, label, checked in buttons:
+            opts = dict(
+                widget_id=id,
+                label=label,
+                value=value,
+                checked=checked,
+            )
+            fieldset.append(page.radio_button("rsmarkup", **opts))
+        page.form.append(fieldset)
+
+        # Which type(s) of board is the filter for (if applicable)?
+        fieldset = page.fieldset("Display Markup for Board")
+        checkboxes = (
+            ("editorial", "Editorial", True),
+            ("advisory", "Advisory", False),
+        )
+        for id, label, checked in checkboxes:
+            opts = dict(widget_id=id, label=label, checked=checked)
+            fieldset.append(page.checkbox(id, value="true", **opts))
+        page.form.append(fieldset)
+
+        # Which revision levels should be applied?
+        fieldset = page.fieldset("Revision Levels")
+        checkboxes = (
+            ("publish", "publish", False),
+            ("approved", "approved", True),
+            ("proposed", "proposed", False),
+        )
+        for id, label, checked in checkboxes:
+            opts = dict(widget_id=id, label=label, checked=checked)
+            fieldset.append(page.checkbox(id, value="true", **opts))
+        page.form.append(fieldset)
+
+        # Add options applicable to glossary filtering.
+        fieldset = page.fieldset("Glossary Definitions")
+        checkboxes = (
+            ("glosspatient", "Patient", True),
+            ("glosshp", "Health Professional", True),
+        )
+        for id, label, checked in checkboxes:
+            opts = dict(widget_id=id, label=label, checked=checked)
+            fieldset.append(page.checkbox(id, value="true", **opts))
+        page.form.append(fieldset)
+
+        # Optional elements to be included.
+        fieldset = page.fieldset("Miscellaneous Display Options")
+        checkboxes = (
+            ("images", "Images", True),
+            ("glossary", "Glossary Terms", False),
+            ("stdword", "Standard Wording", False),
+            ("loeref", "LOE Refs", False),
+        )
+        for id, label, checked in checkboxes:
+            opts = dict(widget_id=id, label=label, checked=checked)
+            fieldset.append(page.checkbox(id, value="true", **opts))
+        page.form.append(fieldset)
+
+        # Add fields for a custom parameter (more can be added).
+        fieldset = page.fieldset("Custom Parameter(s)", id="parameters")
+        legend = fieldset.find("legend")
+        add_button = page.B.SPAN(
+            page.B.IMG(
+                page.B.CLASS("clickable"),
+                src="/images/add.gif",
+                onclick="add_parameter_fields();",
+                title="Add another parameter"
+            ),
+            page.B.CLASS("term-button")
+        )
+        legend.append(add_button)
+        opts = dict(label="Name", wrapper_classes="parm-name")
+        fieldset.append(page.B.DIV(
+            page.text_field("parm-name-1", **opts),
+            page.text_field("parm-value-1", label="Value"),
+            page.B.CLASS("parameter")
+        ))
+        page.form.append(fieldset)
+        page.add_css("\n".join([
+            ".filter-button, .term-button { padding-left: 10px; }",
+            "#parameters div div { display: inline-block; width: 45%; }",
+            "#parameters .parm-name { margin-right: 1rem; }",
+        ]))
+        param_count = page.hidden_field("parm-count", "1")
+        param_count.set("id", "parm-count")
+        page.form.append(param_count)
+        page.head.append(page.B.SCRIPT(src=self.SCRIPT))
+
+    def run(self):
+        """Handle the custom actions."""
+
+        try:
+            if self.table:
+                self.show_report()
+            elif self.filter_specs:
+                self.send_page(self.filtered_xml, self.text_type)
+            else:
+                self.show_form()
+        except Exception as e:
+            self.logger.exception("Filter failure")
+            self.bail(f"Filter failure: {e}")
 
     def show_report(self):
         """Override the base class method to add custom styling."""
 
         if self.filter_set_table:
-            self.report.page.add_css(self.CSS)
+            self.report.page.add_css("\n".join(self.CSS))
         self.report.send(self.format)
 
     def get_member_sets(self, set_name):
-        """Extract the names of filter sets that are member of the
-           named filter set
+        """Extract the names of filter sets that are member of the named set.
 
-           Returns a list of filter set names up to two levels down"""
+        Required positional argument:
+          set_name - string for unique name of filter set
+
+        Return:
+           list of filter set names up to two levels down
+        """
 
         sub_sets = []
         for member in getFilterSet(self.session, set_name).members:
@@ -107,6 +267,11 @@ class Control(Controller):
         return boards
 
     @cached_property
+    def buttons(self):
+        """Custom buttons for the filtering form."""
+        return (self.FILTER, self.VALIDATE, self.QCSETS)
+
+    @cached_property
     def comments(self):
         """(I)nternal, (E)xternal, (A)ll, or (N)one."""
 
@@ -121,21 +286,21 @@ class Control(Controller):
     def doc(self):
         """`Doc` object for the CDR document to be filtered."""
 
-        id = self.fields.getvalue(DOCID)
+        id = self.fields.getvalue(self.DOCID)
         if not id:
-            self.bail("No document selected")
+            return None
         try:
             id = Doc.extract_id(id)
         except Exception:
             self.bail("Unrecognized document ID format")
-        version = self.fields.getvalue("DocVer", "0")
+        version = self.fields.getvalue("DocVer") or "0"
 
         # If no version is specified the default version is the CWD
         # which is indicated with a version=None.  Need to allow
         # "None" as a valid value.
         allowed = "None", "last", "lastp"
         if not version.isdigit() and version not in allowed:
-            self.bail(f"Invalid version {version!r}")
+            self.bail(f"Invalid version {version!r}.")
         return Doc(self.session, id=id, version=version)
 
     @cached_property
@@ -176,9 +341,8 @@ class Control(Controller):
         # "QC Filter Sets" button had been clicked. If there are
         # filters and/or filter sets identified, and the button was
         # not clicked, nothing to do here.
-        if self.filter_specs:
-            if self.fields.getvalue("qcFilterSets") != "Y":
-                return None
+        if self.filter_specs and not self.qc_filter_sets:
+            return None
 
         # Show the sets named by the user, as well as sets which contain
         # the users's sets.
@@ -212,12 +376,15 @@ class Control(Controller):
         """Filters and filter sets chosen for filtering the CDR document."""
 
         values = self.fields.getlist("filter") or self.fields.getlist("Filter")
+        self.logger.info("filter_specs() values=%r", values)
         specs = []
         for value in values:
-            spec = FilterSpec(self, value)
-            if spec.error:
-                self.bail(spec.error)
-            specs.append(spec)
+            if value:
+                spec = FilterSpec(self, value)
+                if spec.error:
+                    self.bail(spec.error)
+                specs.append(spec)
+        self.logger.info("%d specs found", len(specs))
         return specs
 
     @cached_property
@@ -257,6 +424,11 @@ class Control(Controller):
                 levels.append(level)
         return levels
 
+    @property
+    def method(self):
+        """Override the form method so the parameters are in the URL."""
+        return "GET"
+
     @cached_property
     def parms(self):
         """Pack up the parameters to be fed to the CDR filter module."""
@@ -285,10 +457,18 @@ class Control(Controller):
         self.logger.info("Filter.py(parms=%r)", parms)
         return parms
 
+    @cached_property
+    def qc_filter_sets(self):
+        """True if the the users asked for display of QC filter sets."""
+
+        if self.fields.getvalue("qcFilterSets") == "Y":
+            return True
+        return self.request == self.QCSETS
+
     @property
     def redline_strikeout(self):
         """Default is True, but turned off for a bold/underline report."""
-        return self.fields.getvalue("rsmarkup") != "false"
+        return self.fields.getvalue("rsmarkup") not in ("N", "false")
 
     @cached_property
     def resolved_filter_sets(self):
@@ -306,6 +486,11 @@ class Control(Controller):
         """True if images display option is requested."""
         return self.fields.getvalue("images") == "true"
 
+    @cached_property
+    def same_window(self):
+        """Reduce generation of new browser tabs."""
+        return [self.SUBMIT] if self.request else []
+
     @property
     def standard_wording(self):
         """True if standard wording display options are requested."""
@@ -315,14 +500,19 @@ class Control(Controller):
     def subtitle(self):
         """What we display under the main banner."""
 
-        cdr_id = f"{self.doc.doctype} Document {self.doc.cdr_id}"
+        if not self.doc:
+            return self.SUBTITLE
+        cdr_id = f"{self.doc.doctype} Doc CDR{self.doc.id}"
         if self.filter_set_table:
-            return f"QC Filter Sets for CDR XSL/T Filtering of {cdr_id}"
+            return f"Filter Sets for Filtering of {cdr_id}"
         return f"Validation Results for Filtered {cdr_id}"
 
     @property
     def table(self):
         """Pick the table requested for this report."""
+
+        if not self.doc:
+            return None
         return self.validation_table or self.filter_set_table or None
 
     @property
@@ -335,7 +525,8 @@ class Control(Controller):
         """Assemble the table showing the validation results."""
 
         if self.fields.getvalue("validate") != "Y":
-            return None
+            if self.request != self.VALIDATE:
+                return None
         self.dtd.validate(self.filter_result.result_tree)
         errors = self.dtd.error_log.filter_from_errors()
         rows = []
@@ -375,6 +566,8 @@ class FilterSpec:
 
         self.__control = control
         self.__identifier = identifier
+        if not identifier:
+            raise Exception("Missing identifier for FilterSpec")
 
     @property
     def control(self):
@@ -414,7 +607,8 @@ class FilterSpec:
             try:
                 filter_id = Doc.extract_id(self.identifier)
             except Exception:
-                id = self.identifier
+                self.control.logger.exception("FilterSpec.filter_id()")
+                id = self.__identifier
                 self.control.bail(f"{id!r} is not a well-formed CDR ID")
         return filter_id
 
@@ -492,7 +686,7 @@ class ResolvedFilterSet:
         control = self.__control
         B = control.HTMLPage.B
         params = {
-            DOCID: control.doc.cdr_id,
+            control.DOCID: control.doc.cdr_id,
             "DocVer": control.doc.version,
             "filter": self.filter_ids,
         }
@@ -502,8 +696,8 @@ class ResolvedFilterSet:
         params["validate"] = "Y"
         validate_url = control.make_url(control.script, **params)
         buttons = B.SPAN(
-            B.A(B.BUTTON("Filter"), href=filter_url),
-            B.A(B.BUTTON("Validate"), href=validate_url),
+            B.A("Filter", B.CLASS("usa-button"), href=filter_url),
+            B.A("Validate", B.CLASS("usa-button"), href=validate_url),
             B.CLASS("action-buttons"),
         )
         members = [f"{m.id}:{m.name}" for m in self.__set.members]

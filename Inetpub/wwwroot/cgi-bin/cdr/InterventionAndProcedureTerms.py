@@ -3,6 +3,7 @@
 """Generate hierarchical report of terminology for interventions/procedures.
 """
 
+from functools import cached_property
 from cdrcgi import Controller
 
 
@@ -11,56 +12,65 @@ class Control(Controller):
 
     SUBTITLE = "CDR Intervention or Procedure Index Terms"
     LOGNAME = "TerminologyReports"
+    FIELD_NAME = "IncludeAlternateNames"
+    INCLUDE = "Include display of alternate term names"
+    EXCLUDE = "Exclude display of alternate term names"
+    OPTIONS = ((INCLUDE, "True", True), (EXCLUDE, "False", False))
     CREATE_IP = "CREATE TABLE #ip (sid INT, pid INT)"
     CREATE_TERMS = "CREATE TABLE #terms (sid INT, tid INT, name NVARCHAR(MAX))"
     PARENT_PATH = "/Term/TermRelationship/ParentTerm/TermId/@cdr:ref"
     CSS = (
-        "ul.t { width: 600px; margin: 15px auto; }",
-        "li { list-style: none; font-size: 14px; font-family: Arial; }",
-        "li.u { color: green; font-weight: bold; font-family: serif; }",
+        "ul.t { padding-left: 0; }",
+        "li { list-style: none; }",
+        "li.u { color: green; font-weight: bold; }",
         "ul li { font-weight: normal; }",
         "li.u { font-variant: small-caps; }",
         "li.i { font-variant: small-caps; }",
         "li.l { color: blue; font-variant: normal; }",
-        "li.a { color: #ff2222; font-size: 12px; font-style: italic; }",
+        "li.a { color: #ff2222; font-style: italic; }",
         "li.a { font-variant: normal; }",
     )
 
-    def show_form(self):
-        """Bypass the form, which isn't needed for this report."""
-        self.show_report()
+    def populate_form(self, page):
+        """Let the user choose which version of the report to show.
+
+        Required positional argument:
+          page - instance of the HTMLPage class
+        """
+
+        if self.flavor:
+            self.show_report()
+        fieldset = page.fieldset("Display Options")
+        for label, value, checked in self.OPTIONS:
+            opts = dict(label=label, value=value, checked=checked)
+            fieldset.append(page.radio_button(self.FIELD_NAME, **opts))
+        page.form.append(fieldset)
 
     def show_report(self):
         """Override base class method, because we're not using Report class."""
 
-        buttons = (
-            self.HTMLPage.button(self.SUBMENU),
-            self.HTMLPage.button(self.ADMINMENU),
-            self.HTMLPage.button(self.LOG_OUT),
-        )
         opts = dict(
-            buttons=buttons,
             session=self.session,
             action=self.script,
-            banner=self.title,
-            footer=self.footer,
             subtitle=self.subtitle,
         )
-        top = self.patriarch
-        report = self.HTMLPage(self.title, **opts)
-        wrapper = report.B.UL(top.node, self.footer, report.B.CLASS("t"))
-        report.body.append(wrapper)
-        report.body.set("class", "report")
-        report.add_css("\n".join(self.CSS))
-        report.send()
+        page = self.HTMLPage(self.title, **opts)
+        fieldset = page.fieldset("Tree Hierarchy")
+        tree = page.B.UL(self.patriarch.node, page.B.CLASS("usa-list t"))
+        fieldset.append(tree)
+        fieldset.append(self.footer)
+        page.form.append(fieldset)
+        page.body.set("class", "report")
+        page.add_css("\n".join(self.CSS))
+        page.send()
 
-    @property
+    @cached_property
     def flavor(self):
         """If "short" don't collect or show aliases."""
-        if self.fields.getvalue("IncludeAlternateNames") != "False":
-            return "long"
-        else:
-            return "short"
+
+        value = self.fields.getvalue(self.FIELD_NAME)
+        if value:
+            return "long" if value == "True" else "short"
         return self.fields.getvalue("flavor")
 
     @property
@@ -78,7 +88,7 @@ class Control(Controller):
             self.__collect_terms()
         return self._patriarch
 
-    @property
+    @cached_property
     def subtitle(self):
         """String to be displayed directly under the main banner."""
 
@@ -86,13 +96,10 @@ class Control(Controller):
             return f"{self.SUBTITLE} (without Alternate Names)"
         return self.SUBTITLE
 
-    @property
+    @cached_property
     def terms(self):
         """Dictionary of `Term` objects."""
-
-        if not hasattr(self, "_terms"):
-            self._terms = {}
-        return self._terms
+        return {}
 
     def __create_tables(self):
         """Create the two temporary tables needed to build the tree."""
@@ -162,7 +169,7 @@ class Control(Controller):
         for row in query.execute(self.cursor).fetchall():
             if row.pid in self.terms:
                 self.terms[row.pid].children.add(row.tid)
-                self._terms[row.tid].parents.add(row.pid)
+                self.terms[row.tid].parents.add(row.pid)
 
         # Finally, collect the term name aliases.
         if self.flavor == "long":
@@ -170,7 +177,7 @@ class Control(Controller):
             query.join("#terms t", "t.tid = o.doc_id")
             query.where("o.path = '/Term/OtherName/OtherTermName'")
             for row in query.execute(self.cursor).fetchall():
-                self._terms[row.doc_id].aliases.add(row.name)
+                self.terms[row.doc_id].aliases.add(row.name)
 
 
 class Term:

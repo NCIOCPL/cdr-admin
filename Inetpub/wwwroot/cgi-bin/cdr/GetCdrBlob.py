@@ -7,11 +7,11 @@
 #
 # BZIssue::4767
 # ----------------------------------------------------------------------
-import cdrcgi
 import cdr
 import sys
 from lxml import etree
 from cdrapi import db
+from cdrcgi import Controller, FieldStorage
 
 
 class DocInfo:
@@ -117,14 +117,14 @@ class DocInfo:
 
 
 cursor = db.connect(user='CdrGuest').cursor()
-fields = cdrcgi.FieldStorage()
-docId = fields.getvalue('id') or cdrcgi.bail("Missing required 'id' parameter")
+fields = FieldStorage()
+docId = fields.getvalue('id') or Controller.bail("Missing required 'id' parm")
 docVer = fields.getvalue('ver') or ''
 disp = fields.getvalue("disp") or "attachment"
 try:
     info = DocInfo(cursor, docId, docVer)
 except Exception as e:
-    cdrcgi.bail("%s" % e)
+    Controller.bail("%s" % e)
 if info.docVer:
     cursor.execute("""\
             SELECT b.data
@@ -143,10 +143,10 @@ else:
 rows = cursor.fetchall()
 if not rows:
     if info.docVer:
-        cdrcgi.bail("No blob found for version %s of CDR%d" % (docVer,
-                                                               info.docId))
+        message = f"No blob found for version {docVer} of CDR{info.docId:d}"
+        Controller.bail(message)
     else:
-        cdrcgi.bail("No blob found for CDR document %d" % info.docId)
+        Controller.bail(f"No blob found for CDR document {info.docId:d}")
 blob_bytes = rows[0][0]
 sys.stdout.buffer.write(f"""\
 Content-Type: {info.mimeType}

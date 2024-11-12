@@ -52,12 +52,12 @@ class Control(Controller):
     @property
     def end(self):
         """String for the end of the report's date range (optional)."""
-        return self.fields.getvalue("end")
+        return self.parse_date(self.fields.getvalue("end"))
 
     @property
     def start(self):
         """String for the start of the report's date range (optional)."""
-        return self.fields.getvalue("start")
+        return self.parse_date(self.fields.getvalue("start"))
 
     @property
     def subtitle(self):

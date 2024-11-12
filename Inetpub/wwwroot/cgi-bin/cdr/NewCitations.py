@@ -4,7 +4,8 @@
 """
 
 from cdrcgi import Controller
-import datetime
+from datetime import date, timedelta
+from functools import cached_property
 from urllib.parse import urlencode
 
 
@@ -27,8 +28,8 @@ class Control(Controller):
             page - HTMLPage on which the fields are placed
         """
 
-        end = datetime.date.today()
-        start = end - datetime.timedelta(6)
+        end = date.today()
+        start = end - timedelta(6)
         fieldset = page.fieldset("Report Options")
         opts = dict(label="Start Date", value=start)
         fieldset.append(page.date_field("start", **opts))
@@ -36,14 +37,19 @@ class Control(Controller):
         fieldset.append(page.date_field("end", **opts))
         page.form.append(fieldset)
 
-    @property
+    @cached_property
+    def use_basic_web_page(self):
+        """Override to give the report more room."""
+        return True
+
+    @cached_property
     def caption(self):
         """String to be displayed above the report table."""
 
         base = f"{len(self.rows)} Documents Created"
         return self.add_date_range_to_caption(base, self.start, self.end)
 
-    @property
+    @cached_property
     def columns(self):
         """Column headers for the report table."""
 
@@ -56,7 +62,7 @@ class Control(Controller):
             self.Reporter.Column("PMID")
         )
 
-    @property
+    @cached_property
     def end(self):
         """Date range end selected on the form."""
 
@@ -67,7 +73,7 @@ class Control(Controller):
             self.logger.exception("invalid end date")
             self.bail("Invalid ending date")
 
-    @property
+    @cached_property
     def start(self):
         """Date range beginning selected on the form."""
 
@@ -78,7 +84,7 @@ class Control(Controller):
             self.logger.exception("invalid start date")
             self.bail("Invalid starting date")
 
-    @property
+    @cached_property
     def rows(self):
         """Values for the report table.
 
@@ -127,7 +133,7 @@ class Control(Controller):
                 row.title,
                 row.name,
                 str(row.dt)[:10],
-                self.Reporter.Cell(row.publishable or "N/A", classes="center"),
+                self.Reporter.Cell(row.publishable or "N/A", center=True),
                 pmid,
             ])
         return citations

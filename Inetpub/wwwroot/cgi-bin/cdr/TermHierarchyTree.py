@@ -3,7 +3,9 @@
 """Show terminalogy hierarchy.
 """
 
-from cdrcgi import Controller
+from collections import defaultdict
+from functools import cached_property
+from cdrcgi import Controller, BasicWebPage
 
 
 class Control(Controller):
@@ -11,117 +13,116 @@ class Control(Controller):
 
     SUBTITLE = "Term Hierarchy Tree"
     LOGNAME = "TermHierarchyTree"
-    STYLESHEET = "../../stylesheets/TermHierarchyTree.css"
+    CSS = "../../stylesheets/TermHierarchyTree.css"
     SCRIPT = "../../js/TermHierarchyTree.js"
     PARENT_PATH = "/Term/TermRelationship/ParentTerm/TermId/@cdr:ref"
+    INSTRUCTIONS = (
+        "This report provides an interactive interface for navigating "
+        "through the CDR terminology hierarcchy, collapsing and expanding "
+        "nodes dynamically, with the ability to copy the document IDs "
+        "for a given subset of the tree into the clipboard. The leaf nodes "
+        "of the tree are displayed in a teal color. Nodes which have children "
+        "have a navy font color."
+    )
 
-    def show_form(self):
-        """Re-route straight to the report, as we need no input options."""
-        self.show_report()
+    def populate_form(self, page):
+        """Explain the report.
+
+        Required positional argument:
+          page - instance of HTMLPage
+        """
+
+        if not self.fields.getvalue("prompt"):
+            self.show_report()
+        fieldset = page.fieldset("Instructions")
+        fieldset.append(page.B.P(self.INSTRUCTIONS))
+        page.form.append(fieldset)
 
     def show_report(self):
         """Override the base class version, as this is not a tabular report."""
 
-        buttons = (
-            self.HTMLPage.button(self.SUBMENU),
-            self.HTMLPage.button(self.ADMINMENU),
-            self.HTMLPage.button(self.LOG_OUT),
-        )
-        opts = dict(
-            buttons=buttons,
-            subtitle=self.SUBTITLE,
-            method="get",
-            session=self.session,
-        )
-        page = self.HTMLPage(self.TITLE, **opts)
-        page.head.append(page.B.LINK(href=self.STYLESHEET, rel="stylesheet"))
-        page.head.append(page.B.SCRIPT(src=self.SCRIPT))
-        page.body.append(self.tree)
-        page.body.append(self.clipboard)
-        page.body.append(self.footer)
-        page.send()
+        report = BasicWebPage()
+        report.wrapper.append(report.B.H1(self.SUBTITLE))
+        report.head.append(report.B.SCRIPT(src=self.HTMLPage.JQUERY))
+        report.head.append(report.B.SCRIPT(src=self.SCRIPT))
+        report.head.append(report.B.LINK(href=self.CSS, rel="stylesheet"))
+        report.body.append(self.tree)
+        report.body.append(self.clipboard)
+        report.body.append(self.footer)
+        report.send()
 
-    @property
+    @cached_property
     def children(self):
         """Dictionary indexing child term IDs by their parent term IDs."""
 
-        if not hasattr(self, "_children"):
-            self._children = {}
-            for child, parent in self.parent_links:
-                if parent not in self._children:
-                    self._children[parent] = [child]
-                else:
-                    self._children[parent].append(child)
-        return self._children
+        children = {}
+        for child, parent in self.parent_links:
+            if parent not in children:
+                children[parent] = [child]
+            else:
+                children[parent].append(child)
+        return children
 
-    @property
+    @cached_property
     def clipboard(self):
         """Fallback in case the browser doesn't support the real clipboard."""
 
-        if not hasattr(self, "_clipboard"):
-            self._clipboard = self.HTMLPage.fieldset("Copied CDR IDs")
-            self._clipboard.set("class", "hidden")
-            self._clipboard.set("id", "clipboard")
-            self._clipboard.append(self.HTMLPage.B.TEXTAREA())
-        return self._clipboard
+        clipboard = self.HTMLPage.fieldset("Copied CDR IDs")
+        clipboard.set("class", "hidden")
+        clipboard.set("id", "clipboard")
+        clipboard.append(self.HTMLPage.B.TEXTAREA())
+        return clipboard
 
     @property
     def id(self):
-        """Unique ID generator for term nodes."""
+        """Unique ID generator for term nodes (don't use @cached_property)."""
 
         if not hasattr(self, "_id"):
             self._id = 0
         self._id += 1
         return self._id
 
-    @property
+    @cached_property
     def obsolete(self):
         """Terms to be skipped."""
 
-        if not hasattr(self, "_obsolete"):
-            query = self.Query("query_term", "doc_id")
-            query.where("path = '/Term/TermType/TermTypeName'")
-            query.where("value = 'Obsolete term'")
-            rows = query.execute(self.cursor)
-            self._obsolete = {row.doc_id for row in rows}
-        return self._obsolete
+        query = self.Query("query_term", "doc_id")
+        query.where("path = '/Term/TermType/TermTypeName'")
+        query.where("value = 'Obsolete term'")
+        rows = query.execute(self.cursor)
+        return {row.doc_id for row in rows}
 
-    @property
+    @cached_property
     def parent_links(self):
         """Sequence of parent ID, child ID tuples."""
 
-        if not hasattr(self, "_parent_links"):
-            query = self.Query("query_term", "doc_id", "int_val").unique()
-            query.where(query.Condition("path", self.PARENT_PATH))
-            rows = query.execute(self.cursor)
-            self._parent_links = [tuple(row) for row in rows]
-        return self._parent_links
+        query = self.Query("query_term", "doc_id", "int_val").unique()
+        query.where(query.Condition("path", self.PARENT_PATH))
+        rows = query.execute(self.cursor)
+        return [tuple(row) for row in rows]
 
-    @property
+    @cached_property
     def parents(self):
         """Dictionary indexing parent term IDs by their child term IDs."""
 
-        if not hasattr(self, "_parents"):
-            self._parents = {}
-            for child, parent in self.parent_links:
-                if child not in self.obsolete and parent not in self.obsolete:
-                    if child not in self._parents:
-                        self._parents[child] = [parent]
-                    else:
-                        self._parents[child].append(parent)
-        return self._parents
+        parents = {}
+        for child, parent in self.parent_links:
+            if child not in self.obsolete and parent not in self.obsolete:
+                if child not in parents:
+                    parents[child] = [parent]
+                else:
+                    parents[child].append(parent)
+        return parents
 
-    @property
+    @cached_property
     def semantic_types(self):
         """Unique IDs for terms whose term type is 'Semantic type'."""
 
-        if not hasattr(self, "_semantic_types"):
-            query = self.Query("query_term", "doc_id").unique()
-            query.where("path = '/Term/TermType/TermTypeName'")
-            query.where("value = 'Semantic type'")
-            rows = query.execute(self.cursor)
-            self._semantic_types = {row.doc_id for row in rows}
-        return self._semantic_types
+        query = self.Query("query_term", "doc_id").unique()
+        query.where("path = '/Term/TermType/TermTypeName'")
+        query.where("value = 'Semantic type'")
+        rows = query.execute(self.cursor)
+        return {row.doc_id for row in rows}
 
     @property
     def terms(self):
@@ -130,6 +131,11 @@ class Control(Controller):
         The logging of parents and children cannot be eliminated,
         as it is needed for populating the children and parents
         properties of the `Term` objects.
+
+        Caching has to be done by hand, because of the dependency on
+        the `parents` property of the `Term` object, which needs to
+        see this property while it's still in the process of being
+        created.
         """
 
         if not hasattr(self, "_terms"):
@@ -156,29 +162,68 @@ class Control(Controller):
                             parent.children.append(term)
         return self._terms
 
-    @property
+    @cached_property
     def top(self):
         """Top-level (orphan) semantic types."""
 
-        if not hasattr(self, "_top"):
-            self._top = []
-            for id in self.terms:
-                if id in self.semantic_types:
-                    term = self.terms[id]
-                    if not term.parents:
-                        self._top.append(term)
-        return self._top
+        top = []
+        for id in self.terms:
+            if id in self.semantic_types:
+                term = self.terms[id]
+                if not term.parents:
+                    top.append(term)
+        return top
 
-    @property
+    @cached_property
     def tree(self):
         """This is what the folks came to see."""
 
-        if not hasattr(self, "_tree"):
-            self._tree = self.HTMLPage.B.UL()
-            self._tree.set("class", "treeview")
-            for term in sorted(self.top):
-                self._tree.append(term.node)
-        return self._tree
+        tree = self.HTMLPage.B.UL()
+        tree.set("class", "treeview")
+        for term in sorted(self.top):
+            tree.append(term.node)
+        return tree
+
+    def find_terms_in_multiple_top_level_trees(self):
+        """Not used by this script. Invoke for debugging."""
+
+        subtrees = [self.load_subtree(root) for root in self.top]
+        terms = defaultdict(list)
+        for subtree in subtrees:
+            for id in subtree.descendants:
+                terms[id].append(subtree)
+        report = dict(found=[], checked=sum(s.checked for s in subtrees))
+        for id in sorted(terms):
+            if len(terms[id]) > 1:
+                values = dict(
+                    id=id,
+                    name=self.terms[id].name,
+                    subtrees=[subtree.root.name for subtree in terms[id]],
+                )
+                report["found"].append(values)
+        report["elapsed"] = str(self.elapsed)
+        return report
+
+    @staticmethod
+    def load_subtree(term, subtree=None):
+        """Called recursively by debugging routine.
+
+        Pass:
+          subtree - None for top of subtree
+        """
+
+        if subtree is None:
+            class Subtree:
+                def __init__(self, term):
+                    self.root = term
+                    self.descendants = {}
+                    self.checked = 0
+            subtree = Subtree(term)
+        for child in term.children:
+            subtree.checked += 1
+            subtree.descendants[child.id] = child
+            Control.load_subtree(child, subtree)
+        return subtree
 
 
 class Term:
@@ -192,8 +237,8 @@ class Term:
             row - database row for this term
         """
 
-        self.__control = control
-        self.__row = row
+        self.control = control
+        self.row = row
 
     def __lt__(self, other):
         """Allow the terms to be sorted."""
@@ -208,58 +253,53 @@ class Term:
         return f"<Term> {self.name}"
 
     @property
-    def key(self):
-        """Support case-insensitive sorting."""
-        if not hasattr(self, "_key"):
-            self._key = self.name.lower()
-        return self._key
-
-    @property
-    def name(self):
-        """The preferred name for this term."""
-        return self.__row.value
-
-    @property
-    def id(self):
-        """Integer ID for this term's CDR document."""
-        return self.__row.doc_id
-
-    @property
-    def is_semantic_type(self):
-        """True if one of this term's types is 'Semantic type'."""
-        return self.id in self.__control.semantic_types
-
-    @property
     def children(self):
-        """Terms of which this node is a parent."""
+        """Terms of which this node is a parent.
+
+        Make this property available to the control object during population.
+        """
 
         if not hasattr(self, "_children"):
             self._children = []
-            children = self.__control.children.get(self.id)
+            children = self.control.children.get(self.id)
             if children:
                 for id in children:
-                    term = self.__control.terms.get(id)
+                    term = self.control.terms.get(id)
                     if term and term.is_semantic_type == self.is_semantic_type:
                         self._children.append(term)
         return self._children
 
-    @children.setter
-    def children(self, value):
-        """Allow adoption of orphans which are not semantic types."""
-        self._children = value
+    @cached_property
+    def id(self):
+        """Integer ID for this term's CDR document."""
+        return self.row.doc_id
 
-    @property
+    @cached_property
+    def is_semantic_type(self):
+        """True if one of this term's types is 'Semantic type'."""
+        return self.id in self.control.semantic_types
+
+    @cached_property
+    def key(self):
+        """Support case-insensitive sorting."""
+        return self.name.lower()
+
+    @cached_property
     def leaves(self):
         """Unique IDs of descendant leaf nodes under this term."""
 
-        if not hasattr(self, "_leaves"):
-            self._leaves = set()
-            for child in self.children:
-                if not child.children:
-                    self._leaves.add(child.id)
-                else:
-                    self._leaves |= child.leaves
-        return self._leaves
+        leaves = set()
+        for child in self.children:
+            if not child.children:
+                leaves.add(child.id)
+            else:
+                leaves |= child.leaves
+        return leaves
+
+    @cached_property
+    def name(self):
+        """The preferred name for this term."""
+        return self.row.value
 
     @property
     def node(self):
@@ -270,13 +310,13 @@ class Term:
         own instance.
         """
 
-        B = self.__control.HTMLPage.B
+        B = self.control.HTMLPage.B
         if self.children:
             args = self.name, self.children
-            self.__control.logger.debug("%s children: %s", *args)
+            self.control.logger.debug("%s children: %s", *args)
             if self.name == "AIDS-related malignancies":
-                self.__control.logger.info("%s children: %s", *args)
-            id = f"li-{self.__control.id}"
+                self.control.logger.info("%s children: %s", *args)
+            id = f"li-{self.control.id}"
             onclick = f"toggle_node(event, '#{id}')"
             sign = B.SPAN("+", B.CLASS("sign"))
             name = B.SPAN(self.name)
@@ -295,28 +335,29 @@ class Term:
 
     @property
     def parents(self):
-        """Terms of which this is a child."""
+        """Terms of which this is a child.
+
+        Caching has to be done by hand, because of the dependency on
+        the `terms` property of the `control` object, which needs to
+        see this property while it's still in the process of being
+        created.
+        """
 
         if not hasattr(self, "_parents"):
             self._parents = []
-            parents = self.__control.parents.get(self.id)
+            parents = self.control.parents.get(self.id)
             if parents:
                 for id in parents:
-                    term = self.__control.terms.get(id)
+                    term = self.control.terms.get(id)
                     if term and term.is_semantic_type == self.is_semantic_type:
                         self._parents.append(term)
-                if not self._parents and not self.is_semantic_type:
-                    for id in parents:
-                        term = self.__control.terms.get(id)
-                        if term:
-                            term.children.append(self)
-                            self._parents.append(term)
+                    if not self._parents and not self.is_semantic_type:
+                        for id in parents:
+                            term = self.control.terms.get(id)
+                            if term:
+                                term.children.append(self)
+                                self._parents.append(term)
         return self._parents
-
-    @parents.setter
-    def parents(self, value):
-        """Allow adoption of orphans which are not semantic types."""
-        self._parents = value
 
 
 if __name__ == "__main__":

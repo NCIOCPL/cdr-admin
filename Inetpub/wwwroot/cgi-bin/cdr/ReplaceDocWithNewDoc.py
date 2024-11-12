@@ -13,9 +13,10 @@ an existing Summary.
 Requirements and design are described in Bugzilla issue #3561.
 """
 
+from functools import cached_property
+from lxml import etree
 from cdrcgi import Controller
 from cdrapi.docs import Doc
-from lxml import etree
 
 
 class Control(Controller):
@@ -23,9 +24,8 @@ class Control(Controller):
 
     SUBTITLE = "Replace Old Document With New One"
     LOGNAME = "ReplaceDocWithNewDoc"
-    CSS = "/stylesheets/ReplaceDocWithNewDoc.css"
     SUPPORTED_DOCTYPES = {"Summary"}
-    CONFIRM = "Confirm"
+    CONFIRM = "Confirm Replacement"
     CDR_REF = f"{{{Doc.NS}}}ref"
     PURPOSE = (
         "This program replaces the XML of a CDR document with the XML "
@@ -128,18 +128,6 @@ class Control(Controller):
         "in which the new CDR ID would need to be replaced by the old one."
     )
 
-    def run(self):
-        """Override base class version as this is not a standard report."""
-
-        if not (self.request and self.old and self.new):
-            self.show_form()
-        elif self.request == self.SUBMIT:
-            self.confirm()
-        elif self.request == self.CONFIRM:
-            self.replace()
-        else:
-            Controller.run(self)
-
     def populate_form(self, page):
         """Ask the user to identify the two documents and explain what we do.
 
@@ -149,7 +137,7 @@ class Control(Controller):
 
         for name in self.INSTRUCTIONS:
             fieldset = page.fieldset(name)
-            fieldset.set("class", "instructions")
+            fieldset.set("class", "instructions usa-fieldset")
             for segment in getattr(self, name.upper()):
                 if isinstance(segment, str):
                     fieldset.append(page.B.P(segment))
@@ -160,25 +148,39 @@ class Control(Controller):
                     fieldset.append(ul)
             page.form.append(fieldset)
         fieldset = page.fieldset("Enter IDs for Old and New Documents")
-        fieldset.append(page.text_field("old", label="Old Document ID"))
-        fieldset.append(page.text_field("new", label="New Document ID"))
+        opts = dict(label="Old Document ID")
+        if self.old:
+            opts["value"] = self.old.id
+        fieldset.append(page.text_field("old", **opts))
+        opts = dict(label="New Document ID")
+        if self.new:
+            opts["value"] = self.new.id
+        fieldset.append(page.text_field("new", **opts))
         page.form.append(fieldset)
-        page.head.append(page.B.LINK(href=self.CSS, rel="stylesheet"))
+
+    def clear_locks(self):
+        """Make sure we clean up after ourselves."""
+
+        for which_doc in ("old", "new"):
+            try:
+                doc = getattr(self, which_doc)
+                if doc and doc.lock:
+                    doc.check_in()
+            except Exception as e:
+                self.logger.exception(f"Failure unlocking {which_doc} doc")
+                self.alerts.append(dict(
+                    message=f"Failure unlocking {which_doc} doc: {e}",
+                    type="error",
+                ))
 
     def confirm(self):
         """Show the user what will happen and request confirmation."""
 
         # Create a custom page.
-        buttons = (
-            self.HTMLPage.button(self.CONFIRM),
-            self.HTMLPage.button(self.ADMINMENU),
-            self.HTMLPage.button(self.LOG_OUT),
-        )
         opts = dict(
-            buttons=buttons,
             session=self.session,
             action=self.script,
-            subtitle="Confirmation Required"
+            subtitle="Replacement Confirmation Required"
         )
         page = self.HTMLPage(self.TITLE, **opts)
         page.form.append(page.hidden_field("old", self.old.id))
@@ -223,7 +225,8 @@ class Control(Controller):
             paragraph = self.NO_INTERNAL_LINKS_FOUND.format(self.new.cdr_id)
             fieldset.append(page.B.P(paragraph))
         page.form.append(fieldset)
-        page.head.append(page.B.LINK(href=self.CSS, rel="stylesheet"))
+        page.form.append(page.button(self.CONFIRM))
+        page.form.set("target", "_self")
         page.send()
 
     def replace(self):
@@ -275,12 +278,7 @@ class Control(Controller):
         self.logger.info("Blocked %s", self.new.cdr_id)
 
         # Show the outcome.
-        buttons = (
-            self.HTMLPage.button(self.ADMINMENU),
-            self.HTMLPage.button(self.LOG_OUT),
-        )
         opts = dict(
-            buttons=buttons,
             session=self.session,
             action=self.script,
             subtitle="Replacement Successful"
@@ -298,121 +296,162 @@ class Control(Controller):
                 ul.append(page.B.LI(str(error), page.B.CLASS("error")))
             fieldset.append(ul)
             page.form.append(fieldset)
-        page.head.append(page.B.LINK(href=self.CSS, rel="stylesheet"))
         page.send()
 
-    @property
+    def run(self):
+        """Override base class version as this is not a standard report."""
+
+        try:
+            if not self.ready:
+                self.show_form()
+            elif self.request == self.SUBMIT:
+                self.confirm()
+            elif self.request == self.CONFIRM:
+                self.replace()
+            else:
+                Controller.run(self)
+        except Exception as e:
+            self.logger.exception("failure")
+            self.alerts.append(dict(message=f"Failure: {e}", type="error"))
+            self.show_form()
+
+    @cached_property
     def external_links(self):
         """Other documents linking to a portion of the old document."""
 
-        if not hasattr(self, "_external_links"):
-            fields = (
-                "t.name AS doctype",
-                "d.id",
-                "d.title",
-                "n.source_elem",
-                "n.target_frag",
-            )
-            query = self.Query("document d", *fields).unique()
-            query.join("doc_type t", "t.id = d.doc_type")
-            query.join("link_net n", "n.source_doc = d.id")
-            query.where("n.target_frag IS NOT NULL")
-            query.where(query.Condition("n.target_doc", self.old.id))
-            query.where("n.target_doc <> d.id")
-            query.order("t.name", "d.id", "n.source_elem", "n.target_frag")
-            self._external_links = []
-            B = self.HTMLPage.B
-            for row in query.execute(self.cursor).fetchall():
-                self._external_links.append(
-                    B.TR(
-                        B.TD(row.doctype),
-                        B.TD(str(row.id), B.CLASS("center")),
-                        B.TD(row.title),
-                        B.TD(row.source_elem),
-                        B.TD(row.target_frag, B.CLASS("center"))
-                    )
+        fields = (
+            "t.name AS doctype",
+            "d.id",
+            "d.title",
+            "n.source_elem",
+            "n.target_frag",
+        )
+        query = self.Query("document d", *fields).unique()
+        query.join("doc_type t", "t.id = d.doc_type")
+        query.join("link_net n", "n.source_doc = d.id")
+        query.where("n.target_frag IS NOT NULL")
+        query.where(query.Condition("n.target_doc", self.old.id))
+        query.where("n.target_doc <> d.id")
+        query.order("t.name", "d.id", "n.source_elem", "n.target_frag")
+        links = []
+        B = self.HTMLPage.B
+        for row in query.execute(self.cursor).fetchall():
+            links.append(
+                B.TR(
+                    B.TD(row.doctype),
+                    B.TD(str(row.id), B.CLASS("center")),
+                    B.TD(row.title),
+                    B.TD(row.source_elem),
+                    B.TD(row.target_frag, B.CLASS("center"))
                 )
-        return self._external_links
+            )
+        return links
 
-    @property
+    @cached_property
     def internal_links(self):
         """Internal links in the replacement document."""
 
-        if not hasattr(self, "_internal_links"):
-            self._internal_links = []
-            target = f"{self.new.cdr_id}#"
-            for local_name in ("ref", "href"):
-                name = f"{{{Doc.NS}}}{local_name}"
-                xpath = f"//*[starts-with(@cdr:{local_name}, '{target}')]"
-                for node in self.new.root.xpath(xpath, namespaces=Doc.NSMAP):
-                    self._internal_links.append((node, name))
-            for name in ("ReferencedTableNumber", "ReferencedFigureNumber"):
-                xpath = f"//{name}[starts-with(@Target, '{target}')]"
-                for node in self.new.root.xpath(xpath):
-                    self._internal_links.append((node, "Target"))
-        return self._internal_links
+        links = []
+        target = f"{self.new.cdr_id}#"
+        for local_name in ("ref", "href"):
+            name = f"{{{Doc.NS}}}{local_name}"
+            xpath = f"//*[starts-with(@cdr:{local_name}, '{target}')]"
+            for node in self.new.root.xpath(xpath, namespaces=Doc.NSMAP):
+                links.append((node, name))
+        for name in ("ReferencedTableNumber", "ReferencedFigureNumber"):
+            xpath = f"//{name}[starts-with(@Target, '{target}')]"
+            for node in self.new.root.xpath(xpath):
+                links.append((node, "Target"))
+        return links
 
-    @property
+    @cached_property
     def new(self):
-        """Replacement document."""
+        """Document whose content will be used to update the old document."""
 
-        if not hasattr(self, "_new"):
-            self._new = None
-            id = self.fields.getvalue("new", "").strip()
-            if id:
-                self._new = Doc(self.session, id=id)
-                doctype = self._new.doctype.name
-                if doctype not in self.SUPPORTED_DOCTYPES:
-                    self.bail(f"Document type {doctype} not supported")
-                if self.old:
-                    old_doctype = self.old.doctype.name
-                    if old_doctype != doctype:
-                        msg = f"New doc is a {doctype} not a {old_doctype}"
-                        self.bail(msg)
-                    will_replace = self._new.root.find("WillReplace")
-                    if will_replace is None:
-                        self.bail("WillReplace element not found")
-                    cdr_id = will_replace.get(self.CDR_REF)
-                    if cdr_id != self.old.cdr_id:
-                        self.bail(f"WillReplace points to {cdr_id}")
-        return self._new
+        id = self.fields.getvalue("new", "").strip()
+        return Doc(self.session, id=id) if id else None
 
-    @property
+    @cached_property
     def old(self):
         """Existing document whose contents will be replaced."""
 
-        if not hasattr(self, "_old"):
-            self._old = None
-            id = self.fields.getvalue("old", "").strip()
-            if id:
-                self._old = Doc(self.session, id=id)
-                if self._old.doctype.name not in self.SUPPORTED_DOCTYPES:
-                    self.bail(f"Doctype {self._old.doctype} not supported")
-        return self._old
+        id = self.fields.getvalue("old", "").strip()
+        return Doc(self.session, id=id) if id else None
 
-    @property
+    @cached_property
+    def ready(self):
+        """True if the required information has been provided and is valid."""
+
+        # If we're just starting out, the user won't have provided anything.
+        if not self.request:
+            return False
+
+        # Make sure we have both documents, of the same supported doctype.
+        if not self.old:
+            self.alerts.append(dict(
+                message="The Old Document ID field is required.",
+                type="error",
+            ))
+        elif self.old.doctype.name not in self.SUPPORTED_DOCTYPES:
+            message = (
+                f"The old document is a {self.old.doctype} document, "
+                "which is not supported."
+            )
+            self.alerts.append(dict(message=message, type="error"))
+        if not self.new:
+            self.alerts.append(dict(
+                message="The New Document ID field is required.",
+                type="error",
+            ))
+        elif self.new.doctype.name not in self.SUPPORTED_DOCTYPES:
+            message = (
+                f"The new document is a {self.new.doctype} document, "
+                "which is not supported."
+            )
+            self.alerts.append(dict(message=message, type="error"))
+        elif self.old and self.old.doctype.name != self.new.doctype.name:
+            if self.old.doctype.name in self.SUPPORTED_DOCTYPES:
+                message = (
+                    f"The new document is a {self.new.doctype} document, "
+                    f"which does not match the old {self.old.doctype} "
+                    "document."
+                )
+                self.alerts.append(dict(message=message, type="error"))
+
+        # Make sure the new document is marked as replacement for the old.
+        if self.new:
+            node = self.new.root.find("WillReplace")
+            if node is None:
+                self.alerts.append(dict(
+                    message=f"CDR{self.new.id} has no WillReplace element.",
+                    type="error",
+                ))
+            elif self.old:
+                cdr_id = node.get(self.CDR_REF)
+                if not cdr_id:
+                    message = f"WillReplace for CDR{self.new.id} has no ID."
+                    self.alerts.append(dict(message=message, type="error"))
+                elif cdr_id != self.old.cdr_id:
+                    message = f"WillReplace points to {cdr_id}."
+                    self.alerts.append(dict(message=message, type="error"))
+
+        # We only proceed if no problems were detected.
+        return not self.alerts
+
+    @cached_property
+    def same_window(self):
+        """Don't open multiple new browser tabs."""
+        return [self.SUBMIT, self.CONFIRM] if self.request else []
+
+    @cached_property
     def validation_errors(self):
         """Problems found in the replacement document."""
 
-        if not hasattr(self, "_validation_errors"):
-            self.new.validate(types=("schema", "links"))
-            self._validation_errors = [str(error) for error in self.new.errors]
-        return self._validation_errors
+        self.new.validate(types=("schema", "links"))
+        return [str(error) for error in self.new.errors]
 
 
 if __name__ == "__main__":
-    """Don't execute the script if loaded as a module."""
+    """Don't execute if loaded as a module."""
 
-    control = Control()
-    try:
-        control.run()
-    except Exception as e:
-        control.logger.exception("Failure")
-        for which_doc in ("old", "new"):
-            try:
-                doc = getattr(control, which_doc)
-                if doc and doc.lock:
-                    doc.check_in()
-            except Exception:
-                control.logger.exception(f"Failure unlocking {which_doc} doc")
-        control.bail(e)
+    Control().run()

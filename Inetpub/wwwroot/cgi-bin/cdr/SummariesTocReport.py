@@ -5,8 +5,7 @@
 
 from collections import defaultdict
 from functools import cached_property
-from cdrcgi import Controller, HTMLPage, bail
-from cdrapi import db
+from cdrcgi import Controller, BasicWebPage
 from cdrapi.docs import Doc
 from cdr import Board
 
@@ -39,160 +38,14 @@ class Control(Controller):
     )
     LANGUAGES = "english", "spanish"
     DEFAULT_LEVEL = 3
-
-    def add_audience_fieldset(self, page):
-        """Add the radio buttons for choosing the audience.
-
-        Pass:
-            page - HTMLPage object to be filled with field sets.
-        """
-
-        fieldset = page.fieldset("Audience")
-        fieldset.set("class", "board-fieldset")
-        checked = True
-        for audience in self.AUDIENCES:
-            opts = dict(value=audience, checked=checked)
-            fieldset.append(page.radio_button("audience", **opts))
-            checked = False
-        page.form.append(fieldset)
-
-    def add_board_fieldset(self, page):
-        """Add the checkboxes for selecting one or more PDQ boards.
-
-        Pass:
-            page - HTMLPage object to be filled with field sets.
-        """
-
-        fieldset = page.fieldset("Board(s)")
-        fieldset.set("class", "board-fieldset")
-        opts = dict(value="all", label="All Boards", checked=True)
-        fieldset.append(page.checkbox("board", **opts))
-        for board in sorted(self.boards.values()):
-            opts = dict(value=board.id, label=str(board))
-            fieldset.append(page.checkbox("board", **opts))
-        page.form.append(fieldset)
-
-    def add_cdrid_fieldset(self, page):
-        """Add the field for the summary document ID.
-
-        Pass:
-            page - HTMLPage object to be filled with field sets.
-        """
-
-        fieldset = page.fieldset("Summary Document ID")
-        fieldset.set("id", "cdrid-fieldset")
-        fieldset.append(page.text_field("id", label="CDR ID"))
-        page.form.append(fieldset)
-
-    def add_language_fieldset(self, page):
-        """Add the radio buttons for choosing between English and Spanish.
-
-        Pass:
-            page - HTMLPage object to be filled with field sets.
-        """
-
-        fieldset = page.fieldset("Language")
-        fieldset.set("class", "board-fieldset")
-        checked = True
-        for language in self.LANGUAGES:
-            opts = dict(value=language, checked=checked)
-            fieldset.append(page.radio_button("language", **opts))
-            checked = False
-        page.form.append(fieldset)
-
-    def add_level_fieldset(self, page):
-        """Add a picklist for choosing how deep the report should go.
-
-        Pass:
-            page - HTMLPage object to be filled with field sets.
-        """
-
-        fieldset = page.fieldset("Table of Contents Depth")
-        options = [("", "All Levels")] + [str(n) for n in range(1, 10)]
-        tooltip = f"QC report uses level {self.DEFAULT_LEVEL:d}"
-        default = str(self.DEFAULT_LEVEL)
-        opts = dict(options=options, default=default, tooltip=tooltip)
-        fieldset.append(page.select("level", **opts))
-        page.form.append(fieldset)
-
-    def add_method_fieldset(self, page):
-        """Add the fields for choosing how summaries will be selected.
-
-        Pass:
-            page - HTMLPage object to be filled with field sets.
-        """
-
-        fieldset = page.fieldset("Selection Method")
-        checked = True
-        for value, display in self.METHODS:
-            opts = dict(value=value, label=display, checked=checked)
-            fieldset.append(page.radio_button("method", **opts))
-            checked = False
-        page.form.append(fieldset)
-
-    def add_options_fieldset(self, page):
-        """Add the checkbox for choosing whether to display Summary CDR IDs.
-
-        Pass:
-            page - HTMLPage object to be filled with field sets.
-        """
-
-        fieldset = page.fieldset("Options")
-        opts = dict(value="include_id", label="Include CDR ID", checked=True)
-        fieldset.append(page.checkbox("include_id", **opts))
-        page.form.append(fieldset)
-
-    def add_title_fieldset(self, page):
-        """Add the field for entering a summary title fragment.
-
-        Pass:
-            page - HTMLPage object to be filled with field sets.
-        """
-
-        fieldset = page.fieldset("Summary Title")
-        fieldset.set("id", "title-fieldset")
-        fieldset.append(page.text_field("title", label="Title"))
-        page.form.append(fieldset)
-
-    def build_tables(self):
-        """Show the report if we have all the information we need.
-
-        We might not, as there are at least two stages of cascading
-        forms (sometimes three) to get through before we get to the
-        point where we're ready to actually create the report when
-        the user wants to zero in on a single summary.
-        """
-
-        if self.selection_method == "board" or self.version and self.id:
-            self.report_page.send()
-        elif self.id:
-            self.show_version_form()
-        elif self.fragment:
-            self.show_title_form()
-        else:
-            self.show_form()
-
-    def populate_form(self, page):
-        """Assemble the main form for this report.
-
-        Broken into helper methods, since this is a complex form.
-        We add some client-side scripting to make the form easier
-        to use.
-
-        Pass:
-            page - HTMLPage object to be filled with field sets.
-        """
-
-        self.add_method_fieldset(page)
-        self.add_cdrid_fieldset(page)
-        self.add_title_fieldset(page)
-        self.add_board_fieldset(page)
-        self.add_audience_fieldset(page)
-        self.add_language_fieldset(page)
-        self.add_level_fieldset(page)
-        self.add_options_fieldset(page)
-        page.add_script("""\
+    CSS = """\
+h5 { font-size: 1.17em; }
+li { line-height: 1.3; }
+hr { margin-top: 2rem; }
+"""
+    SCRIPT = """\
 function check_method(value) {
+    console.log("check_method(" + value + ")");
     if (value == "id") {
         jQuery("fieldset.board-fieldset").hide();
         jQuery("fieldset#title-fieldset").hide();
@@ -222,55 +75,209 @@ function check_board(val) {
 jQuery(function() {
     var value = jQuery("input[name='method']:checked").val();
     check_method(value);
-});""")
+});
+"""
 
-    def show_title_form(self):
-        """Let the user pick a summary from those which match her fragment."""
+    def add_audience_fieldset(self, page):
+        """Add the radio buttons for choosing the audience.
 
-        if not self.fragment_matches:
-            bail("No summaries match that title fragment")
-        page = self.form_page
-        page.form.append(page.hidden_field("method", value="id"))
-        page.form.append(page.hidden_field("level", self.level))
-        if self.include_id:
-            page.form.append(page.hidden_field("include_id", "Y"))
-        fieldset = page.fieldset("Choose Summary")
-        fieldset.set("style", "width: 600px")
-        for summary in self.fragment_matches:
-            opts = dict(value=summary.id, label=summary.display)
-            if summary.tooltip:
-                opts["tooltip"] = summary.tooltip
-            fieldset.append(page.radio_button("id", **opts))
+        Pass:
+            page - HTMLPage object to be filled with field sets.
+        """
+
+        fieldset = page.fieldset("Audience")
+        fieldset.set("class", "board-fieldset usa-fieldset")
+        default = self.audience or "health_professional"
+        for audience in self.AUDIENCES:
+            checked = audience == default
+            opts = dict(value=audience, checked=checked)
+            fieldset.append(page.radio_button("audience", **opts))
         page.form.append(fieldset)
-        page.send()
 
-    def show_version_form(self):
-        """We have a summary id, let the user pick a version."""
+    def add_board_fieldset(self, page):
+        """Add the checkboxes for selecting one or more PDQ boards.
 
-        page = self.form_page
-        page.form.append(page.hidden_field("method", value="id"))
-        page.form.append(page.hidden_field("id", value=self.id))
-        page.form.append(page.hidden_field("level", self.level))
-        if self.include_id:
-            page.form.append(page.hidden_field("include_id", "Y"))
-        fieldset = page.fieldset("Select Document Version")
-        fieldset.set("style", "width: 600px")
-        options = [(v.id, v.description) for v in self.versions]
-        fieldset.append(page.select("version", options=options))
+        Pass:
+            page - HTMLPage object to be filled with field sets.
+        """
+
+        fieldset = page.fieldset("Board(s)")
+        fieldset.set("class", "board-fieldset usa-fieldset")
+        checked = not self.board or "all" in self.board
+        opts = dict(value="all", label="All Boards", checked=checked)
+        fieldset.append(page.checkbox("board", **opts))
+        for board in sorted(self.boards.values()):
+            checked = str(board.id) in self.board
+            opts = dict(value=board.id, label=str(board), checked=checked)
+            fieldset.append(page.checkbox("board", **opts))
         page.form.append(fieldset)
-        page.send()
 
-    @property
+    def add_cdrid_fieldset(self, page):
+        """Add the field for the summary document ID.
+
+        Pass:
+            page - HTMLPage object to be filled with field sets.
+        """
+
+        fieldset = page.fieldset("Summary Document ID")
+        fieldset.set("id", "cdrid-fieldset")
+        fieldset.append(page.text_field("id", label="CDR ID", value=self.id))
+        page.form.append(fieldset)
+
+    def add_language_fieldset(self, page):
+        """Add the radio buttons for choosing between English and Spanish.
+
+        Pass:
+            page - HTMLPage object to be filled with field sets.
+        """
+
+        fieldset = page.fieldset("Language")
+        fieldset.set("class", "board-fieldset usa-fieldset")
+        default = self.language or self.LANGUAGES[0]
+        for language in self.LANGUAGES:
+            checked = language == default
+            opts = dict(value=language, checked=checked)
+            fieldset.append(page.radio_button("language", **opts))
+        page.form.append(fieldset)
+
+    def add_level_fieldset(self, page):
+        """Add a picklist for choosing how deep the report should go.
+
+        Pass:
+            page - HTMLPage object to be filled with field sets.
+        """
+
+        fieldset = page.fieldset("Table of Contents Depth")
+        options = [("", "All Levels")] + [str(n) for n in range(1, 10)]
+        tooltip = f"QC report uses level {self.DEFAULT_LEVEL:d}"
+        default = self.fields.getvalue("level") or str(self.DEFAULT_LEVEL)
+        opts = dict(options=options, default=default, tooltip=tooltip)
+        fieldset.append(page.select("level", **opts))
+        page.form.append(fieldset)
+
+    def add_method_fieldset(self, page):
+        """Add the fields for choosing how summaries will be selected.
+
+        Pass:
+            page - HTMLPage object to be filled with field sets.
+        """
+
+        fieldset = page.fieldset("Selection Method")
+        default = self.selection_method or self.METHODS[0][0]
+        self.logger.info("default selection method is %s", default)
+        for value, display in self.METHODS:
+            checked = value == default
+            opts = dict(value=value, label=display, checked=checked)
+            fieldset.append(page.radio_button("method", **opts))
+        page.form.append(fieldset)
+
+    def add_options_fieldset(self, page):
+        """Add the checkbox for choosing whether to display Summary CDR IDs.
+
+        Pass:
+            page - HTMLPage object to be filled with field sets.
+        """
+
+        fieldset = page.fieldset("Options")
+        checked = self.include_id if self.request else True
+        opts = dict(
+            value="include_id",
+            label="Include CDR ID",
+            checked=checked,
+        )
+        fieldset.append(page.checkbox("include_id", **opts))
+        page.form.append(fieldset)
+
+    def add_title_fieldset(self, page):
+        """Add the field for entering a summary title fragment.
+
+        Pass:
+            page - HTMLPage object to be filled with field sets.
+        """
+
+        fieldset = page.fieldset("Summary Title")
+        fieldset.set("id", "title-fieldset")
+        fieldset.append(page.text_field("title", value=self.fragment))
+        page.form.append(fieldset)
+
+    def populate_form(self, page):
+        """Assemble the main form for this report.
+
+        Broken into helper methods, since this is a complex form.
+        We add some client-side scripting to make the form easier
+        to use.
+
+        Pass:
+            page - HTMLPage object to be filled with field sets.
+        """
+
+        # If the URL has the required values already show the report.
+        if self.ready:
+            return self.report.send()
+
+        # Show the version selection form if a document has been selected.
+        if self.id:
+            self.logger.info("selecting version for CDR%s", self.id)
+            page.form.append(page.hidden_field("method", value="id"))
+            page.form.append(page.hidden_field("id", value=self.id))
+            fieldset = page.fieldset("Select Document Version")
+            options = [(v.id, v.description) for v in self.versions]
+            fieldset.append(page.select("version", options=options))
+            page.form.append(fieldset)
+
+        # Let the user select from a list of matching summaries.
+        elif self.titles:
+            self.logger.info("selecting document mathing %r", self.fragment)
+            page.form.append(page.hidden_field("method", value="id"))
+            page.form.append(page.hidden_field("title", self.fragment))
+            fieldset = page.fieldset("Choose Summary")
+            for summary in self.titles:
+                opts = dict(value=summary.id, label=summary.display)
+                if summary.tooltip:
+                    opts["tooltip"] = summary.tooltip
+                fieldset.append(page.radio_button("id", **opts))
+            page.form.append(fieldset)
+
+        # If we have no ID or titles, show the initial form.
+        else:
+            self.logger.info("showing initial form")
+            self.add_method_fieldset(page)
+            self.add_cdrid_fieldset(page)
+            self.add_title_fieldset(page)
+            self.add_board_fieldset(page)
+            self.add_audience_fieldset(page)
+            self.add_language_fieldset(page)
+            page.add_script(self.SCRIPT)
+
+        # Carry these fields forward for all the steps.
+        self.add_level_fieldset(page)
+        self.add_options_fieldset(page)
+
+    def show_report(self):
+        """Show the report if we have all the information we need.
+
+        We might not, as there are at least two stages of cascading
+        forms (sometimes three) to get through before we get to the
+        point where we're ready to actually create the report when
+        the user wants to zero in on a single summary.
+        """
+
+        try:
+            return self.report.send() if self.ready else self.show_form()
+        except Exception as e:
+            self.logger.exception("failure")
+            self.bail(e)
+
+    @cached_property
     def audience(self):
         """Either patient or health_professional."""
 
-        if not hasattr(self, "_audience"):
-            self._audience = self.fields.getvalue("audience")
-            if self._audience and self._audience not in self.AUDIENCES:
-                bail()
-        return self._audience
+        audience = self.fields.getvalue("audience")
+        if audience and audience not in self.AUDIENCES:
+            self.bail()
+        return audience
 
-    @property
+    @cached_property
     def board(self):
         """Board(s) which the user has selected.
 
@@ -280,97 +287,95 @@ jQuery(function() {
 
         return self.fields.getlist("board")
 
-    @property
+    @cached_property
     def boards(self):
         """PDQ boards for the form's picklist."""
-
-        if not hasattr(self, "_boards"):
-            self._boards = Board.get_boards(cursor=self.cursor)
-        return self._boards
-
-    @property
-    def fragment(self):
-        """Title fragment used to find matching summaries."""
-
-        if not hasattr(self, "_fragment"):
-            self._title = (self.fields.getvalue("title") or "").strip()
-        return self._title
+        return Board.get_boards(cursor=self.cursor)
 
     @cached_property
-    def fragment_matches(self):
-        """Information about summaries which match the title fragment."""
-
-        if not self.fragment:
-            bail("No title fragment to match")
-        pattern = f"{self.fragment}%"
-        query = db.Query("document d", "d.id", "d.title").order(2, 1)
-        query.join("doc_type t", "t.id = d.doc_type")
-        query.where("t.name = 'Summary'")
-        query.where(query.Condition("d.title", pattern, "LIKE"))
-        fragment_matches = []
-
-        class _Summary:
-            def __init__(self, doc_id, display, tooltip=None):
-                self.id = doc_id
-                self.display = display
-                self.tooltip = tooltip
-        for doc_id, title in query.execute(self.cursor).fetchall():
-            if len(title) > 60:
-                short_title = title[:57] + "..."
-                summary = _Summary(doc_id, short_title, title)
-            else:
-                summary = _Summary(doc_id, title)
-            fragment_matches.append(summary)
-        return fragment_matches
+    def fragment(self):
+        """Title fragment used to find matching summaries."""
+        return self.fields.getvalue("title", "").strip()
 
     @cached_property
     def id(self):
         """CDR document ID for the summary to be used for the report."""
 
-        doc_id = self.fields.getvalue("id")
-        if doc_id:
-            try:
-                doc = Doc(self.session, id=doc_id)
-                doctype = doc.doctype.name
-                if doctype != "Summary":
-                    self.bail(f"CDR{doc.id} is a {doctype} document.")
-            except Exception:
-                self.bail(f"Document {doc_id} was not found")
-            return doc.id
-        if self.fragment and len(self.fragment_matches) == 1:
-            return self.fragment_matches[0].id
+        match self.selection_method:
+            case "id":
+                return self.fields.getvalue("id", "").strip()
+            case "title":
+                if self.fragment and len(self.titles) == 1:
+                    return self.titles[0].id
+                return None
         return None
 
     @cached_property
     def include_id(self):
         """Boolean indicating whether Summary CDR IDs should be displayed."""
-
         return True if self.fields.getvalue("include_id") else False
 
-    @property
+    @cached_property
     def language(self):
         """Either english or spanish."""
 
-        if not hasattr(self, "_language"):
-            self._language = self.fields.getvalue("language")
-            if self._language and self._language not in self.LANGUAGES:
-                bail()
-        return self._language
+        language = self.fields.getvalue("language")
+        if language and language not in self.LANGUAGES:
+            self.bail()
+        return language
 
     @cached_property
     def level(self):
         """Integer indicating how deep the report should go."""
-
         return self.fields.getvalue("level") or "999"
 
-    @property
-    def selection_method(self):
-        """One of board, id, or title."""
+    @cached_property
+    def ready(self):
+        """True if we have what we need for the report."""
 
-        return self.fields.getvalue("method")
+        if not self.request:
+            return False
+        match self.selection_method:
+            case "board":
+                return True
+            case "title":
+                if not self.fragment:
+                    message = "No title fragment provided."
+                    self.alerts.append(dict(message=message, type="error"))
+                elif not self.titles:
+                    message = f"No summaries match {self.fragment!r}."
+                    self.logger.error("ready check: %s", message)
+                    self.alerts.append(dict(message=message, type="warning"))
+                return False
+            case "id":
+                if not self.id:
+                    message = "No document ID provided."
+                    if self.fragment:
+                        message = "No summary selected."
+                    self.logger.error("ready check: %s", message)
+                    self.alerts.append(dict(message=message, type="error"))
+                    return False
+                try:
+                    doc = Doc(self.session, id=self.id)
+                    if doc.doctype.name != "Summary":
+                        message = f"CDR{self.id} is a {doc.doctype} document."
+                        self.logger.error("ready check: %s", message)
+                        self.alerts.append(dict(message=message, type="error"))
+                        self.id = None
+                        return False
+                    self.id = doc.id
+                except Exception:
+                    message = f"Document {self.id} was not found."
+                    self.logger.exception("ready check: %s", message)
+                    self.alerts.append(dict(message=message, type="error"))
+                    self.id = None
+                    return False
+                return True if self.version else False
+            case _:
+                self.bail()
 
     @cached_property
-    def report_page(self):
+    def report(self):
         """Assemble the HTMLPage object for the report.
 
         This is a non-tabular report, so we create the page ourselves,
@@ -378,8 +383,8 @@ jQuery(function() {
         """
 
         self.logger.info("processing %d summaries", len(self.summaries))
-        page = HTMLPage(self.title, subtitle=self.report_title)
-        page.body.set("id", "summaries-toc-report")
+        report = BasicWebPage()
+        report.wrapper.append(report.B.H1(self.report_title))
         boards = defaultdict(list)
         for summary in sorted(self.summaries):
             self.logger.debug("processing %s", summary.title)
@@ -390,101 +395,133 @@ jQuery(function() {
                     boards[board].append(summary)
         for board in sorted(boards):
             if board:
-                page.body.append(page.B.H4(board))
+                report.wrapper.append(report.B.H2(board))
             for summary in boards[board]:
                 for node in summary.nodes:
-                    page.body.append(node)
-        return page
+                    report.wrapper.append(node)
+        report.wrapper.append(self.footer)
+        report.page.head.append(report.B.STYLE(self.CSS))
+        return report
 
-    @property
+    @cached_property
     def report_title(self):
         """Create the string identifying which report this is."""
 
-        if not hasattr(self, "_report_title"):
-            if self.selection_method == "id":
-                self._report_title = "Single Summary TOC Report"
-            else:
-                audience = self.AUDIENCES.get(self.audience) or ""
-                language = self.language.title()
-                self._report_title = f"PDQ {language} {audience} Summaries"
-        return self._report_title
+        if self.selection_method == "id":
+            return "Single Summary TOC Report"
+        audience = self.AUDIENCES.get(self.audience) or ""
+        language = self.language.title()
+        return f"PDQ {language} {audience} Summaries"
 
-    @property
+    @cached_property
+    def same_window(self):
+        """Reduce the number of new browser tabs created."""
+        return [self.SUBMIT] if self.request else []
+
+    @cached_property
+    def selection_method(self):
+        """One of board, id, or title."""
+        return self.fields.getvalue("method", "").strip()
+
+    @cached_property
     def summaries(self):
         """PDQ summaries (`Summary` objects) to be displayed on the report."""
 
-        if not hasattr(self, "_summaries"):
-            fields = "q.doc_id", "q.value AS title"
-            if self.id:
-                query = db.Query("query_term q", *fields).unique()
-                query.where(query.Condition("doc_id", self.id))
-            else:
-                audience = f"{self.AUDIENCES.get(self.audience)}s"
-                language = self.language.title()
-                b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
-                t_path = "/Summary/TranslationOf/@cdr:ref"
-                a_path = "/Summary/SummaryMetaData/SummaryAudience"
-                l_path = "/Summary/SummaryMetaData/SummaryLanguage"
-                query = db.Query("query_term q", *fields).unique()
-                query.join("active_doc d", "d.id = q.doc_id")
-                query.join("doc_version v", "v.id = d.id")
-                query.where("v.publishable = 'Y'")
-                query.join("query_term a", "a.doc_id = d.id")
-                query.where(query.Condition("a.path", a_path))
-                query.where(query.Condition("a.value", audience))
-                query.join("query_term l", "l.doc_id = d.id")
-                query.where(query.Condition("l.path", l_path))
-                query.where(query.Condition("l.value", language))
-                if "all" not in self.board:
-                    if language == "English":
-                        query.join("query_term_pub b", "b.doc_id = d.id")
-                    else:
-                        query.join("query_term_pub t", "t.doc_id = d.id")
-                        query.where(query.Condition("t.path", t_path))
-                        query.join("query_term b", "b.doc_id = t.int_val")
-                    query.where(query.Condition("b.path", b_path))
-                    query.where(query.Condition("b.int_val", self.board, "IN"))
-            query.where("q.path = '/Summary/SummaryTitle'")
-            self.logger.debug("query=\n%s", query)
-            self.logger.debug("self.board = %s", self.board)
-            query.log()
-            rows = query.execute(self.cursor).fetchall()
-            self._summaries = [Summary(self, row) for row in rows]
-        return self._summaries
+        fields = "q.doc_id", "q.value AS title"
+        if self.id:
+            query = self.Query("query_term q", *fields).unique()
+            query.where(query.Condition("doc_id", self.id))
+        else:
+            audience = f"{self.AUDIENCES.get(self.audience)}s"
+            language = self.language.title()
+            b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
+            t_path = "/Summary/TranslationOf/@cdr:ref"
+            a_path = "/Summary/SummaryMetaData/SummaryAudience"
+            l_path = "/Summary/SummaryMetaData/SummaryLanguage"
+            query = self.Query("query_term q", *fields).unique()
+            query.join("active_doc d", "d.id = q.doc_id")
+            query.join("doc_version v", "v.id = d.id")
+            query.where("v.publishable = 'Y'")
+            query.join("query_term a", "a.doc_id = d.id")
+            query.where(query.Condition("a.path", a_path))
+            query.where(query.Condition("a.value", audience))
+            query.join("query_term l", "l.doc_id = d.id")
+            query.where(query.Condition("l.path", l_path))
+            query.where(query.Condition("l.value", language))
+            if "all" not in self.board:
+                if language == "English":
+                    query.join("query_term_pub b", "b.doc_id = d.id")
+                else:
+                    query.join("query_term_pub t", "t.doc_id = d.id")
+                    query.where(query.Condition("t.path", t_path))
+                    query.join("query_term b", "b.doc_id = t.int_val")
+                query.where(query.Condition("b.path", b_path))
+                query.where(query.Condition("b.int_val", self.board, "IN"))
+        query.where("q.path = '/Summary/SummaryTitle'")
+        self.logger.debug("query=\n%s", query)
+        self.logger.debug("self.board = %s", self.board)
+        query.log()
+        rows = query.execute(self.cursor).fetchall()
+        return [Summary(self, row) for row in rows]
 
-    @property
+    @cached_property
+    def titles(self):
+        """Information about summaries which match the title fragment."""
+
+        if self.selection_method != "title" or not self.fragment:
+            return []
+        pattern = f"{self.fragment}%"
+        query = self.Query("document d", "d.id", "d.title").order(2, 1)
+        query.join("doc_type t", "t.id = d.doc_type")
+        query.where("t.name = 'Summary'")
+        query.where(query.Condition("d.title", pattern, "LIKE"))
+        matches = []
+
+        class Summary:
+            def __init__(self, doc_id, display, tooltip=None):
+                self.id = doc_id
+                self.display = display
+                self.tooltip = tooltip
+        for doc_id, title in query.execute(self.cursor).fetchall():
+            if len(title) > 60:
+                short_title = title[:57] + "..."
+                summary = Summary(doc_id, short_title, title)
+            else:
+                summary = Summary(doc_id, title)
+            matches.append(summary)
+        return matches
+
+    @cached_property
     def version(self):
         """Integer for a specific version of the selected document.
 
         Will be `None` if we don't yet have a version number.
         """
 
-        if not hasattr(self, "_version"):
-            self._version = self.fields.getvalue("version")
-            if self._version:
-                self._version = int(self._version)
-            elif self.id and len(self.versions) == 1:
-                self._version = self.versions[0].id
-        return self._version
+        version = self.fields.getvalue("version")
+        if version:
+            return int(version)
+        if self.id and len(self.versions) == 1:
+            return self.versions[0].id
+        return None
 
-    @property
+    @cached_property
     def versions(self):
         """Version numbers with descriptions for the picklist."""
 
-        if not hasattr(self, "_versions"):
-            class Version:
-                def __init__(self, number, description):
-                    self.id = number
-                    self.description = description
-            self._versions = [Version(-1, "Current Working Version")]
-            fields = "num", "comment", "dt"
-            query = db.Query("doc_version", *fields).order("num DESC")
-            query.where(query.Condition("id", self.id))
-            for row in query.execute(self.cursor).fetchall():
-                date = row.dt.strftime("%Y-%m-%d")
-                description = f"[V{row.num} {date}] {row.comment}"
-                self._versions.append(Version(row.num, description))
-        return self._versions
+        class Version:
+            def __init__(self, number, description):
+                self.id = number
+                self.description = description
+        versions = [Version(-1, "Current Working Version")]
+        fields = "num", "comment", "dt"
+        query = self.Query("doc_version", *fields).order("num DESC")
+        query.where(query.Condition("id", self.id))
+        for row in query.execute(self.cursor).fetchall():
+            date = row.dt.strftime("%Y-%m-%d")
+            description = f"[V{row.num} {date}] {row.comment}"
+            versions.append(Version(row.num, description))
+        return versions
 
 
 class Summary:
@@ -502,8 +539,12 @@ class Summary:
         """Remember the caller's information. Let properties do the real work.
         """
 
-        self.__control = control
-        self.__row = row
+        self.control = control
+        self.row = row
+
+    def __lt__(self, other):
+        """Support sorting a sequence of `Summary` objects."""
+        return self.title.lower() < other.title.lower()
 
     @cached_property
     def boards(self):
@@ -522,7 +563,7 @@ class Summary:
 
         b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
         t_path = "/Summary/TranslationOf/@cdr:ref"
-        query = db.Query("query_term_pub b", "b.int_val").unique()
+        query = self.control.Query("query_term_pub b", "b.int_val").unique()
         if self.control.language == "english":
             query.where(query.Condition("b.path", b_path))
             query.where(query.Condition("b.doc_id", self.id))
@@ -540,11 +581,6 @@ class Summary:
         return boards
 
     @cached_property
-    def control(self):
-        """Access to report parameters and database connectivity."""
-        return self.__control
-
-    @cached_property
     def html(self):
         """Filtered HTML for the report."""
 
@@ -553,12 +589,12 @@ class Summary:
         result = doc.filter(*self.FILTERS, parms=self.parms)
         return str(result.result_tree).strip()
 
-    @property
+    @cached_property
     def id(self):
         """Unique CDR ID for the summary."""
-        return self.__row.doc_id
+        return self.row.doc_id
 
-    @property
+    @cached_property
     def nodes(self):
         """Sequence of HTML elements to be added to the report.
 
@@ -573,30 +609,28 @@ class Summary:
 
         return self.H.fragments_fromstring(self.html)
 
-    @property
+    @cached_property
     def parms(self):
         """Parameters for XSL/T filtering."""
+
         level = str(self.control.level) or "999"
         flag = "Y" if self.control.include_id else "N"
         return dict(showLevel=level, showId=flag)
 
-    @property
+    @cached_property
     def title(self):
         """Title for the PDQ Summary document."""
-        return self.__row.title
+        return self.row.title
 
-    @property
+    @cached_property
     def version(self):
         """Which version of the document do we want to filter?"""
+
         if self.control.selection_method == "board":
             return None
         if not self.control.version or self.control.version < 1:
             return None
         return self.control.version
-
-    def __lt__(self, other):
-        """Support sorting a sequence of `Summary` objects."""
-        return self.title.lower() < other.title.lower()
 
 
 if __name__ == "__main__":

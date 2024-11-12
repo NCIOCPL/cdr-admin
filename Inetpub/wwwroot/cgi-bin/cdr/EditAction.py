@@ -3,6 +3,7 @@
 """Create a new CDR action or modify an existing one.
 """
 
+from functools import cached_property
 from cdrcgi import Controller
 
 
@@ -10,7 +11,7 @@ class Control(Controller):
     """Top-level logic for editing interface."""
 
     EDIT_ACTIONS = "EditActions.py"
-    SUBMENU = "Action Menu"
+    ACTION_MENU = "Action Menu"
     DELETE = "Delete Action"
     SAVE_CHANGES = "Save Changes"
     SAVE_NEW = "Save New Action"
@@ -44,7 +45,7 @@ class Control(Controller):
     def return_to_actions_menu(self, deleted=None):
         """Go back to the menu listing all the CDR actions."""
 
-        opts = dict(deleted=deleted) if deleted else {}
+        opts = dict(deleted=deleted) if deleted else dict(returned="true")
         self.navigate_to(self.EDIT_ACTIONS, self.session.name, **opts)
 
     def run(self):
@@ -55,7 +56,7 @@ class Control(Controller):
                 return self.delete()
             elif self.request in (self.SAVE_CHANGES, self.SAVE_NEW):
                 return self.save()
-            elif self.request == self.SUBMENU:
+            elif self.request == self.ACTION_MENU:
                 return self.return_to_actions_menu()
         except Exception as e:
             self.bail(f"Failure: {e}")
@@ -68,12 +69,13 @@ class Control(Controller):
         self.action.comment = self.comment
         self.action.doctype_specific = "Y" if self.doctype_specific else "N"
         if self.action.id:
+            alert = f"Action {self.name!r} successfully updated."
             self.action.modify(self.session)
-            self.subtitle = f"Action {self.name!r} successfully updated"
         else:
+            alert = f"Action {self.name!r} successfully added."
             self.action.add(self.session)
-            self.subtitle = f"Action {self.name!r} successfully added"
             self.action = self.session.get_action(self.name)
+        self.alerts.append(dict(message=alert, type="success"))
         self.show_form()
 
     @property
@@ -93,55 +95,44 @@ class Control(Controller):
         """Allow replacement after a save."""
         self._action = value
 
-    @property
+    @cached_property
     def buttons(self):
-        """Add our custom navigation buttons."""
+        """Identify our custom navigation buttons."""
 
-        if not hasattr(self, "_buttons"):
-            self._buttons = [self.SUBMENU, self.ADMINMENU, self.LOG_OUT]
-            if self.action.id:
-                self._buttons.insert(0, self.DELETE)
-                self._buttons.insert(0, self.SAVE_CHANGES)
-            else:
-                self._buttons.insert(0, self.SAVE_NEW)
-        return self._buttons
+        if self.action.id:
+            return [self.SAVE_CHANGES, self.DELETE, self.ACTION_MENU]
+        return [self.SAVE_NEW, self.ACTION_MENU]
 
-    @property
+    @cached_property
     def comment(self):
         """Get the comment value from the form field."""
         return self.fields.getvalue("comment")
 
-    @property
+    @cached_property
     def doctype_specific(self):
         """True if permissions for this action are doctype-specific."""
 
-        if not hasattr(self, "_doctype_specific"):
-            if "doctype-specific" in self.fields.getlist("options"):
-                self._doctype_specific = True
-            else:
-                self._doctype_specific = False
-        return self._doctype_specific
+        if "doctype-specific" in self.fields.getlist("options"):
+            return True
+        return False
 
-    @property
+    @cached_property
     def name(self):
         """Current value of the form's name field."""
         return self.fields.getvalue("name")
+
+    @cached_property
+    def same_window(self):
+        """Don't open any new browser tabs."""
+        return self.buttons
 
     @property
     def subtitle(self):
         """Dynamic string for display under the main banner."""
 
-        if not hasattr(self, "_subtitle"):
-            if self.name:
-                self._subtitle = f"Editing {self.name!r} action"
-            else:
-                self._subtitle = "Adding New Action"
-        return self._subtitle
-
-    @subtitle.setter
-    def subtitle(self, value):
-        """Provide status information after a save."""
-        self._subtitle = value
+        if self.action.id:
+            return f"Edit {self.action.name} Action"
+        return "Add New Action"
 
 
 if __name__ == "__main__":

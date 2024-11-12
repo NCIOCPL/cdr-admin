@@ -3,6 +3,7 @@
 """Let the user adjust the status of unfinished jobs.
 """
 
+from functools import cached_property
 from cdrcgi import Controller
 
 
@@ -24,13 +25,6 @@ class Control(Controller):
     )
     HEADERS = "Job ID", "Job Type", "Job Started", "Job Status", "Actions"
     FIELDS = "id", "pub_subset", "started", "status"
-    CSS = (
-        "button { margin: 0 5px; } ",
-        "fieldset { width: 1000px; }",
-        "table { width: 975px; margin: auto; }",
-        "td, th { background: #e8e8e8; border-color: #aaa; }",
-        "td:last-child { text-align: center }",
-    )
 
     def run(self):
         """Override the base class version because this isn't a report."""
@@ -50,6 +44,8 @@ class Control(Controller):
                     " WHERE id = ?"
                     "   AND status NOT IN ('Success', 'Failure')", values)
                 self.conn.commit()
+                message = f"Set the status for job {self.id} to {self.status}."
+                self.alerts.append(dict(message=message, type="success"))
             self.show_form()
 
     def populate_form(self, page):
@@ -64,20 +60,21 @@ class Control(Controller):
         page.form.append(fieldset)
         fieldset = page.fieldset("Unfinished Publishing Jobs")
         headers = [page.B.TH(header) for header in self.HEADERS]
-        table = page.B.TABLE(page.B.TR(*headers))
+        thead = page.B.THEAD(page.B.TR(*headers))
+        classes = "usa-table usa-table--borderless"
+        table = page.B.TABLE(thead, page.B.CLASS(classes))
         for job in self.jobs:
             started = str(job.started)[:19]
             opts = dict(id=job.id, status=self.FAILURE)
             url = self.make_url(self.script, **opts)
             onclick = f"location.href='{url}'"
-            button = page.B.BUTTON("Fail", onclick=onclick, type="button")
+            button = page.button("Fail", onclick=onclick)
             buttons = page.B.SPAN(button)
             if job.status == self.WAIT:
                 opts["status"] = self.IN_PROCESS
                 url = self.make_url(self.script, **opts)
                 onclick = f"location.href='{url}'"
-                opts = dict(onclick=onclick, type="button")
-                buttons.append(page.B.BUTTON("Resume", **opts))
+                buttons.append(page.button("Resume", onclick=onclick))
             tr = page.B.TR(
                 page.B.TD(str(job.id), page.B.CLASS("center")),
                 page.B.TD(job.pub_subset),
@@ -88,47 +85,41 @@ class Control(Controller):
             table.append(tr)
         fieldset.append(table)
         page.form.append(fieldset)
-        page.add_css("\n".join(self.CSS))
+        page.add_css(
+            ".usa-form .usa-button { margin-top: 0; }\n"
+            "table { width: 100%; }\n"
+        )
 
-    @property
+    @cached_property
+    def buttons(self):
+        """Form has no Submit button."""
+        return []
+
+    @cached_property
     def id(self):
         """Integer for the job we want to manage."""
 
-        if not hasattr(self, "_id"):
-            self._id = self.fields.getvalue("id")
-            if self._id:
-                try:
-                    self._id = int(self._id)
-                except Exception:
-                    self.logger.exception("bad job ID")
-                    self.bail()
-        return self._id
+        id = self.fields.getvalue("id")
+        if id:
+            try:
+                return int(id)
+            except Exception:
+                self.logger.exception("bad job ID")
+                self.bail()
+        return None
 
-    @property
+    @cached_property
     def jobs(self):
         """Jobs which haven't yet hit the finish line."""
 
-        if not hasattr(self, "_jobs"):
-            query = self.Query("pub_proc", *self.FIELDS).order("started")
-            query.where("status NOT IN ('Success', 'Failure', 'Verifying')")
-            self._jobs = query.execute(self.cursor).fetchall()
-        return self._jobs
+        query = self.Query("pub_proc", *self.FIELDS).order("started")
+        query.where("status NOT IN ('Success', 'Failure', 'Verifying')")
+        return query.execute(self.cursor).fetchall()
 
-    @property
+    @cached_property
     def status(self):
         """String for the new status to be applied to the job."""
-
-        if not hasattr(self, "_status"):
-            self._status = self.fields.getvalue("status")
-        return self._status
-
-    @property
-    def subtitle(self):
-        """Override the base class version so we can show actions performed."""
-
-        if self.id and self.status:
-            return f"Set the status for job {self.id} to {self.status}"
-        return self.SUBTITLE
+        return self.fields.getvalue("status")
 
 
 if __name__ == "__main__":

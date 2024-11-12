@@ -1,7 +1,0 @@
-fieldset { width: 1000px; }
-.labeled-field label { width: 400px; }
-fieldset.instructions li { font-style: italic; color: green; }
-fieldset.instructions ul { list-style-type: none; }
-fieldset.instructions li:before { content: "\2713 "; }
-table { width: 90%; }
-td, th { background: #ececec; border-color: #ccc; }

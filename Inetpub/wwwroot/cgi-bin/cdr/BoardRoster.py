@@ -3,9 +3,10 @@
 """Display the Board Roster with or without assistant information.
 """
 
-from cdrcgi import Controller, sendPage
+from functools import cached_property
+from cdrcgi import Controller, BasicWebPage
 from cdrapi.docs import Doc
-import datetime
+from datetime import date, datetime, timedelta
 from lxml import html
 
 
@@ -102,7 +103,7 @@ class Control(Controller):
             fieldset.append(page.checkbox("option", value=option))
         page.form.append(fieldset)
         fieldset = page.fieldset("Columns to Include")
-        fieldset.set("class", "summary-fieldset hidden")
+        fieldset.set("class", "summary-fieldset hidden usa-fieldset")
         for name, header in self.COLUMNS:
             checked = name in self.DEFAULTS
             opts = dict(value=name, label=name, checked=checked)
@@ -112,38 +113,45 @@ class Control(Controller):
             fieldset.append(page.checkbox("column", **opts))
         page.form.append(fieldset)
         fieldset = page.fieldset("Miscellaneous Summary Report Options")
-        fieldset.set("class", "summary-fieldset hidden")
+        fieldset.set("class", "summary-fieldset hidden usa-fieldset")
         fieldset.append(page.B.P(self.EXTRA_HELP))
-        fieldset.append(page.text_field("extra", label="Extra Cols", value=0))
+        field = page.text_field("extra", label="Extra Cols", value=0)
+        field.find("input").set("type", "number")
+        fieldset.append(field)
         page.form.append(fieldset)
         fieldset = page.add_output_options(default="html")
-        fieldset.set("class", "summary-fieldset hidden")
+        fieldset.set("class", "summary-fieldset hidden usa-fieldset")
         page.add_script("\n".join(self.JS))
 
     def show_report(self):
         """Override the base class (this might not be a tabular report)."""
 
         if not self.board_id:
+            message = "You must select a board."
+            self.alerts.append(dict(message=message, type="error"))
             return self.show_form()
         if self.type == "full":
-            sendPage(self.full_report)
-        else:
-            self.report.send(self.format)
+            return self.send_page(self.full_report)
+        if self.format == "html" and len(self.column_headers) > 3:
+            report = BasicWebPage()
+            report.wrapper.append(report.B.H1(self.subtitle))
+            report.wrapper.append(self.build_tables().node)
+            report.wrapper.append(self.footer)
+            return report.send()
+        Controller.show_report(self)
 
-    @property
+    @cached_property
     def board_id(self):
         """Integer ID for the board selected from the form (if any)."""
 
-        if not hasattr(self, "_board_id"):
-            self._board_id = None
-            id = self.fields.getvalue("board", "").strip()
-            if id:
-                if not id.isdigit():
-                    self.bail()
-                self._board_id = int(id)
-        return self._board_id
+        id = self.fields.getvalue("board", "").strip()
+        if id:
+            if not id.isdigit():
+                self.bail()
+            return int(id)
+        return None
 
-    @property
+    @cached_property
     def board_manager_block(self):
         """Block for the bottom of the full report.
 
@@ -198,82 +206,76 @@ class Control(Controller):
             width="100%"
         )
 
-    @property
+    @cached_property
     def board_name(self):
         """String for the board name, drawn from its document title."""
 
-        if not hasattr(self, "_board_name"):
-            self._board_name = dict(self.boards).get(self._board_id)
-            if not self._board_name:
-                self.bail("No board selected")
-        return self._board_name
+        name = dict(self.boards).get(self.board_id)
+        if not name:
+            self.bail("No board selected")
+        return name
 
-    @property
+    @cached_property
     def boards(self):
         """Boards for the picklist."""
 
-        if not hasattr(self, "_boards"):
-            query = self.Query("active_doc d", "d.id", "d.title").unique()
-            query.join("query_term t", "t.doc_id = d.id")
-            query.where("t.path = '/Organization/OrganizationType'")
-            query.where("t.value LIKE 'PDQ % Board'")
-            query.order("d.title")
-            self._boards = []
-            for row in query.execute(self.cursor).fetchall():
-                self._boards.append([row.id, row.title.split(";")[0].strip()])
-        return self._boards
+        query = self.Query("active_doc d", "d.id", "d.title").unique()
+        query.join("query_term t", "t.doc_id = d.id")
+        query.where("t.path = '/Organization/OrganizationType'")
+        query.where("t.value LIKE 'PDQ % Board'")
+        query.order("d.title")
+        boards = []
+        for row in query.execute(self.cursor).fetchall():
+            boards.append([row.id, row.title.split(";")[0].strip()])
+        return boards
 
-    @property
+    @cached_property
     def column_headers(self):
         """Column headers for the summary table."""
+
         headers = [self.Reporter.Column("Name", width="250px")]
         for field, header in self.COLUMNS:
             if field in self.columns:
-                headers.append(self.Reporter.Column(header, width="100px"))
+                headers.append(self.Reporter.Column(header, width="120px"))
         for width in self.extra_columns:
             headers.append(self.Reporter.Column(" ", width=f"{width}px"))
         return headers
 
-    @property
+    @cached_property
     def columns(self):
         """Columns selected for inclusion in the summary report."""
+        return self.fields.getlist("column")
 
-        if not hasattr(self, "_columns"):
-            self._columns = self.fields.getlist("column")
-        return self._columns
-
-    @property
+    @cached_property
     def extra_columns(self):
         """Sequence of integers for width in pixels of extra columns."""
 
-        if not hasattr(self, "_extra_columns"):
-            self._extra_columns = []
-            value = self.fields.getvalue("extra")
-            if value:
-                if ":" in value:
-                    count, widths = value.split(":", 1)
-                else:
-                    count, widths = value, None
-                try:
-                    count = int(count)
-                    if count < 0:
-                        self.bail("count must be a non-negativeinteger")
-                    if widths:
-                        widths = [int(width) for width in widths.split()]
-                        if len(widths) != count:
-                            self.bail("Widths much match number of extra cols")
-                except Exception:
-                    self.logger.exception("Failure with extra of %s", value)
-                    self.bail("Invalid value for extra columns")
+        value = self.fields.getvalue("extra")
+        if value:
+            if ":" in value:
+                count, widths = value.split(":", 1)
+            else:
+                count, widths = value, None
+            try:
+                count = int(count)
+                if count < 0:
+                    self.bail("count must be a non-negativeinteger")
                 if widths:
-                    self._extra_columns = widths
-                elif count:
-                    remaining = 750 - 100 * len(self.columns)
-                    width = remaining / count if remaining > 0 else 100
-                    self._extra_columns = [width] * count
-        return self._extra_columns
+                    widths = [int(width) for width in widths.split()]
+                    if len(widths) != count:
+                        self.bail("Widths much match number of extra cols")
+            except Exception:
+                self.logger.exception("Failure with extra of %s", value)
+                self.bail("Invalid value for extra columns")
+            if widths:
+                return widths
+            elif count:
+                remaining = 750 - 100 * len(self.columns)
+                width = remaining / count if remaining > 0 else 100
+                return [width] * count
+            return []
 
-    @property
+    @cached_property
     def full_report(self):
         """Custom report, without the standard CDR admin banner."""
 
@@ -303,63 +305,59 @@ class Control(Controller):
         opts = dict(pretty_print=True, encoding="unicode")
         return html.tostring(page, **opts)
 
-    @property
+    @cached_property
     def members(self):
         """Current members of the selected PDQ board."""
 
-        if not hasattr(self, "_members"):
-            self._members = []
-            if self.board_id:
-                fields = (
-                    "m.doc_id AS member_id",
-                    "d.id AS person_id",
-                    "t.value AS term_start",
-                    "e.value AS eic_start",
-                    "f.value AS eic_finish",
-                )
-                query = self.Query("query_term m", *fields).unique()
-                query.join("query_term p", "p.doc_id = m.doc_id")
-                query.join("active_doc d", "d.id = p.int_val")
-                query.join("query_term c", "c.doc_id = m.doc_id",
-                           "LEFT(c.node_loc, 4) = LEFT(m.node_loc, 4)")
-                query.outer("query_term t", "t.doc_id = m.doc_id",
-                            "LEFT(t.node_loc, 4) = LEFT(m.node_loc, 4)",
-                            f"t.path = '{self.TERM_START_PATH}'")
-                query.outer("query_term e", "e.doc_id = m.doc_id",
-                            "LEFT(e.node_loc, 4) = LEFT(m.node_loc, 4)",
-                            f"e.path = '{self.EIC_START_PATH}'")
-                query.outer("query_term f", "f.doc_id = m.doc_id",
-                            "LEFT(f.node_loc, 4) = LEFT(m.node_loc, 4)",
-                            f"f.path = '{self.EIC_FINISH_PATH}'")
-                query.where(f"m.path = '{self.BOARD_PATH}'")
-                query.where(f"p.path = '{self.PERSON_PATH}'")
-                query.where(f"c.path = '{self.CURRENT_PATH}'")
-                query.where("c.value = 'Yes'")
-                query.where(query.Condition("m.int_val", self.board_id))
-                query.log()
-                rows = query.execute(self.cursor).fetchall()
-                self._members = [BoardMember(self, row) for row in rows]
-        return self._members
+        if not self.board_id:
+            return []
+        if self.board_id:
+            fields = (
+                "m.doc_id AS member_id",
+                "d.id AS person_id",
+                "t.value AS term_start",
+                "e.value AS eic_start",
+                "f.value AS eic_finish",
+            )
+            query = self.Query("query_term m", *fields).unique()
+            query.join("query_term p", "p.doc_id = m.doc_id")
+            query.join("active_doc d", "d.id = p.int_val")
+            query.join("query_term c", "c.doc_id = m.doc_id",
+                       "LEFT(c.node_loc, 4) = LEFT(m.node_loc, 4)")
+            query.outer("query_term t", "t.doc_id = m.doc_id",
+                        "LEFT(t.node_loc, 4) = LEFT(m.node_loc, 4)",
+                        f"t.path = '{self.TERM_START_PATH}'")
+            query.outer("query_term e", "e.doc_id = m.doc_id",
+                        "LEFT(e.node_loc, 4) = LEFT(m.node_loc, 4)",
+                        f"e.path = '{self.EIC_START_PATH}'")
+            query.outer("query_term f", "f.doc_id = m.doc_id",
+                        "LEFT(f.node_loc, 4) = LEFT(m.node_loc, 4)",
+                        f"f.path = '{self.EIC_FINISH_PATH}'")
+            query.where(f"m.path = '{self.BOARD_PATH}'")
+            query.where(f"p.path = '{self.PERSON_PATH}'")
+            query.where(f"c.path = '{self.CURRENT_PATH}'")
+            query.where("c.value = 'Yes'")
+            query.where(query.Condition("m.int_val", self.board_id))
+            query.log()
+            rows = query.execute(self.cursor).fetchall()
+            return [BoardMember(self, row) for row in rows]
 
-    @property
+    @cached_property
     def method(self):
         """Smooth the way for pulling the report into Microsoft Word."""
         return "get"
 
-    @property
+    @cached_property
     def no_results(self):
         """Suppress the warning which would otherwise be shown."""
         return None
 
-    @property
+    @cached_property
     def options(self):
         """Options selected for the full report."""
+        return self.fields.getlist("option")
 
-        if not hasattr(self, "_options"):
-            self._options = self.fields.getlist("option")
-        return self._options
-
-    @property
+    @cached_property
     def rows(self):
         """Values for the summary table."""
 
@@ -370,7 +368,12 @@ class Control(Controller):
             rows.append(footnote)
         return rows
 
-    @property
+    @cached_property
+    def same_window(self):
+        """Avoid opening lots of browser tabs."""
+        return self.SUBMIT if self.request else []
+
+    @cached_property
     def title(self):
         """Override title for Excel workbook."""
 
@@ -378,7 +381,7 @@ class Control(Controller):
             return self.board_name
         return self.TITLE
 
-    @property
+    @cached_property
     def type(self):
         """Report type (full or summary)."""
         return self.fields.getvalue("type") or "full"
@@ -400,9 +403,9 @@ class BoardMember:
     in https://tracker.nci.nih.gov/browse/OCECDR-4693.
     """
 
-    TODAY = str(datetime.date.today())
+    TODAY = str(date.today())
     FREQUENCY = {"Every year": 1, "Every two years": 2}
-    YEAR = datetime.timedelta(365)
+    YEAR = timedelta(365)
     SPECIFIC_CONTACT = "BoardMemberContact/SpecificBoardMemberContact"
     COMMON_FILTERS = [
         "set:Denormalization PDQBoardMemberInfo Set",
@@ -433,7 +436,7 @@ class BoardMember:
         b = 0 if other.is_eic else 1, other.name.upper()
         return a < b
 
-    @property
+    @cached_property
     def affiliations(self):
         """Sequence of strings for member's professional affiliations."""
 
@@ -445,7 +448,7 @@ class BoardMember:
                 affiliations.append(name)
         return affiliations
 
-    @property
+    @cached_property
     def areas_of_expertise(self):
         """Sequence of strings showing professional strengths."""
 
@@ -454,60 +457,52 @@ class BoardMember:
             areas |= membership.areas_of_expertise
         return sorted(areas)
 
-    @property
+    @cached_property
     def assistant_email(self):
         """String for the email address of the board member's assistant."""
 
-        if not hasattr(self, "_assistant_email"):
-            self._assistant_email = None
-            node = self.doc.root.find("BoardMemberAssistant/AssistantEmail")
-            self._assistant_email = Doc.get_text(node, "").strip()
-        return self._assistant_email
+        node = self.doc.root.find("BoardMemberAssistant/AssistantEmail")
+        return Doc.get_text(node, "").strip() or None
 
-    @property
+    @cached_property
     def assistant_name(self):
         """String for the name of the board member's assistant."""
 
         node = self.doc.root.find("BoardMemberAssistant/AssistantName")
         return Doc.get_text(node, "").strip()
 
-    @property
+    @cached_property
     def contact_mode(self):
         """String for the name of the board member's preferred contact mode."""
 
         node = self.doc.root.find("BoardMemberContactMode")
         return Doc.get_text(node, "").strip()
 
-    @property
+    @cached_property
     def doc(self):
         """`Doc` object for the membership info document."""
+        return Doc(self.__control.session, id=self.__row.member_id)
 
-        if not hasattr(self, "_doc"):
-            self._doc = Doc(self.__control.session, id=self.__row.member_id)
-        return self._doc
-
-    @property
+    @cached_property
     def eic_end(self):
         """String for the date the editor-in-chief term (if any) ended."""
         return self.__row.eic_finish
 
-    @property
+    @cached_property
     def eic_start(self):
         """String for the date the editor-in-chief term (if any) started."""
         return self.__row.eic_start
 
-    @property
+    @cached_property
     def email(self):
         """Email address parsed from the filtered member information."""
 
-        if not hasattr(self, "_email"):
-            self._email = None
-            if self.filtered_info is not None:
-                node = self.filtered_info.find("table/tr/td/email")
-                self._email = Doc.get_text(node, "").strip()
-        return self._email
+        if self.filtered_info is not None:
+            node = self.filtered_info.find("table/tr/td/email")
+            return Doc.get_text(node, "").strip()
+        return None
 
-    @property
+    @cached_property
     def emails(self):
         """Unique email addresses for the board member."""
 
@@ -530,7 +525,7 @@ class BoardMember:
             br = self.__control.HTMLPage.B.BR()
         return self.__control.Reporter.Cell(span)
 
-    @property
+    @cached_property
     def employee_status(self):
         """String indicating whether member is a government employee."""
 
@@ -540,18 +535,16 @@ class BoardMember:
             status = "No^*"
         return status
 
-    @property
+    @cached_property
     def fax(self):
         """Fax number parsed from the filtered member information."""
 
-        if not hasattr(self, "_fax"):
-            self._fax = None
-            if self.filtered_info is not None:
-                node = self.filtered_info.find("table/tr/td/fax")
-                self._fax = Doc.get_text(node, "").strip()
-        return self._fax
+        if self.filtered_info is not None:
+            node = self.filtered_info.find("table/tr/td/fax")
+            return Doc.get_text(node, "").strip()
+        return None
 
-    @property
+    @cached_property
     def faxes(self):
         """Unique fax numbers for this board member."""
 
@@ -562,21 +555,20 @@ class BoardMember:
             faxes.append(self.specific_fax)
         return faxes or ""
 
-    @property
+    @cached_property
     def filtered_info(self):
         """Information pulled together for the board members using XSL/T."""
 
-        if not hasattr(self, "_filtered_info"):
-            filters = list(self.COMMON_FILTERS)
-            filters.append(self.SPECIFIC_FILTERS[self.__control.type])
-            result = self.doc.filter(*filters, parms=self.filter_parms)
-            self._filtered_info = html.fromstring(str(result.result_tree))
-            for node in self._filtered_info.findall("br"):
-                if node.tail == "U.S.A.":
-                    self._filtered_info.remove(node)
-        return self._filtered_info
+        filters = list(self.COMMON_FILTERS)
+        filters.append(self.SPECIFIC_FILTERS[self.__control.type])
+        result = self.doc.filter(*filters, parms=self.filter_parms)
+        filtered_info = html.fromstring(str(result.result_tree))
+        for node in filtered_info.findall("br"):
+            if node.tail == "U.S.A.":
+                filtered_info.remove(node)
+        return filtered_info
 
-    @property
+    @cached_property
     def filter_parms(self):
         """Dictionary of parameter information to feed to the filters."""
 
@@ -590,69 +582,55 @@ class BoardMember:
             otherInfo="Yes" if Control.SHOW_ALL in options else "No",
         )
 
-    @property
+    @cached_property
     def full_name(self):
         """Name of the board member parsed from the filtered information."""
 
-        if not hasattr(self, "_full_name"):
-            self._full_name = self.name
-            if self.filtered_info is not None:
-                node = self.filtered_info.find("b")
-                self._full_name = Doc.get_text(node, "").strip()
-        return self._full_name
+        if self.filtered_info is not None:
+            node = self.filtered_info.find("b")
+            return Doc.get_text(node, "").strip()
+        return self.name
 
-    @property
+    @cached_property
     def is_eic(self):
         """True if this board member is the current editor-in-chief."""
 
-        if not hasattr(self, "_is_eic"):
-            self._is_eic = False
-            if self.eic_start and self.eic_start <= self.TODAY:
-                if not self.eic_end or self.eic_end > self.TODAY:
-                    self._is_eic = True
-        return self._is_eic
+        if self.eic_start and self.eic_start <= self.TODAY:
+            if not self.eic_end or self.eic_end > self.TODAY:
+                return True
+        return False
 
-    @property
+    @cached_property
     def memberships(self):
         """Membership(s) in the selected board."""
 
-        if not hasattr(self, "_memberships"):
-            self._memberships = []
-            for node in self.doc.root.findall("BoardMembershipDetails"):
-                membership = self.Membership(self.__control, node)
-                if membership.board_id == self.__control.board_id:
-                    self._memberships.append(membership)
-        return self._memberships
+        memberships = []
+        for node in self.doc.root.findall("BoardMembershipDetails"):
+            membership = self.Membership(self.__control, node)
+            if membership.board_id == self.__control.board_id:
+                memberships.append(membership)
+        return memberships
 
-    @property
+    @cached_property
     def name(self):
         """Member's name, as pulled from the Person document title."""
+        return self.person.title.split(";")[0].strip()
 
-        if not hasattr(self, "_name"):
-            self._name = self.person.title.split(";")[0].strip()
-        return self._name
-
-    @property
+    @cached_property
     def person(self):
         """`Doc` object for the member's CDR Person document."""
+        return Doc(self.__control.session, id=self.__row.person_id)
 
-        if not hasattr(self, "_person"):
-            session = self.__control.session
-            self._person = Doc(session, id=self.__row.person_id)
-        return self._person
-
-    @property
+    @cached_property
     def phone(self):
         """Phone number parsed from the filtered member information."""
 
-        if not hasattr(self, "_phone"):
-            self._phone = None
-            if self.filtered_info is not None:
-                node = self.filtered_info.find("table/tr/td/phone")
-                self._phone = Doc.get_text(node, "").strip()
-        return self._phone
+        if self.filtered_info is not None:
+            node = self.filtered_info.find("table/tr/td/phone")
+            return Doc.get_text(node, "").strip()
+        return None
 
-    @property
+    @cached_property
     def phones(self):
         """Sequence of phone numbers."""
 
@@ -663,17 +641,16 @@ class BoardMember:
             phones.append(self.specific_phone)
         return phones
 
-    @property
+    @cached_property
     def response_dates(self):
         """Response dates added by OCECDR-4693."""
 
-        if not hasattr(self, "_response_dates"):
-            self._response_dates = []
-            for membership in self.memberships:
-                self._response_dates += membership.response_dates
-        return self._response_dates
+        dates = []
+        for membership in self.memberships:
+            dates += membership.response_dates
+        return dates
 
-    @property
+    @cached_property
     def row(self):
         """Values for the summary report's table."""
 
@@ -715,37 +692,31 @@ class BoardMember:
             row.append("")
         return row
 
-    @property
+    @cached_property
     def specific_email(self):
         """String for email address used specifically for the member role."""
 
-        if not hasattr(self, "_specific_email"):
-            path = f"{self.SPECIFIC_CONTACT}/BoardContactEmail"
-            node = self.doc.root.find(path)
-            self._specific_email = Doc.get_text(node, "").strip()
-        return self._specific_email
+        path = f"{self.SPECIFIC_CONTACT}/BoardContactEmail"
+        node = self.doc.root.find(path)
+        return Doc.get_text(node, "").strip()
 
-    @property
+    @cached_property
     def specific_fax(self):
         """String for fax number used specifically for the member role."""
 
-        if not hasattr(self, "_specific_fax"):
-            path = f"{self.SPECIFIC_CONTACT}/BoardContactFax"
-            node = self.doc.root.find(path)
-            self._specific_fax = Doc.get_text(node, "").strip()
-        return self._specific_fax
+        path = f"{self.SPECIFIC_CONTACT}/BoardContactFax"
+        node = self.doc.root.find(path)
+        return Doc.get_text(node, "").strip()
 
-    @property
+    @cached_property
     def specific_phone(self):
         """String for phone number used specifically for the member role."""
 
-        if not hasattr(self, "_specific_phone"):
-            path = f"{self.SPECIFIC_CONTACT}/BoardContactPhone"
-            node = self.doc.root.find(path)
-            self._specific_phone = Doc.get_text(node, "").strip()
-        return self._specific_phone
+        path = f"{self.SPECIFIC_CONTACT}/BoardContactPhone"
+        node = self.doc.root.find(path)
+        return Doc.get_text(node, "").strip()
 
-    @property
+    @cached_property
     def subgroups(self):
         """Sequence of strings for the names of the member's subgroups."""
 
@@ -754,34 +725,32 @@ class BoardMember:
             subgroups |= membership.subgroups
         return sorted(subgroups)
 
-    @property
+    @cached_property
     def term_end(self):
         """String for the calculated end of the board member's term."""
 
-        if not hasattr(self, "_term_end"):
-            self._term_end = None
-            if self.term_start:
-                for membership in self.memberships:
-                    if membership.frequency:
-                        years = self.FREQUENCY.get(membership.frequency)
-                        if years is None:
-                            message = "Invalid frequency {!r} for {}"
-                            args = self.full_name, membership.frequency
-                            self.__control.bail(message.format(*args))
-                        delta = self.YEAR * years
-                        try:
-                            args = self.term_start, "%Y-%m-%d"
-                            start = datetime.datetime.strptime(*args)
-                            end = start + delta
-                            self._term_end = end.strftime("%Y-%m-%d")
-                        except Exception:
-                            self.__control.logger.exception(self.full_name)
-                            args = self.full_name, self.term_start
-                            message = "Bad term date for {}: {}"
-                            self.__control.bail(message.format(*args))
-        return self._term_end
+        if not self.term_start:
+            return None
+        for membership in self.memberships:
+            if membership.frequency:
+                years = self.FREQUENCY.get(membership.frequency)
+                if years is None:
+                    message = "Invalid frequency {!r} for {}"
+                    args = self.full_name, membership.frequency
+                    self.__control.bail(message.format(*args))
+                delta = self.YEAR * years
+                try:
+                    args = self.term_start, "%Y-%m-%d"
+                    start = datetime.strptime(*args)
+                    end = start + delta
+                    return end.strftime("%Y-%m-%d")
+                except Exception:
+                    self.__control.logger.exception(self.full_name)
+                    args = self.full_name, self.term_start
+                    message = "Bad term date for {}: {}"
+                    self.__control.bail(message.format(*args))
 
-    @property
+    @cached_property
     def term_start(self):
         """String for the date the board member's term began."""
         return self.__row.term_start
@@ -799,66 +768,59 @@ class BoardMember:
 
             self.__node = node
 
-        @property
+        @cached_property
         def areas_of_expertise(self):
             """Member's expertise relevant to this board."""
 
-            if not hasattr(self, "_areas_of_expertise"):
-                self._areas_of_expertise = set()
-                for node in self.__node.findall("AreaOfExpertise"):
-                    area = Doc.get_text(node, "").strip()
-                    if area:
-                        self._areas_of_expertise.add(area)
-            return self._areas_of_expertise
+            areas = set()
+            for node in self.__node.findall("AreaOfExpertise"):
+                area = Doc.get_text(node, "").strip()
+                if area:
+                    areas.add(area)
+            return areas
 
-        @property
+        @cached_property
         def board_id(self):
             """Integer for the board's CDR Organization ID."""
 
-            if not hasattr(self, "_board_id"):
-                self._board_id = None
-                node = self.__node.find("BoardName")
-                if node is not None:
-                    ref = node.get(f"{{{Doc.NS}}}ref")
-                    if ref:
-                        try:
-                            self._board_id = Doc.extract_id(ref)
-                        except Exception:
-                            self.__control.logger.exception("board ID")
-            return self._board_id
+            node = self.__node.find("BoardName")
+            if node is not None:
+                ref = node.get(f"{{{Doc.NS}}}ref")
+                if ref:
+                    try:
+                        return Doc.extract_id(ref)
+                    except Exception:
+                        self.__control.logger.exception("board ID")
+            return None
 
-        @property
+        @cached_property
         def frequency(self):
             """How long before term is up for renewal."""
 
-            if not hasattr(self, "_frequency"):
-                node = self.__node.find("TermRenewalFrequency")
-                self._frequency = Doc.get_text(node, "").strip()
-            return self._frequency
+            node = self.__node.find("TermRenewalFrequency")
+            return Doc.get_text(node, "").strip()
 
-        @property
+        @cached_property
         def response_dates(self):
             """When the user responded to invitations for this board."""
 
-            if not hasattr(self, "_response_dates"):
-                self._response_dates = []
-                for node in self.__node.findall("ResponseDate"):
-                    response_date = Doc.get_text(node, "").strip()
-                    if response_date:
-                        self._response_dates.append(response_date)
-            return self._response_dates
+            response_dates = []
+            for node in self.__node.findall("ResponseDate"):
+                response_date = Doc.get_text(node, "").strip()
+                if response_date:
+                    response_dates.append(response_date)
+            return response_dates
 
-        @property
+        @cached_property
         def subgroups(self):
             """Sequence of strings for the names of the member's subgroups."""
 
-            if not hasattr(self, "_subgroups"):
-                self._subgroups = set()
-                for node in self.__node.findall("MemberOfSubgroup"):
-                    name = Doc.get_text(node, "").strip()
-                    if name:
-                        self._subgroups.add(name)
-            return self._subgroups
+            subgroups = set()
+            for node in self.__node.findall("MemberOfSubgroup"):
+                name = Doc.get_text(node, "").strip()
+                if name:
+                    subgroups.add(name)
+            return subgroups
 
 
 if __name__ == "__main__":

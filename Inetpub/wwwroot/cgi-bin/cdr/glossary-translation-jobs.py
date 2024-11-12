@@ -5,7 +5,8 @@
 https://tracker.nci.nih.gov/browse/OCECDR-4489
 """
 
-from cdrcgi import Controller, navigateTo
+from functools import cached_property
+from cdrcgi import Controller
 
 
 class Control(Controller):
@@ -24,58 +25,66 @@ class Control(Controller):
     PURGE = "Purge"
     SUMMARY = "Summary"
     MEDIA = "Media"
-    REPORTS_MENU = SUBMENU = "Reports"
-    ADMINMENU = "Admin"
-    CSS = "th, td { background-color: #e8e8e8; border-color: #bbb; }"
+    COLUMNS = (
+        "\u2713",
+        "Doc ID",
+        "Doc Type",
+        "Doc Title",
+        "Status",
+        "Status Date",
+        "Assigned To",
+        "Comment",
+    )
 
-    def populate_form(self, page):
-        """Override to replace the standard form with a table of jobs.
+    def show_form(self):
+        """Overridden because the form needs a very wide table."""
 
-        Instead of form fields, we're actually displaying a table
-        containing one row for each job in the queue, sorted by
-        job state, with a sub-sort on user name and date of last
-        state transition.
+        class Page(self.HTMLPage):
+            """Derived class so we can override the layout of main."""
 
-        Change in requirements: the queue must now support re-assigning
-        jobs in bulk.
+            @cached_property
+            def main(self):
+                """Move the form outside the grid container so it's wider."""
 
-        Pass:
-            page - HTMLPage object on which we place the table
-        """
+                return self.B.E(
+                    "main",
+                    self.B.DIV(
+                        self.B.H1("Glossary Translation Job Queue"),
+                        self.B.CLASS("grid-container")
+                    ),
+                    self.form,
+                    self.B.CLASS("usa-section")
+                )
 
-        if self.message:
-            para = page.B.P(self.message, page.B.CLASS("strong info center"))
-            page.form.append(para)
+        opts = dict(
+            control=self,
+            action=self.script,
+            session=self.session,
+            method=self.method,
+        )
+        page = Page(self.title, **opts)
+        container = page.B.DIV(page.B.CLASS("grid-container"))
         fieldset = page.fieldset("Assign To")
         for row in self.translators:
             opts = dict(value=row.id, label=row.fullname)
             fieldset.append(page.radio_button("assign_to", **opts))
-        page.form.append(fieldset)
-        fields = ("j.doc_id", "s.value_name", "u.fullname", "j.state_date",
-                  "j.comments")
-        query = self.Query("glossary_translation_job j", *fields)
-        query.join("usr u", "u.id = j.assigned_to")
-        query.join("document d", "d.id = j.doc_id")
-        query.join("glossary_translation_state s", "s.value_id = j.state_id")
-        query.order("j.state_date", "s.value_pos", "u.fullname")
-        rows = query.execute(self.cursor).fetchall()
-        table = page.B.TABLE(
-            page.B.THEAD(
-                page.B.TR(
-                    page.B.TH("SELECT JOB"),
-                    page.B.TH("DOC ID"),
-                    page.B.TH("DOC TYPE"),
-                    page.B.TH("DOC TITLE"),
-                    page.B.TH("STATUS"),
-                    page.B.TH("STATUS DATE"),
-                    page.B.TH("ASSIGNED TO"),
-                    page.B.TH("COMMENT"),
-                )
-            ),
-            page.B.TBODY(*[Job(self, row).row for row in rows]),
-        )
-        page.form.append(table)
-        page.add_css(self.CSS)
+        container.append(fieldset)
+        for label in self.buttons:
+            container.append(page.button(label, onclick=self.SAME_WINDOW))
+        for alert in self.alerts:
+            message = alert["message"]
+            del alert["message"]
+            page.add_alert(message, **alert)
+        page.form.append(container)
+        page.form.append(self.table.node)
+        page.add_css("""\
+form { width: 90%; margin: 0 auto; }
+.usa-table { margin-top: 3rem; }
+.usa-table caption { font-size: 1.3rem; text-align: center; }
+.usa-table th:first-child { text-align: center; }
+.clickable.usa-checkbox__label {  margin-top: -.25rem; margin-left: .75rem; }
+""")
+        page.send()
 
     def run(self):
         """Override base class method, as we support extra buttons/tasks."""
@@ -83,11 +92,11 @@ class Control(Controller):
         if not self.session.can_do("MANAGE TRANSLATION QUEUE"):
             self.bail("not authorized")
         if self.request == self.ADD:
-            navigateTo("glossary-translation-job.py", self.session.name)
+            self.redirect("glossary-translation-job.py")
         elif self.request == self.SUMMARY:
-            navigateTo("translation-jobs.py", self.session.name)
+            self.redirect("translation-jobs.py")
         elif self.request == self.MEDIA:
-            navigateTo("media-translation-jobs.py", self.session.name)
+            self.redirect("media-translation-jobs.py")
         elif self.request == self.PURGE:
             if not self.session.can_do("PRUNE TRANSLATION QUEUE"):
                 self.bail("not authorized")
@@ -100,7 +109,9 @@ class Control(Controller):
             )
             count = self.cursor.rowcount
             self.conn.commit()
-            self.message = f"Purged jobs for {count:d} published translations."
+            message = f"Purged jobs for {count:d} published translations."
+            self.alerts.append(dict(message=message, type="success"))
+            return self.show_form()
         elif self.request == self.ASSIGN:
             count = 0
             fields = "state_id", "comments", "assigned_to"
@@ -129,65 +140,94 @@ class Control(Controller):
                 self.cursor.execute(update, params)
                 self.conn.commit()
                 count += 1
-            self.message = f"Re-assigned {count:d} jobs"
+            message = f"Re-assigned {count:d} jobs."
+            self.alerts.append(dict(message=message, type="success"))
+            return self.show_form()
         Controller.run(self)
 
-    @property
+    @cached_property
+    def alerts(self):
+        """Messages to be displayed at the top of the page."""
+
+        alerts = []
+        if self.message:
+            alerts.append(dict(message=self.message, type="success"))
+        if self.warning:
+            alerts.append(dict(message=self.warning, type="warning"))
+        return alerts
+
+    @cached_property
     def assignee(self):
         """New translator for a job."""
 
-        if not hasattr(self, "_assignee"):
-            assignee = self.fields.getvalue("assign_to")
-            if not assignee:
-                self.bail("No translator selected")
-            try:
-                self._assignee = int(assignee)
-            except Exception:
-                self.bail()
-            if self._assignee not in [row.id for row in self.translators]:
-                self.bail()
-        return self._assignee
+        assignee = self.fields.getvalue("assign_to")
+        if not assignee:
+            self.bail("No translator selected")
+        try:
+            assignee = int(assignee)
+        except Exception:
+            self.bail()
+        if assignee not in [row.id for row in self.translators]:
+            self.bail()
+        return assignee
 
-    @property
+    @cached_property
     def buttons(self):
-        """Add our custom buttons for the extra tasks."""
+        """This form uses custom buttons."""
+        return self.ASSIGN, self.ADD, self.PURGE, self.MEDIA, self.SUMMARY
 
-        return (
-            self.ADD,
-            self.ASSIGN,
-            self.PURGE,
-            self.MEDIA,
-            self.SUMMARY,
-            self.REPORTS_MENU,
-            self.ADMINMENU,
-            self.LOG_OUT,
-        )
-
-    @property
+    @cached_property
     def message(self):
-        """Optional string, displayed prominently above the jobs table."""
+        """Information about successfully performed action just taken."""
+        return self.fields.getvalue("message")
 
-        if hasattr(self, "_message"):
-            return self._message
+    @cached_property
+    def rows(self):
+        """Rows for the table of queued jobs."""
 
-    @message.setter
-    def message(self, value):
-        """This is how the purge action reports its activity."""
-        self._message = value
+        fields = (
+            "j.doc_id",
+            "s.value_name",
+            "u.fullname",
+            "j.state_date",
+            "j.comments",
+        )
+        query = self.Query("glossary_translation_job j", *fields)
+        query.join("usr u", "u.id = j.assigned_to")
+        query.join("document d", "d.id = j.doc_id")
+        query.join("glossary_translation_state s", "s.value_id = j.state_id")
+        query.order("j.state_date", "s.value_pos", "u.fullname")
+        rows = query.execute(self.cursor).fetchall()
+        return [Job(self, row).row for row in rows]
 
-    @property
+    @cached_property
+    def same_window(self):
+        """Don't open any more new browser tabs."""
+        return self.buttons
+
+    @cached_property
+    def table(self):
+        """Table of queued glossary translation jobs."""
+
+        opts = dict(cols=self.COLUMNS, caption="Jobs")
+        return self.Reporter.Table(self.rows, **opts)
+
+    @cached_property
     def translators(self):
         """Get the list of users who can translate Glossary documents."""
 
-        if not hasattr(self, "_translators"):
-            query = self.Query("usr u", "u.id", "u.fullname")
-            query.join("grp_usr x", "x.usr = u.id")
-            query.join("grp g", "g.id = x.grp")
-            query.where("u.expired IS NULL")
-            query.where("g.name = 'Spanish Glossary Translators'")
-            query.order("u.fullname")
-            self._translators = query.execute(self.cursor).fetchall()
-        return self._translators
+        query = self.Query("usr u", "u.id", "u.fullname")
+        query.join("grp_usr x", "x.usr = u.id")
+        query.join("grp g", "g.id = x.grp")
+        query.where("u.expired IS NULL")
+        query.where("g.name = 'Spanish Glossary Translators'")
+        query.order("u.fullname")
+        return query.execute(self.cursor).fetchall()
+
+    @cached_property
+    def warning(self):
+        """Warning message passed on from the form page."""
+        return self.fields.getvalue("warning")
 
 
 class Job:
@@ -206,17 +246,14 @@ class Job:
         self.__control = control
         self.__row = row
 
-    @property
+    @cached_property
     def comments(self):
         """Notes on the translation job."""
 
-        if not hasattr(self, "_comments"):
-            self._comments = self.__row.comments or ""
-            if len(self._comments) > 40:
-                self._comments = self._comments[:40] + "..."
-        return self._comments
+        comments = self.__row.comments or ""
+        return comments[:40] + "..." if len(comments) > 40 else comments
 
-    @property
+    @cached_property
     def date(self):
         """Date when the current job state was assigned."""
         return str(self.__row.state_date)[:10]
@@ -226,45 +263,40 @@ class Job:
         """CDR ID of the glossary document being translated."""
         return self.__row.doc_id
 
-    @property
+    @cached_property
     def doc_type(self):
         """Use the abbreviations GTN and GTC for name and concept documents."""
 
-        if not hasattr(self, "_doc_type"):
-            query = self.__control.Query("doc_type t", "t.name")
-            query.join("document d", "d.doc_type = t.id")
-            query.where(query.Condition("d.id", self.doc_id))
-            row = query.execute(self.__control.cursor).fetchone()
-            if not row or not row.name.startswith("GlossaryTerm"):
-                self.__control.bail(f"CDR{self.doc_id} is not a glossary doc")
-            self._doc_type = "GTN" if "Name" in row.name else "GTC"
-        return self._doc_type
+        query = self.__control.Query("doc_type t", "t.name")
+        query.join("document d", "d.doc_type = t.id")
+        query.where(query.Condition("d.id", self.doc_id))
+        row = query.execute(self.__control.cursor).fetchone()
+        if not row or not row.name.startswith("GlossaryTerm"):
+            self.__control.bail(f"CDR{self.doc_id} is not a glossary doc")
+        return "GTN" if "Name" in row.name else "GTC"
 
-    @property
+    @cached_property
     def row(self):
         """
         Create a row for the job queue table, showing information about
         this individual translation job.
         """
 
-        B = self.__control.HTMLPage.B
-        url = self.URL.format(self.__control.session, self.doc_id)
-        link = B.A(f"CDR{self.doc_id:d}", href=url, title="edit job")
-        checkbox = B.INPUT(
-            id=str(self.doc_id),
-            type="checkbox",
-            name="assignments",
-            value=str(self.doc_id)
-        )
-        return B.TR(
-            B.TD(checkbox, B.CLASS("center")),
-            B.TD(link),
-            B.TD(self.doc_type),
-            B.TD(self.title),
-            B.TD(self.state),
-            B.TD(self.date, B.CLASS("nowrap")),
-            B.TD(self.user),
-            B.TD(self.comments)
+        Page = self.__control.HTMLPage
+        Cell = self.__control.Reporter.Cell
+        doc_id = str(self.doc_id)
+        url = self.URL.format(self.__control.session, doc_id)
+        opts = dict(widget_id=doc_id, value=doc_id, label="\u00a0")
+        checkbox = Page.checkbox("assignments", **opts)
+        return (
+            Cell(checkbox, center=True),
+            Cell(f"CDR{doc_id}", href=url, title="edit job"),
+            self.doc_type,
+            self.title,
+            self.state,
+            Cell(self.date, classes="nowrap"),
+            self.user,
+            self.comments,
         )
 
     @property
@@ -272,29 +304,25 @@ class Job:
         """Which state is the translation job in?"""
         return self.__row.value_name
 
-    @property
+    @cached_property
     def title(self):
         """Come up with a reasonable doc title (tricky for concept docs)."""
 
-        if not hasattr(self, "_title"):
-            if self.doc_type == "GTN":
-                query = self.__control.Query("document", "title")
-                query.where(query.Condition("id", self.doc_id))
-                row = query.execute(self.__control.cursor).fetchone()
-                self._title = row.title if row else None
-            else:
-                path = "/GlossaryTermName/GlossaryTermConcept/@cdr:ref"
-                query = self.__control.Query("document d", "d.title")
-                query.join("query_term q", "q.doc_id = d.id")
-                query.join("glossary_translation_job j", "j.doc_id = d.id")
-                query.where(query.Condition("q.path", path))
-                query.where(query.Condition("q.int_val", self.doc_id))
-                query.order("d.title")
-                rows = query.execute(self.__control.cursor).fetchall() or []
-                titles = [row.title.split(";")[0].strip() for row in rows]
-                pattern = "GTC for {}"
-                self._title = pattern.format("; ".join(titles))
-        return self._title
+        if self.doc_type == "GTN":
+            query = self.__control.Query("document", "title")
+            query.where(query.Condition("id", self.doc_id))
+            row = query.execute(self.__control.cursor).fetchone()
+            return row.title if row else None
+        path = "/GlossaryTermName/GlossaryTermConcept/@cdr:ref"
+        query = self.__control.Query("document d", "d.title")
+        query.join("query_term q", "q.doc_id = d.id")
+        query.where(query.Condition("q.path", path))
+        query.where(query.Condition("q.int_val", self.doc_id))
+        query.order("d.title")
+        rows = query.execute(self.__control.cursor).fetchall() or []
+        titles = [row.title.split(";")[0].strip() for row in rows]
+        pattern = "GTC for {}"
+        return pattern.format("; ".join(titles))
 
     @property
     def user(self):

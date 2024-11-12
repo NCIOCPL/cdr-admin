@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""Pull audio files from the SFTP server to the CDR server.
+"""Pull audio files from the s/FTP server to the CDR server.
 """
 
 from glob import glob
@@ -19,7 +19,7 @@ class Control(Controller):
     """Processing logic."""
 
     TIER = Tier()
-    SUBTITLE = "Retrieve Audio Files From CIPSFTP Server"
+    SUBTITLE = "Retrieve Audio Files From Secure FTP Server"
     LOGNAME = "FtpAudio"
     USER = "cdroperator"
     WEEK = r"^Week_\d{4}_\d\d(_Rev\d)?"
@@ -33,10 +33,10 @@ class Control(Controller):
     INSTRUCTIONS = (
         "Files which match the pattern Week_YYYY_WW.zip or "
         "Week_YYYY_WW_RevN.zip will be retrieved from the source "
-        "directory on the NCI SFTP server and placed in the destination "
+        "directory on the NCI s/FTP server and placed in the destination "
         "directory on the Windows CDR server. Then they will be copied "
-        "(if running in test mode) or moved to a backup location on the SFTP "
-        "sevver (referred to below as the Transferred directory). By default, "
+        "(if running in test mode) or moved to a backup location on the s/FTP "
+        "server (referred to below as the Transferred directory). By default, "
         "retrieval of a zip file will be skipped if the file already exists "
         "on the Windows CDR server (though this can be overridden). "
         "In test mode, the retrievals will be reported but not "
@@ -72,7 +72,6 @@ class Control(Controller):
         opts = dict(value="overwrite", label=label)
         fieldset.append(page.checkbox("options", **opts))
         page.form.append(fieldset)
-        page.add_css("fieldset {width:600px} #paths input {width:400px}")
 
     def build_tables(self):
         """Perform the retrievals and report the processing outcome."""
@@ -270,7 +269,7 @@ class Control(Controller):
 
     @property
     def connection(self):
-        """Connection to the SFTP server."""
+        """Connection to the s/FTP server."""
 
         if not hasattr(self, "_connection"):
             self._connection = paramiko.SSHClient()
@@ -376,7 +375,7 @@ class Control(Controller):
 
     @property
     def server(self):
-        """Local name of the SFTP server."""
+        """Local name of the s/FTP server."""
 
         if not hasattr(self, "_server"):
             self._server = self.session.tier.hosts["SFTP"].split(".")[0]

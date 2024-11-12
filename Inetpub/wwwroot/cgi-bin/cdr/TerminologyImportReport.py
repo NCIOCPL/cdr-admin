@@ -12,8 +12,14 @@ class Control(Controller):
     """Report-specific behavior implemented in this derived class."""
 
     SUBTITLE = "Terminology Import/Update Report"
-    FIELDS = "n.doc_id", "c.value AS code, n.value AS name", "a.dt", "a.comment"
-    COLUMNS = "CDR ID", "NCI/T ID", "Preferred Name", "Action", "Date"
+    FIELDS = (
+        "n.doc_id",
+        "c.value AS code,"
+        "n.value AS name",
+        "a.dt",
+        "a.comment",
+    )
+    COLUMNS = "CDR ID", "EVS ID", "Preferred Name", "Action", "Date"
 
     def build_tables(self):
         """Create the table for the report."""
@@ -55,6 +61,11 @@ class Control(Controller):
     def end(self):
         """Ending date for the date range on which we are to report."""
         return self.parse_date(self.fields.getvalue("end"))
+
+    @cached_property
+    def report_css(self):
+        """Prevent the import date from wrapping to a second line."""
+        return "td:last-child { text-wrap: nowrap; }"
 
     @cached_property
     def start(self):

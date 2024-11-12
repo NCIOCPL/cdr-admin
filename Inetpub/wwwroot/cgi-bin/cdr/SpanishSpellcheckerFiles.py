@@ -7,7 +7,6 @@
 
 import sys
 from cdrcgi import Controller
-from functools import cached_property
 from pathlib import Path
 from CreateDictionary import CreateDictionary
 
@@ -33,7 +32,7 @@ class Control(Controller):
                                  "and then copy it to the XMetaL dictionary "
                                  "location on the network at: "))
         fieldset.append(page.B.P(page.B.PRE(
-                                 "    OCPL\_Cross\CDR\STEDMANS")))
+                                 r"    OCPL\_Cross\CDR\STEDMANS")))
         fieldset.append(page.B.P("Overwrite one of the existing files "
                                  "(dict_hp.dic or dict_pat.dic) with the "
                                  "newly created HP or patient file."))
@@ -52,11 +51,10 @@ class Control(Controller):
         fieldset.append(page.radio_button("audience", **opts))
         page.form.append(fieldset)
 
-
     def show_report(self):
         """Cycle back to the form."""
 
-        opts = {'audience':self.fields.getvalue('audience')}
+        opts = dict(audience=self.fields.getvalue("audience"))
         dictFile = CreateDictionary(opts).run()
         filename = Path(dictFile).name
 
@@ -74,12 +72,6 @@ Content-length: {len(dict_bytes)}
 """.encode("utf-8"))
         sys.stdout.buffer.write(dict_bytes)
         sys.exit(0)
-
-
-    @cached_property
-    def buttons(self):
-        """Customize the action buttons on the banner bar."""
-        return self.SUBMIT, self.REPORTS_MENU, self.ADMINMENU, self.LOG_OUT
 
 
 if __name__ == "__main__":

@@ -3,7 +3,8 @@
 """Interface for editing a CDR group.
 """
 
-from cdrcgi import Controller, navigateTo, bail
+from functools import cached_property
+from cdrcgi import Controller
 from cdrapi.docs import Doctype
 
 
@@ -11,8 +12,9 @@ class Control(Controller):
     """Top-level logic for editing interface."""
 
     EDIT_GROUPS = "EditGroups.py"
-    SUBMENU = "Group Menu"
-    SAVE = "Save Changes"
+    GROUP_MENU = "Group Menu"
+    SAVE_CHANGES = "Save Changes"
+    SAVE_NEW = "Save New Group"
     DELETE = "Delete Group"
 
     def delete(self):
@@ -35,7 +37,9 @@ class Control(Controller):
         page.form.append(fieldset)
         fieldset = page.fieldset("Group Members")
         fieldset.set("id", "users-fieldset")
-        fieldset.set("class", "checkboxes")
+        fieldset.set("class", "usa-fieldset checkboxes")
+        ul = page.B.UL()
+        fieldset.append(ul)
         for name in sorted(self.users, key=str.lower):
             user = self.users[name]
             opts = dict(value=user.name, label=user.name)
@@ -43,23 +47,27 @@ class Control(Controller):
                 opts["tooltip"] = user.fullname
             if self.group.users and name in self.group.users:
                 opts["checked"] = True
-            fieldset.append(page.checkbox("user", **opts))
+            ul.append(page.B.LI(page.checkbox("user", **opts)))
         page.form.append(fieldset)
         fieldset = page.fieldset("Actions Independent Of Document Types")
-        fieldset.set("class", "checkboxes")
+        fieldset.set("class", "checkboxes usa-fieldset")
         fieldset.set("id", "independent-actions")
+        ul = page.B.UL()
+        fieldset.append(ul)
         for action in self.actions:
             if action.doctype_specific == "N":
                 opts = dict(value=action.name, label=action.name)
                 if self.group.actions and action.name in self.group.actions:
                     opts["checked"] = True
-                fieldset.append(page.checkbox("action", **opts))
+                ul.append(page.B.LI(page.checkbox("action", **opts)))
         page.form.append(fieldset)
         for action in self.actions:
             if action.doctype_specific == "Y":
                 group = self.action_group_name(action)
                 fieldset = page.fieldset(action.name)
-                fieldset.set("class", "checkboxes")
+                fieldset.set("class", "checkboxes usa-fieldset")
+                ul = page.B.UL()
+                fieldset.append(ul)
                 if self.group.actions:
                     doctypes = self.group.actions.get(action.name) or []
                 else:
@@ -68,21 +76,25 @@ class Control(Controller):
                     opts = dict(value=doctype, label=doctype)
                     if doctype in doctypes:
                         opts["checked"] = True
-                    fieldset.append(page.checkbox(group, **opts))
+                    ul.append(page.B.LI(page.checkbox(group, **opts)))
                 page.form.append(fieldset)
+
+        # Don't know why the first column in the list is positioned lower than
+        # the subsequent columns. Doesn't work that way for other links in
+        # columns. May have something to do with the tricky positioning of
+        # checkboxes used by USWDS. Solution is to raise the DIV for the first
+        # checkbox by .75rem.
         page.add_css("""\
-fieldset {width: 1200px; }
-fieldset.checkboxes div { float: left; width: 240px; }
-fieldset#users-fieldset div { width: 200px;}
-fieldset#independent-actions div { width: 300px; }
-.labeled-field textarea, .labeled-field #name { width: 1050px; }
+.checkboxes ul { column-width: 13rem; list-style-type: none; }
+.checkboxes ul li:first-child div { margin-top: -.75rem; }
+#independent-actions ul { column-width: 15rem; }
 """)
 
     def return_to_groups_menu(self, deleted=None):
         """Go back to the menu listing all the CDR groups."""
 
-        opts = dict(deleted=deleted) if deleted else {}
-        navigateTo(self.EDIT_GROUPS, self.session.name, **opts)
+        opts = dict(deleted=deleted) if deleted else dict(returned="true")
+        self.navigate_to(self.EDIT_GROUPS, self.session.name, **opts)
 
     def run(self):
         """Override base class so we can handle the extra buttons."""
@@ -90,12 +102,12 @@ fieldset#independent-actions div { width: 300px; }
         try:
             if self.request == self.DELETE:
                 return self.delete()
-            elif self.request == self.SAVE:
+            elif self.request in (self.SAVE_CHANGES, self.SAVE_NEW):
                 return self.save()
-            elif self.request == self.SUBMENU:
+            elif self.request == self.GROUP_MENU:
                 return self.return_to_groups_menu()
         except Exception as e:
-            bail(f"Failure: {e}")
+            self.bail(f"Failure: {e}")
         Controller.run(self)
 
     def save(self):
@@ -111,118 +123,95 @@ fieldset#independent-actions div { width: 300px; }
         self.group = self.session.Group(**opts)
         if self.group.id:
             self.group.modify(self.session)
-            self.subtitle = f"Group {self.name!r} successfully updated"
+            alert = f"Group {self.name!r} successfully updated."
         else:
             self.group.add(self.session)
-            self.subtitle = f"Group {self.name!r} successfully added"
+            alert = f"Group {self.name!r} successfully added."
+        self.alerts.append(dict(message=alert, type="success"))
         self.show_form()
 
-    @property
+    @cached_property
     def actions(self):
         """Sequence of `Action` objects for all the actions in the system."""
+        return self.session.list_actions()
 
-        if not hasattr(self, "_actions"):
-            self._actions = self.session.list_actions()
-        return self._actions
-
-    @property
+    @cached_property
     def allowed_actions(self):
         """Checkboxes checked for the "action" groups."""
 
-        if not hasattr(self, "_allowed_actions"):
-            actions = {}
-            independent_actions = self.fields.getlist("action")
-            for action in self.actions:
-                if action.doctype_specific == "N":
-                    if action.name in independent_actions:
-                        actions[action.name] = [""]
-                else:
-                    action_group_name = self.action_group_name(action)
-                    doctypes = self.fields.getlist(action_group_name)
-                    if doctypes:
-                        actions[action.name] = doctypes
-            self._allowed_actions = actions
-        return self._allowed_actions
+        actions = {}
+        independent_actions = self.fields.getlist("action")
+        for action in self.actions:
+            if action.doctype_specific == "N":
+                if action.name in independent_actions:
+                    actions[action.name] = [""]
+            else:
+                action_group_name = self.action_group_name(action)
+                doctypes = self.fields.getlist(action_group_name)
+                if doctypes:
+                    actions[action.name] = doctypes
+        return actions
 
-    @property
+    @cached_property
     def buttons(self):
         """Add our custom navigation buttons."""
 
-        if not hasattr(self, "_buttons"):
-            buttons = [self.SAVE, self.SUBMENU, self.ADMINMENU, self.LOG_OUT]
-            if self.group.id:
-                buttons.insert(1, self.DELETE)
-            self._buttons = buttons
-        return self._buttons
+        if self.group.id:
+            return self.SAVE_CHANGES, self.DELETE, self.GROUP_MENU
+        return self.SAVE_NEW, self.GROUP_MENU
 
-    @property
+    @cached_property
     def comment(self):
         """Current value of the form's description field."""
         return self.fields.getvalue("description")
 
-    @property
+    @cached_property
     def doctypes(self):
         """Sorted names of all the active document types."""
+        return Doctype.list_doc_types(self.session)
 
-        if not hasattr(self, "_doctypes"):
-            self._doctypes = Doctype.list_doc_types(self.session)
-        return self._doctypes
-
-    @property
+    @cached_property
     def group(self):
         """Object for the CDR group being edited/created."""
 
-        if not hasattr(self, "_group"):
-            name = self.fields.getvalue("grp")
-            if name:
-                self._group = self.session.get_group(name)
-            else:
-                opts = dict(
-                    name=self.name,
-                    comment=self.comment,
-                    session=self.session
-                )
-                self._group = self.session.Group(**opts)
-        return self._group
+        name = self.fields.getvalue("grp")
+        if name:
+            return self.session.get_group(name)
+        opts = dict(
+            name=self.name,
+            comment=self.comment,
+            session=self.session
+        )
+        return self.session.Group(**opts)
 
-    @group.setter
-    def group(self, value):
-        """Allow replacement after a save."""
-        self._group = value
-
-    @property
+    @cached_property
     def members(self):
         """Checkboxes checked from the "user" group."""
+        return self.fields.getlist("user")
 
-        if not hasattr(self, "_members"):
-            self._members = self.fields.getlist("user")
-        return self._members
-
-    @property
+    @cached_property
     def name(self):
         """Current value of the form's name field."""
         return self.fields.getvalue("name")
 
-    @property
+    @cached_property
+    def same_window(self):
+        """Don't open any new browser tabs."""
+        return self.buttons
+
+    @cached_property
     def subtitle(self):
         """Dynamic string for display under the main banner."""
+        return self.group.name or "Add New Group"
 
-        if not hasattr(self, "_subtitle"):
-            self._subtitle = self.group.name or "Add New Group"
-        return self._subtitle
-
-    @subtitle.setter
-    def subtitle(self, value):
-        """Provide status information after a save."""
-        self._subtitle = value
-
-    @property
+    @cached_property
     def users(self):
-        if not hasattr(self, "_users"):
-            self._users = {}
-            for name in self.session.list_users():
-                self._users[name] = self.session.User(self.session, name=name)
-        return self._users
+        """Active users for whom we generate checkboxes."""
+
+        users = {}
+        for name in self.session.list_users():
+            users[name] = self.session.User(self.session, name=name)
+        return users
 
     @staticmethod
     def action_group_name(action):

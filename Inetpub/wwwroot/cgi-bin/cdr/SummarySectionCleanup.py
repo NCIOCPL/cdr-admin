@@ -5,6 +5,7 @@
 See https://tracker.nci.nih.gov/browse/OCECDR-3804.
 """
 
+from functools import cached_property
 from cdrcgi import Controller
 from cdrapi.docs import Doc
 
@@ -18,6 +19,13 @@ class Control(Controller):
     T_PATH = "/Summary/TranslationOf/@cdr:ref"
     A_PATH = "/Summary/SummaryMetaData/SummaryAudience"
     L_PATH = "/Summary/SummaryMetaData/SummaryLanguage"
+    INSTRUCTIONS = (
+        "This report identifies paragraph-level elements which are "
+        "found outside of section elements, so that they can be moved "
+        "to an appropriate location. The report is intended to be run "
+        "on an onoing basis (or at least until all the misplaced elements "
+        "have been fixed)."
+    )
 
     def populate_form(self, page, titles=None):
         """Fill in the fields for the report request.
@@ -29,7 +37,10 @@ class Control(Controller):
                      form to select one of the summary titles)
         """
 
-        self.add_summary_selection_fields(page, titles=titles)
+        fieldset = page.fieldset("Instructions")
+        fieldset.append(page.B.P(self.INSTRUCTIONS))
+        page.form.append(fieldset)
+        self.add_summary_selection_fields(page, titles=self.summary_titles)
         page.add_output_options(default=self.format)
 
     def build_tables(self):
@@ -38,59 +49,47 @@ class Control(Controller):
         opts = dict(columns=self.columns, caption=self.subtitle)
         return self.Reporter.Table(self.rows, **opts)
 
-    @property
+    @cached_property
     def audience(self):
         """Patient or Health Professional."""
 
-        if not hasattr(self, "_audience"):
-            default = self.AUDIENCES[0]
-            self._audience = self.fields.getvalue("audience", default)
-            if self._audience not in self.AUDIENCES:
-                self.bail()
-        return self._audience
+        default = self.AUDIENCES[0]
+        audience = self.fields.getvalue("audience", default)
+        if audience not in self.AUDIENCES:
+            self.bail()
+        return audience
 
-    @property
+    @cached_property
     def board(self):
         """PDQ board(s) selected for the report."""
 
-        if not hasattr(self, "_board"):
-            boards = self.fields.getlist("board")
-            if not boards or "all" in boards:
-                self._board = ["all"]
-            else:
-                self._board = []
-                for id in boards:
-                    try:
-                        board = int(id)
-                    except Exception:
-                        self.bail()
-                    if board not in self.boards:
-                        self.bail()
-                    self._board.append(int(id))
-        return self._board
+        values = self.fields.getlist("board")
+        if not values or "all" in values:
+            return ["all"]
+        boards = []
+        for value in values:
+            try:
+                board = int(value)
+            except Exception:
+                self.logger.exception("Internal error: shouldn't happen.")
+                self.bail()
+            if board not in self.boards:
+                self.logger.error("Invalid board %d", board)
+                self.bail()
+            boards.append(board)
+        return boards
 
-    @property
+    @cached_property
     def boards(self):
         """For validation of the board selections."""
+        return self.get_boards()
 
-        if not hasattr(self, "_boards"):
-            self._boards = self.get_boards()
-        return self._boards
-
-    @property
+    @cached_property
     def cdr_id(self):
         """Integer for the summary document selected for the report."""
+        return self.fields.getvalue("cdr-id")
 
-        if not hasattr(self, "_cdr_id"):
-            self._cdr_id = self.fields.getvalue("cdr-id")
-            if self._cdr_id:
-                try:
-                    self._cdr_id = Doc.extract_id(self._cdr_id)
-                except Exception:
-                    self.bail("Invalid format for CDR ID")
-        return self._cdr_id
-
-    @property
+    @cached_property
     def columns(self):
         """Sequence of column definitions for the report table."""
 
@@ -100,53 +99,79 @@ class Control(Controller):
             self.Reporter.Column("Summary Sections", width="500px"),
         )
 
-    @property
+    @cached_property
     def fragment(self):
         """Title fragment provided for matching summaries."""
 
-        if not hasattr(self, "_fragment"):
-            self._fragment = self.fields.getvalue("title")
-        return self._fragment
+        if self.selection_method != "title":
+            return None
+        return self.fields.getvalue("title")
 
-    @property
+    @cached_property
     def language(self):
         """English or Spanish."""
 
-        if not hasattr(self, "_language"):
-            default = self.LANGUAGES[0]
-            self._language = self.fields.getvalue("language", default)
-            if self._language not in self.LANGUAGES:
-                self.bail()
-        return self._language
+        default = self.LANGUAGES[0]
+        language = self.fields.getvalue("language", default)
+        if language not in self.LANGUAGES:
+            self.bail()
+        return language
 
-    @property
+    @cached_property
+    def ready(self):
+        """True if we have what we need for the report."""
+
+        if not self.request:
+            return False
+        match self.selection_method:
+            case "id":
+                if not self.cdr_id:
+                    message = "CDR ID is required."
+                    self.alerts.append(dict(message=message, type="error"))
+                    return False
+                try:
+                    doc = Doc(self.session, id=self.cdr_id)
+                    if doc.doctype.name != "Summary":
+                        msg = f"CDR{doc.id} is a {doc.doctype} document."
+                        self.alerts.append(dict(message=msg, type="warning"))
+                        return False
+                    self.cdr_id = doc.id
+                except Exception:
+                    self.logger.exception(self.cdr_id)
+                    message = "Document {self.cdr_id} was not found."
+                    self.alerts.append(dict(message=message, type="error"))
+                    return False
+                return True
+            case "title":
+                if not self.fragment:
+                    message = "Title fragment is required."
+                    self.alerts.append(dict(message=message, type="error"))
+                    return False
+                if not self.summary_titles:
+                    message = "No summaries match that title fragment"
+                    self.alerts.append(dict(message=message, type="warning"))
+                    return False
+                return len(self.summary_titles) == 1
+            case "board":
+                return True
+            case _:
+                self.bail()
+
+    @cached_property
     def rows(self):
         """One row for each summary which has problem sections."""
         return [summary.row for summary in self.summaries if summary.sections]
 
-    @property
+    @cached_property
     def summaries(self):
         """Summaries selected by ID, title, or board."""
 
-        if not hasattr(self, "_summaries"):
-            if self.selection_method == "title":
-                if not self.fragment:
-                    self.bail("Title fragment is required.")
-                if not self.summary_titles:
-                    self.bail("No summaries match that title fragment")
-                if len(self.summary_titles) == 1:
-                    summary = Summary(self, self.summary_titles[0].id)
-                    self._summaries = [summary]
-                else:
-                    self.populate_form(self.form_page, self.summary_titles)
-                    self.form_page.send()
-            elif self.selection_method == "id":
-                if not self.cdr_id:
-                    self.bail("CDR ID is required.")
-                self._summaries = [Summary(self, self.cdr_id)]
-            else:
-                if not self.board:
-                    self.bail("At least one board is required.")
+        match self.selection_method:
+            case "id":
+                return [Summary(self, self.cdr_id)]
+            case "title":
+                return [Summary(self, self.summary_titles[0].id)]
+            case "board":
                 query = self.Query("active_doc d", "d.id")
                 query.join("query_term_pub a", "a.doc_id = d.id")
                 query.where(f"a.path = '{self.A_PATH}'")
@@ -166,9 +191,10 @@ class Control(Controller):
                 query.log(label="SummarySectionCleanup")
                 rows = query.unique().execute(self.cursor).fetchall()
                 summaries = [Summary(self, row.id) for row in rows]
-                self._summaries = sorted(summaries)
-                self.logger.info("found %d summaries", len(self._summaries))
-        return self._summaries
+                self.logger.info("found %d summaries", len(summaries))
+                return sorted(summaries)
+            case _:
+                self.bail()
 
 
 class Summary:
@@ -192,45 +218,29 @@ class Summary:
             doc_id - integer for the summary's CDR document ID
         """
 
-        self.__control = control
-        self.__doc_id = doc_id
+        self.control = control
+        self.id = doc_id
 
     def __lt__(self, other):
         """Support case-insensitive sorting of the summaries by title."""
         return self.key < other.key
 
-    @property
-    def control(self):
-        """Access to the DB and report options and creation tools."""
-        return self.__control
-
-    @property
+    @cached_property
     def doc(self):
         """`Doc` object for the CDR Summary document."""
+        return Doc(self.control.session, id=self.id)
 
-        if not hasattr(self, "_doc"):
-            self._doc = Doc(self.control.session, id=self.id)
-        return self._doc
-
-    @property
-    def id(self):
-        """Integer for the summary's CDR document ID."""
-        return self.__doc_id
-
-    @property
+    @cached_property
     def key(self):
         """Composite values for sorting."""
+        return self.title.lower(), self.id
 
-        if not hasattr(self, "_key"):
-            self._key = self.title.lower(), self.id
-        return self._key
-
-    @property
+    @cached_property
     def row(self):
         """Assemble the row for the report table."""
         return self.id, self.title, self.sections
 
-    @property
+    @cached_property
     def sections(self):
         """Sequence of string identifying anomalous summary sections.
 
@@ -251,33 +261,32 @@ class Summary:
 
         """
 
-        if not hasattr(self, "_sections"):
-            self._sections = []
-            prev_section_empty = False
-            for section in self.doc.root.iter("SummarySection"):
-                children = [c for c in section if isinstance(c.tag, str)]
-                tags = [child.tag for child in children]
-                if not children:
-                    self._sections.append("*** Empty Section ***")
-                    prev_section_empty = True
-                elif tags[0] == "Title":
-                    title = children[0].text or None
-                    if title is None or not title.strip():
-                        title = "EMPTY TITLE"
-                    if prev_section_empty:
-                        self._sections.append("*** %s" % title)
-                    if not (set(tags) & Summary.NORMAL_CONTENT):
-                        ancestors = [a.tag for a in section.iterancestors()]
-                        if "Insertion" not in ancestors:
-                            if not prev_section_empty:
-                                self._sections.append(title)
-                            self._sections.append(tags)
-                    prev_section_empty = False
-            if prev_section_empty:
-                self._sections.append("*** Last Section")
-        return self._sections
+        sections = []
+        prev_section_empty = False
+        for section in self.doc.root.iter("SummarySection"):
+            children = [c for c in section if isinstance(c.tag, str)]
+            tags = [child.tag for child in children]
+            if not children:
+                sections.append("*** Empty Section ***")
+                prev_section_empty = True
+            elif tags[0] == "Title":
+                title = children[0].text or None
+                if title is None or not title.strip():
+                    title = "EMPTY TITLE"
+                if prev_section_empty:
+                    sections.append("*** %s" % title)
+                if not (set(tags) & Summary.NORMAL_CONTENT):
+                    ancestors = [a.tag for a in section.iterancestors()]
+                    if "Insertion" not in ancestors:
+                        if not prev_section_empty:
+                            sections.append(title)
+                        sections.append(tags)
+                prev_section_empty = False
+        if prev_section_empty:
+            sections.append("*** Last Section")
+        return sections
 
-    @property
+    @cached_property
     def title(self):
         """String for the title of the summary document."""
         return self.doc.title

@@ -11,7 +11,7 @@ import datetime
 class Control(Controller):
     """Access to database, session, and report/form building."""
 
-    SUBTITLE = "Glossary Term Name Documents Modified Report"
+    SUBTITLE = "GTN Documents Modified Report"
     NAME_LABELS = {"en": "Term Name", "es": "Translated Term Name"}
     LANGUAGES = (("en", "English"), ("es", "Spanish"))
     STATUS_PATHS = dict(
@@ -118,7 +118,7 @@ class Control(Controller):
     @property
     def end(self):
         """End of the date range for the report."""
-        return self.fields.getvalue("end_date")
+        return self.parse_date(self.fields.getvalue("end_date"))
 
     @property
     def format(self):
@@ -152,7 +152,7 @@ class Control(Controller):
     @property
     def start(self):
         """Beginning of the date range for the report."""
-        return self.fields.getvalue("start_date")
+        return self.parse_date(self.fields.getvalue("start_date"))
 
     @property
     def status(self):

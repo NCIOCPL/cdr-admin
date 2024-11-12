@@ -3,15 +3,17 @@
 """Pass through resources from unsecured URLs.
 """
 
-from cdrcgi import Controller, sendPage
+from functools import cached_property
 from os import path
 from re import compile
 from sys import stdout
-import requests
 from urllib.parse import urlparse
+from requests import get
+from cdrcgi import Controller
 
 # TODO: Get Acquia to fix their broken certificates.
 from urllib3.exceptions import InsecureRequestWarning
+import requests
 # pylint: disable-next=no-member
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
@@ -81,26 +83,23 @@ class Control(Controller):
                 src = f"{self.relative_base}/{src}"
         return f'url("{self.PROXY}?url={src}")'
 
-    @property
+    @cached_property
     def absolute_base(self):
         """Start of a URL to which we can attach an absolute path."""
 
         return f"{self.parsed_url.scheme}://{self.parsed_url.netloc}"
 
-    @property
+    @cached_property
     def content_type(self):
         """Turned around from the proxied source."""
         return self.response.headers.get("content-type", "text/plain")
 
-    @property
+    @cached_property
     def parsed_url(self):
         """Access to the components of the url which we are proxying."""
+        return urlparse(self.url)
 
-        if not hasattr(self, "_parsed_url"):
-            self._parsed_url = urlparse(self.url)
-        return self._parsed_url
-
-    @property
+    @cached_property
     def payload(self):
         """Bytes ready to be returned to the user's browser.
 
@@ -113,36 +112,29 @@ class Control(Controller):
         even less robust, but at least it will work with IE.
         """
 
-        if not hasattr(self, "_payload"):
-            self._payload = self.response.content
-            if "css" in self.content_type:
-                original = self._payload.decode("utf-8")
-                modified = self.PATTERN.sub(self.callback, original)
-                self._payload = modified.encode("utf-8")
-        return self._payload
+        payload = self.response.content
+        if "css" not in self.content_type:
+            return payload
+        original = payload.decode("utf-8")
+        modified = self.PATTERN.sub(self.callback, original)
+        return modified.encode("utf-8")
 
-    @property
+    @cached_property
     def relative_base(self):
         """Start of a URL to which we can attach a relative path."""
 
         segments = path.split(self.parsed_url.path)
         return f"{self.absolute_base}{segments[0]}"
 
-    @property
+    @cached_property
     def response(self):
         """What we get back from the URL we're proxying."""
+        return get(self.url, verify=False)
 
-        if not hasattr(self, "_response"):
-            self._response = requests.get(self.url, verify=False)
-        return self._response
-
-    @property
+    @cached_property
     def url(self):
         """The resource we're tunneling."""
-
-        if not hasattr(self, "_url"):
-            self._url = self.fields.getvalue("url")
-        return self._url
+        return self.fields.getvalue("url")
 
 
 if __name__ == "__main__":
@@ -153,4 +145,4 @@ if __name__ == "__main__":
         control.run()
     except Exception:
         control.logger.exception("Failure")
-        sendPage("", textType="plain")
+        control.send_page("", textType="plain")

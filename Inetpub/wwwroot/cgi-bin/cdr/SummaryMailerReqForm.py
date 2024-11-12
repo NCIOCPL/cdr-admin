@@ -4,6 +4,7 @@
 """
 
 from datetime import datetime
+from functools import cached_property
 from json import dumps
 from operator import attrgetter
 from lxml import etree
@@ -19,7 +20,6 @@ class Control(Controller):
     requested tracking documents.
     """
 
-    SUBMENU = "Mailer Menu"
     SUBTITLE = "PDQ Advisory Board Members Tracking Request Form"
     LOGNAME = "advisory-board-trackers"
     INSTRUCTIONS = (
@@ -48,8 +48,6 @@ class Control(Controller):
 
         if not self.session.can_do("SUMMARY MAILERS"):
             self.bail("User not authorized to create Summary mailers")
-        if self.request == self.SUBMENU:
-            return self.redirect("Mailers.py")
         elif self.request == self.SUBMIT:
             if self.selection_method == "all" or self.pairs:
                 return self.show_report()
@@ -118,7 +116,7 @@ class Control(Controller):
         fieldset.append(page.select("board", **opts))
         page.form.append(fieldset)
         fieldset = page.fieldset("Selection Method", id="method-block")
-        fieldset.set("class", "hidden")
+        fieldset.set("class", "hidden usa-fieldset")
         all = "Send All Summaries to all Board Members"
         opts = dict(label=all, value="all", checked=True)
         fieldset.append(page.radio_button("selection_method", **opts))
@@ -128,7 +126,7 @@ class Control(Controller):
         fieldset.append(page.radio_button("selection_method", **opts))
         page.form.append(fieldset)
         fieldset = page.fieldset("Choose Member(s)", id="members-block")
-        fieldset.set("class", "hidden")
+        fieldset.set("class", "hidden usa-fieldset")
         opts = dict(tooltip="Hold down the control (Ctrl) key while "
                     "left-clicking to select multiple board members",
                     multiple=True, classes="taller", onchange="memchg()")
@@ -136,7 +134,7 @@ class Control(Controller):
         page.form.append(fieldset)
         fieldset = page.fieldset("Choose One Or More Summaries(s)")
         fieldset.set("id", "summaries-block")
-        fieldset.set("class", "hidden")
+        fieldset.set("class", "hidden usa-fieldset")
         opts = dict(tooltip="Hold down the control (Ctrl) key while "
                     "left-clicking to select multiple summaries",
                     multiple=True, classes="taller", onchange="sumchg()")
@@ -144,7 +142,6 @@ class Control(Controller):
         page.form.append(fieldset)
         self.add_script(page)
         page.add_css("select.taller { height: 150px; }")
-        page.send()
 
     def show_candidates(self):
         """Put up a cascading second form.
@@ -163,11 +160,13 @@ class Control(Controller):
         page.form.append(page.hidden_field(*args))
         page.form.append(page.hidden_field("board", self.board.id))
         fieldset = page.fieldset(self.board.name)
-        div = page.B.DIV(id="extra-buttons")
-        opts = dict(type="button", onclick="check_all()")
-        div.append(page.B.BUTTON("Check All", **opts))
-        opts["onclick"] = "clear_all()"
-        div.append(page.B.BUTTON("Clear All", **opts))
+        div = page.B.DIV(page.B.CLASS("margin-bottom-3"), id="extra-buttons")
+        div.append(page.button("Submit"))
+        classes = "button usa-button margin-right-1"
+        opts = dict(type="button", onclick="check_all();")
+        div.append(page.B.BUTTON("Check All", page.B.CLASS(classes), **opts))
+        opts["onclick"] = "clear_all();"
+        div.append(page.B.BUTTON("Clear All", page.B.CLASS(classes), **opts))
         fieldset.append(div)
         self.board.show_choices(page, fieldset)
         page.form.append(fieldset)
@@ -192,13 +191,10 @@ function outer_clicked(id) {
     else
         jQuery(".inner-" + id).prop("checked", false);
 }""")
-
-        page.add_css("""\
-fieldset { width: 750px; padding-bottom: 25px; }
-.outer-cb { margin-top: 15px; }
-.inner-cb { margin-left: 15px; }
-#extra-buttons { margin: 15px 0 5px 25px; }
-#extra-buttons button { margin-right: 5px; }""")
+        page.add_css(
+            ".outer-cb { margin-top: 2rem; }\n"
+            ".inner-cb { margin-left: 1rem; }\n"
+        )
         page.send()
 
     def add_instructions(self, page):
@@ -286,7 +282,8 @@ function board_change() {
         return;
     }
     jQuery('#method-block').show();
-    check_selection_method(jQuery('input[name=selection_method]:checked').val());
+    var method = jQuery('input[name=selection_method]:checked').val();
+    check_selection_method(method);
     var board = boards[board_id];
     var members = jQuery('#members');
     var summaries = jQuery('#summaries');
@@ -305,47 +302,48 @@ function board_change() {
 }
 jQuery(document).ready(function() { board_change(); });""")
 
-    @property
+    @cached_property
     def board(self):
         "Load selected board, if any."
 
-        if not hasattr(self, "_board"):
-            self._board = None
-            board_id = self.fields.getvalue("board")
-            if board_id:
-                if not board_id.isdigit():
-                    self.bail()
-                self._board = self.boards.get(int(board_id))
-                if not self._board:
-                    self.bail()
-        return self._board
+        board_id = self.fields.getvalue("board")
+        if not board_id:
+            return None
+        if not board_id.isdigit():
+            self.bail()
+        board = self.boards.get(int(board_id))
+        if not board:
+            self.bail()
+        return board
 
-    @property
+    @cached_property
     def board_list(self):
         "Generate a picklist for the PDQ Advisory Boards"
+
         boards = sorted(self.boards.values())
         return [("", "Choose One")] + [(b.id, b.name) for b in boards]
 
-    @property
+    @cached_property
     def board_objects(self):
         """Create JavaScript for a list of Board objects."""
 
-        return """\
-function Board(id, boardType, members, summaries) {
+        objects = ",\n".join([self.boards[key].script for key in self.boards])
+        return f"""\
+function Board(id, boardType, members, summaries) {{
     this.id        = id;
     this.boardType = boardType;
     this.members   = members;
     this.summaries = summaries;
-}
-function Choice(label, value) {
+}}
+function Choice(label, value) {{
     this.label = label;
     this.value = value;
-}
-var boards = {
-%s
-};""" % ",\n".join([self.boards[key].script for key in self.boards])
+}}
+var boards = {{
+{objects}
+}};"""
 
-    @property
+    @cached_property
     def boards(self):
         """
         Find out which boards have which summaries and which board members.
@@ -355,83 +353,80 @@ var boards = {
         generation software expects).
         """
 
-        if not hasattr(self, "_boards"):
-            boards = {}
-            i_path = "/PDQBoardMemberInfo"
-            p_path = f"{i_path}/BoardMemberName/@cdr:ref"
-            c_path = f"{i_path}/BoardMembershipDetails/CurrentMember"
-            b_path = f"{i_path}/BoardMembershipDetails/BoardName/@cdr:ref"
-            t_path = "/Organization/OrganizationType"
-            fields = "p.int_val", "b.int_val", "d.title"
-            query = self.Query("active_doc d", *fields)
-            query.join("doc_version v", "v.id = d.id")
-            query.join("query_term c", "c.doc_id = d.id")
-            query.join("query_term b", "b.doc_id = c.doc_id "
-                       "AND LEFT(b.node_loc, 4) = LEFT(c.node_loc, 4)")
-            query.join("active_doc active_board",
-                       "active_board.id = b.int_val")
-            query.join("query_term p", "p.doc_id = d.id")
-            query.join("query_term t", "t.doc_id = b.int_val")
-            query.where(query.Condition("v.val_status", "V"))
-            query.where(query.Condition("c.path", c_path))
-            query.where(query.Condition("b.path", b_path))
-            query.where(query.Condition("t.path", t_path))
-            query.where(query.Condition("p.path", p_path))
-            query.where(query.Condition("c.value", "Yes"))
-            query.where("t.value = 'PDQ Advisory Board'")
-            query.unique()
-            rows = query.execute(self.cursor).fetchall()
-            for member_id, board_id, doc_title in rows:
-                board = boards.get(board_id)
-                if not board:
-                    board = boards[board_id] = Board(self, board_id)
-                args = self, board, member_id, doc_title
-                board.members[member_id] = BoardMember(*args)
+        boards = {}
+        i_path = "/PDQBoardMemberInfo"
+        p_path = f"{i_path}/BoardMemberName/@cdr:ref"
+        c_path = f"{i_path}/BoardMembershipDetails/CurrentMember"
+        b_path = f"{i_path}/BoardMembershipDetails/BoardName/@cdr:ref"
+        t_path = "/Organization/OrganizationType"
+        fields = "p.int_val", "b.int_val", "d.title"
+        query = self.Query("active_doc d", *fields)
+        query.join("doc_version v", "v.id = d.id")
+        query.join("query_term c", "c.doc_id = d.id")
+        query.join("query_term b", "b.doc_id = c.doc_id "
+                   "AND LEFT(b.node_loc, 4) = LEFT(c.node_loc, 4)")
+        query.join("active_doc active_board",
+                   "active_board.id = b.int_val")
+        query.join("query_term p", "p.doc_id = d.id")
+        query.join("query_term t", "t.doc_id = b.int_val")
+        query.where(query.Condition("v.val_status", "V"))
+        query.where(query.Condition("c.path", c_path))
+        query.where(query.Condition("b.path", b_path))
+        query.where(query.Condition("t.path", t_path))
+        query.where(query.Condition("p.path", p_path))
+        query.where(query.Condition("c.value", "Yes"))
+        query.where("t.value = 'PDQ Advisory Board'")
+        query.unique()
+        rows = query.execute(self.cursor).fetchall()
+        for member_id, board_id, doc_title in rows:
+            board = boards.get(board_id)
+            if not board:
+                board = boards[board_id] = Board(self, board_id)
+            args = self, board, member_id, doc_title
+            board.members[member_id] = BoardMember(*args)
 
-            # Can't use placeholders in queries with subqueries because
-            # of a Microsoft bug. OK because we control all of the
-            # string values being tested.
-            b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
-            a_path = "/Summary/SummaryMetaData/SummaryAudience"
-            subquery = self.Query("document d", "d.id").unique()
-            subquery.join("query_term t", "t.doc_id = d.id")
-            subquery.where("t.path = '%s'" % t_path)
-            subquery.where("t.value = 'PDQ Advisory Board'")
-            cols = "d.id", "MAX(v.num)", "b.int_val", "d.title"
-            query = self.Query("active_doc d", *cols)
-            query.join("doc_version v", "v.id = d.id")
-            query.join("query_term b", "b.doc_id = d.id")
-            query.join("active_doc active_board",
-                       "active_board.id = b.int_val")
-            query.join("query_term a", "a.doc_id = d.id")
-            query.where("v.publishable = 'Y'")
-            query.where(query.Condition("b.int_val", subquery, "IN"))
-            query.where("b.path = '%s'" % b_path)
-            query.where("a.path = '%s'" % a_path)
-            query.where("a.value = 'Health professionals'")
-            query.group("d.id", "d.title", "b.int_val")
-            rows = query.execute(self.cursor).fetchall()
-            for doc_id, doc_version, board_id, doc_title in rows:
-                board = boards.get(board_id)
-                if not board:
-                    board = boards[board_id] = Board(self, board_id)
-                args = self, board, doc_id, doc_title
-                board.summaries[doc_id] = BoardSummary(*args)
-            self._boards = boards
-        return self._boards
+        # Can't use placeholders in queries with subqueries because
+        # of a Microsoft bug. OK because we control all of the
+        # string values being tested.
+        b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
+        a_path = "/Summary/SummaryMetaData/SummaryAudience"
+        subquery = self.Query("document d", "d.id").unique()
+        subquery.join("query_term t", "t.doc_id = d.id")
+        subquery.where("t.path = '%s'" % t_path)
+        subquery.where("t.value = 'PDQ Advisory Board'")
+        cols = "d.id", "MAX(v.num)", "b.int_val", "d.title"
+        query = self.Query("active_doc d", *cols)
+        query.join("doc_version v", "v.id = d.id")
+        query.join("query_term b", "b.doc_id = d.id")
+        query.join("active_doc active_board",
+                   "active_board.id = b.int_val")
+        query.join("query_term a", "a.doc_id = d.id")
+        query.where("v.publishable = 'Y'")
+        query.where(query.Condition("b.int_val", subquery, "IN"))
+        query.where("b.path = '%s'" % b_path)
+        query.where("a.path = '%s'" % a_path)
+        query.where("a.value = 'Health professionals'")
+        query.group("d.id", "d.title", "b.int_val")
+        rows = query.execute(self.cursor).fetchall()
+        for doc_id, _, board_id, doc_title in rows:
+            board = boards.get(board_id)
+            if not board:
+                board = boards[board_id] = Board(self, board_id)
+            args = self, board, doc_id, doc_title
+            board.summaries[doc_id] = BoardSummary(*args)
+        return boards
 
-    @property
+    @cached_property
     def members(self):
         """Board members selected by the user."""
 
-        if not hasattr(self, "_members"):
-            self._members = self.fields.getlist("members") or ["all"]
-            for value in self._members:
-                if value != "all" and not value.isdigit():
-                    self.bail()
-        return self._members
+        members = self.fields.getlist("members") or ["all"]
+        for value in members:
+            if value != "all" and not value.isdigit():
+                self.bail()
+        return members
 
-    @property
+    @cached_property
     def pairs(self):
         """Summary/board member ID pairs selected by the user.
 
@@ -439,30 +434,26 @@ var boards = {
         (cascading) form.
         """
 
-        if not hasattr(self, "_pairs"):
-            self._pairs = self.fields.getlist("pairs")
-            for pair in self._pairs:
-                ids = pair.split("-")
-                if len(ids) != 2:
+        pairs = self.fields.getlist("pairs")
+        for pair in pairs:
+            ids = pair.split("-")
+            if len(ids) != 2:
+                self.bail()
+            for id in ids:
+                if not id.isdigit():
                     self.bail()
-                for id in ids:
-                    if not id.isdigit():
-                        self.bail()
-        return self._pairs
+        return pairs
 
-    @property
+    @cached_property
     def selection_method(self):
         """How the user wants to make the initial summary/member selection."""
 
-        if not hasattr(self, "_selection_method"):
-            method = self.fields.getvalue("selection_method") or "all"
-            valid = {"all", "summary", "member"}
-            if method not in valid:
-                self.bail()
-            self._selection_method = method
-        return self._selection_method
+        method = self.fields.getvalue("selection_method") or "all"
+        if method not in {"all", "summary", "member"}:
+            self.bail()
+        return method
 
-    @property
+    @cached_property
     def subtitle(self):
         """Figure out what to display under the main banner."""
 
@@ -471,16 +462,15 @@ var boards = {
                 return "Tracker Documents Generated"
         return self.SUBTITLE
 
-    @property
+    @cached_property
     def summaries(self):
         """Summaries selected by the user."""
 
-        if not hasattr(self, "_summaries"):
-            self._summaries = self.fields.getlist("summaries") or ["all"]
-            for value in self._summaries:
-                if value != "all" and not value.isdigit():
-                    self.bail()
-        return self._summaries
+        summaries = self.fields.getlist("summaries") or ["all"]
+        for value in summaries:
+            if value != "all" and not value.isdigit():
+                self.bail()
+        return summaries
 
 
 class Board:
@@ -502,8 +492,8 @@ class Board:
             doc_id - integer for the board's unique CDR document ID
         """
 
-        self.__control = control
-        self.__doc_id = doc_id
+        self.control = control
+        self.id = doc_id
 
     def __lt__(self, other):
         "Support sorting the boards alphabetically by name."
@@ -577,70 +567,49 @@ class Board:
                 msg = "None of the selected summaries have any board members"
             self.control.bail(msg)
 
-    @property
-    def control(self):
-        """Access to the database and the user's selections."""
-        return self.__control
-
-    @property
-    def id(self):
-        """Integer for the board's unique CDR document ID."""
-        return self.__doc_id
-
-    @property
+    @cached_property
     def members(self):
         """Dictionary of members of this board."""
+        return {}
 
-        if not hasattr(self, "_members"):
-            self._members = {}
-        return self._members
-
-    @property
+    @cached_property
     def name(self):
         """String for the board's name."""
 
-        if not hasattr(self, "_name"):
-            query = self.control.Query("query_term", "value")
-            query.where(query.Condition("path", self.N_PATH))
-            query.where(query.Condition("doc_id", self.id))
-            rows = query.execute(self.control.cursor).fetchall()
-            if not rows:
-                message = f"No name found for board document CDR{self.id:d}"
-                self.control.bail(message)
-            self._name = rows[0][0]
-        return self._name
+        query = self.control.Query("query_term", "value")
+        query.where(query.Condition("path", self.N_PATH))
+        query.where(query.Condition("doc_id", self.id))
+        rows = query.execute(self.control.cursor).fetchall()
+        if not rows:
+            message = f"No name found for board document CDR{self.id:d}"
+            self.control.bail(message)
+        return rows[0][0]
 
-    @property
+    @cached_property
     def summaries(self):
         """Dictionary of summaries managed by this board."""
+        return {}
 
-        if not hasattr(self, "_summaries"):
-            self._summaries = {}
-        return self._summaries
-
-    @property
+    @cached_property
     def type(self):
         """String for board's type (editorial or advisory)."""
 
-        if not hasattr(self, "_type"):
-            org_types = ("PDQ Editorial Board", "PDQ Advisory Board")
-            query = self.control.Query("query_term", "value")
-            query.where(query.Condition("path", self.O_PATH))
-            query.where(query.Condition("value", org_types, "IN"))
-            query.where(query.Condition("doc_id", self.id))
-            rows = query.execute(self.control.cursor).fetchall()
-            if not rows:
-                self.control.bail(f"Can't find board type for {self.name!r}")
-            if len(rows) > 1:
-                message = f"Multiple board types found for {self.name!r}"
-                self.control.bail(message)
-            if rows[0][0].upper() == 'PDQ EDITORIAL BOARD':
-                self._type = 'editorial'
-            else:
-                self._type = 'advisory'
-        return self._type
+        org_types = ("PDQ Editorial Board", "PDQ Advisory Board")
+        query = self.control.Query("query_term", "value")
+        query.where(query.Condition("path", self.O_PATH))
+        query.where(query.Condition("value", org_types, "IN"))
+        query.where(query.Condition("doc_id", self.id))
+        rows = query.execute(self.control.cursor).fetchall()
+        if not rows:
+            self.control.bail(f"Can't find board type for {self.name!r}")
+        if len(rows) > 1:
+            message = f"Multiple board types found for {self.name!r}"
+            self.control.bail(message)
+        if rows[0][0].upper() == 'PDQ EDITORIAL BOARD':
+            return 'editorial'
+        return 'advisory'
 
-    @property
+    @cached_property
     def script(self):
         """
         Create the Javascript objects which are used at runtime to
@@ -655,10 +624,10 @@ class Board:
         if summaries:
             summaries = glue.join([s.script for s in sorted(summaries)])
             summaries = "\n        %s" % summaries
-        return """\
-    '%s': new Board('%s', '%s', [%s
-    ], [%s
-    ])""" % (self.id, self.id, self.type, members, summaries)
+        return f"""\
+    '{self.id}': new Board('{self.id}', '{self.type}', [{members}
+    ], [{summaries}
+    ])"""
 
 
 class Choice:
@@ -680,44 +649,26 @@ class Choice:
             doc_title - string for the member or summary title
         """
 
-        self.__control = control
-        self.__board = board
-        self.__id = id
-        self.__doc_title = doc_title
+        self.control = control
+        self.board = board
+        self.id = id
+        self.doc_title = doc_title
 
     def __lt__(self, other):
         """Sort the choices by their names."""
         return self.name < other.name
 
-    @property
-    def board(self):
-        """Board object for the user's board selection."""
-        return self.__board
-
-    @property
-    def control(self):
-        """Access to the database and the user's selections."""
-        return self.__control
-
-    @property
-    def id(self):
-        """Integer for the board's member or summary."""
-        return self.__id
-
-    @property
+    @cached_property
     def name(self):
         """Parse the front part of the title for a name."""
+        return self.doc_title.split(self.NAME_DELIM)[0].strip()
 
-        if not hasattr(self, "_name"):
-            self._name = self.__doc_title.split(self.NAME_DELIM)[0].strip()
-        return self._name
-
-    @property
+    @cached_property
     def script(self):
         """Create JavaScript object for the choice."""
         return f"""new Choice({dumps(self.name)}, "{self.id}")"""
 
-    @property
+    @cached_property
     def checkbox_ids(self):
         raise Exception("Property checkbox_ids method must be overridden.")
 
@@ -731,7 +682,7 @@ class BoardMember(Choice):
 
     NAME_DELIM = "("
 
-    @property
+    @cached_property
     def checkbox_ids(self):
         """
         Find the document IDs of the summaries for which this board
@@ -754,7 +705,7 @@ class BoardMember(Choice):
 class BoardSummary(Choice):
     """Option for picklist of PDQ summaries for a single board."""
 
-    @property
+    @cached_property
     def checkbox_ids(self):
         """
         Find the document IDs of the members of this board who are
@@ -776,7 +727,7 @@ class BoardSummary(Choice):
 
 class Tracker:
     """
-    CDR document used to track review of a summary by an advisory board member
+    CDR document used to track review of a summary by an advisory board member.
     """
 
     NS = "cips.nci.nih.gov/cdr"
@@ -799,38 +750,31 @@ class Tracker:
           reviewer - Doc object for the board member
         """
 
-        self.__session = session
-        self.__summary = summary_id
-        self.__reviewer = reviewer_id
+        self.session = session
+        self.summary_id = summary_id
+        self.reviewer_id = reviewer_id
 
-    @property
-    def session(self):
-        """Object for the user's CDR login session."""
-        return self.__session
-
-    @property
+    @cached_property
     def summary(self):
         """CDR API `Doc` object for the tracker's PDQ Summary."""
 
-        if not hasattr(self, "_summary"):
-            self._summary = Tracker.summaries.get(self.__summary)
-            if not self._summary:
-                doc = Doc(self.session, id=self.__summary)
-                self._summary = Tracker.summaries[self.__summary] = doc
-        return self._summary
+        summary = Tracker.summaries.get(self.summary_id)
+        if not summary:
+            doc = Doc(self.session, id=self.summary_id)
+            summary = Tracker.summaries[self.summary_id] = doc
+        return summary
 
-    @property
+    @cached_property
     def reviewer(self):
         """CDR API `Doc` object for the tracker's board member."""
 
-        if not hasattr(self, "_reviewer"):
-            self._reviewer = Tracker.reviewers.get(self.__reviewer)
-            if not self._reviewer:
-                doc = Doc(self.session, id=self.__reviewer)
-                self._reviewer = Tracker.summaries[self.__reviewer] = doc
-        return self._reviewer
+        reviewer = Tracker.reviewers.get(self.reviewer_id)
+        if not reviewer:
+            doc = Doc(self.session, id=self.reviewer_id)
+            reviewer = Tracker.reviewers[self.reviewer_id] = doc
+        return reviewer
 
-    @property
+    @cached_property
     def xml(self):
         """
         Serialized XML for the new CDR document encoded as UTF-8
@@ -862,4 +806,8 @@ class Tracker:
 
 
 if __name__ == "__main__":
-    Control().run()
+    control = Control()
+    try:
+        control.run()
+    except Exception:
+        control.logger.exception("failure:")

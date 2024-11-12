@@ -3,22 +3,25 @@
 """Generate report of statistics on the most recent weekly export job.
 """
 
+from functools import cached_property
 from cdrcgi import Controller
 
 
 class Control(Controller):
     """Report logic."""
 
-    def populate_form(self, page):
-        """Skip the form, which isn't needed for this report."""
-        self.show_report()
+    SUBTITLE = "Publishing Count By Doctype"
 
-    def build_tables(self):
-        """Create the only table needed for the report."""
+    def populate_form(self, page):
+        """Show the table directly.
+
+        Required positional argument:
+          page - HTMLPage instance
+        """
 
         rows = []
         total = 0
-        for doc_type in self.counts:
+        for doc_type in sorted(self.counts):
             count = self.counts[doc_type]
             total += count
             row = (
@@ -32,24 +35,31 @@ class Control(Controller):
         )
         rows.append(row)
         columns = "Document Type", "Count"
-        caption = f"Documents Exported By Job {self.job}"
+        caption = f"Exported By The Latest Weekly Export Job (#{self.job})"
         table = self.Reporter.Table(rows, columns=columns, caption=caption)
-        return table
+        page.form.append(table.node)
+        page.add_css(
+            "form table { width: 60%; }\n"
+            "th:last-child { text-align: right; }\n"
+        )
 
     @property
+    def buttons(self):
+        """No buttons needed."""
+        return []
+
+    @cached_property
     def counts(self):
         """Find the number of documents publishing for each document type."""
 
-        if not hasattr(self, "_counts"):
-            query = self.Query("doc_type t", "t.name", "COUNT(*) AS n")
-            query.join("document d", "d.doc_type = t.id")
-            query.join("pub_proc_doc p", "p.doc_id = d.id")
-            query.where(query.Condition("pub_proc", self.job))
-            query.where("p.failure IS NULL")
-            query.group("t.name")
-            rows = query.execute(self.cursor).fetchall()
-            self._counts = dict([tuple(row) for row in rows])
-        return self._counts
+        query = self.Query("doc_type t", "t.name", "COUNT(*) AS n")
+        query.join("document d", "d.doc_type = t.id")
+        query.join("pub_proc_doc p", "p.doc_id = d.id")
+        query.where(query.Condition("pub_proc", self.job))
+        query.where("p.failure IS NULL")
+        query.group("t.name")
+        rows = query.execute(self.cursor).fetchall()
+        return dict([tuple(row) for row in rows])
 
     @property
     def job(self):

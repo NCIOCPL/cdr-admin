@@ -4,7 +4,7 @@
 """
 
 from cdrapi.docs import Doc
-from cdrcgi import Controller, navigateTo, DOCID
+from cdrcgi import Controller
 from difflib import Differ
 from lxml import etree
 from requests import post
@@ -23,11 +23,6 @@ class Control(Controller):
         "of one of the documents has been seriously mangled.",
     )
     CSS = (
-        "pre {"
-        "    border: solid #936 2px; font-size: 12px; padding: 12px; ",
-        "    width: 700px; margin: 25px auto; ",
-        "}",
-        "fieldset { width: 700px; }",
         ".del { background-color: #fafad2; } /* light goldenrod yellow */",
         ".add { background-color: #f0e68c; } /* khaki */",
         ".pnt { background-color: #87cefa; } /* light sky blue */",
@@ -42,7 +37,7 @@ class Control(Controller):
         """Override the base class version, as this isn't a standard report."""
 
         if not self.doc or self.request == self.FILTERS:
-            navigateTo("EditFilters.py", self.session.name)
+            self.navigate_to("EditFilters.py", self.session.name)
         elif not self.request or self.request in (self.VIEW, self.COMPARE):
             self.show_form()
         else:
@@ -55,7 +50,7 @@ class Control(Controller):
             page - HTMLPage object on which the form and filter are placed
         """
 
-        page.form.append(page.hidden_field(DOCID, self.doc.id))
+        page.form.append(page.hidden_field(self.DOCID, self.doc.id))
         fieldset = page.fieldset("Select Stage For Filter Comparison")
         for tier in self.TIERS:
             if tier != self.session.tier.name:
@@ -73,25 +68,26 @@ class Control(Controller):
         fieldset.append(page.checkbox("options", **opts))
         page.form.append(fieldset)
         if self.diff is not None:
-            page.form.append(self.diff)
+            fieldset = page.fieldset("Filter Comparison")
+            fieldset.append(self.diff)
         else:
-            page.form.append(page.B.PRE(self.doc.xml.strip()))
+            fieldset = page.fieldset("Filter Document")
+            fieldset.append(page.B.PRE(self.doc.xml.strip()))
+        page.form.append(fieldset)
         page.add_css("\n".join(self.CSS))
+
+    @property
+    def same_window(self):
+        """We're already in a separate tab; don't open any more."""
+        return self.COMPARE, self.FILTERS, self.VIEW
 
     @property
     def buttons(self):
         """Customize the command buttons."""
 
-        buttons = [
-            self.COMPARE,
-            self.FILTERS,
-            self.DEVMENU,
-            self.ADMINMENU,
-            self.LOG_OUT,
-        ]
         if self.request and self.request != self.VIEW:
-            buttons.insert(0, self.VIEW)
-        return buttons
+            return self.VIEW, self.COMPARE, self.FILTERS
+        return self.COMPARE, self.FILTERS
 
     @property
     def default_tier(self):
@@ -152,7 +148,7 @@ class Control(Controller):
         """`Doc` object for filter to display or compare."""
 
         if not hasattr(self, "_doc"):
-            id = self.fields.getvalue(DOCID)
+            id = self.fields.getvalue(self.DOCID)
             if not id:
                 self.bail()
             self._doc = Doc(self.session, id=id)

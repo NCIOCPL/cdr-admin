@@ -6,13 +6,13 @@
 from functools import cached_property
 from html import escape as html_escape
 from re import findall, split, sub
-from sys import stdout
+from sys import stdout, exit as sys_exit
 from lxml import etree, html
 from requests import get
 from cdr import getDoc, IdAndName, lastVersions, listVersions
 from cdrapi.docs import Doc
 from cdrapi.settings import Tier
-from cdrcgi import Controller, HTMLPage
+from cdrcgi import Controller, BasicWebPage, HTMLPage
 
 
 class Control(Controller):
@@ -54,6 +54,7 @@ class Control(Controller):
         "Content-disposition: attachment; filename={}\n\n{}"
     )
     CSS = (
+        "h1 { font-size: 1.2em; margin: 1rem 0; }",
         ".tag { color: blue; font-weight: bold }",
         ".name { color: brown }",
         ".value { color: red }",
@@ -108,35 +109,20 @@ class Control(Controller):
             raw = self.RAW.format(name, self.xml)
             stdout.buffer.write(raw.encode("utf-8"))
         else:
-            subtitle = f"CDR Document {cdr_id}"
+            title = f"CDR Document {cdr_id}"
             if self.version:
-                subtitle += f" (version {self.version})"
-            buttons = (
-                HTMLPage.button(self.SUBMENU),
-                HTMLPage.button(self.ADMINMENU),
-                HTMLPage.button(self.LOG_OUT),
-            )
-            opts = dict(
-                subtitle=subtitle,
-                session=self.session,
-                action=self.script,
-                buttons=buttons,
-            )
-
-            class Page(HTMLPage):
-                """Customized for raw HTML block."""
-                def __init__(self, pre, title, **opts):
-                    self.__pre = pre
-                    HTMLPage.__init__(self, title, **opts)
-
-                def tostring(self):
-                    opts = dict(self.STRING_OPTS, encoding="unicode")
-                    string = html.tostring(self.html, **opts)
-                    return string.replace("@@PRE@@", self.__pre)
-            page = Page(self.display, self.TITLE, **opts)
-            page.form.append(page.B.PRE("@@PRE@@"))
-            page.add_css("\n".join(self.CSS))
-            page.send()
+                title += f" (version {self.version})"
+            report = BasicWebPage()
+            report.head.append(report.B.STYLE("\n".join(self.CSS)))
+            # report.body.remove(report.wrapper)
+            report.wrapper.append(report.B.H1(title))
+            report.wrapper.append(report.B.PRE("@@PRE@@"))
+            opts = dict(HTMLPage.STRING_OPTS, encoding="unicode")
+            page = html.tostring(report.page, **opts)
+            page = page.replace("@@PRE@@", self.display)
+            string = f"Content-type: text/html;charset=utf-8\n\n{page}"
+            stdout.buffer.write(string.encode("utf-8"))
+            sys_exit(0)
 
     @staticmethod
     def markup_tag(match):
@@ -210,7 +196,7 @@ class Control(Controller):
         if not self.id:
             if self.request:
                 message = "Document ID is required."
-                return self.bail(message)
+                self.alerts.append(dict(message=message, type="error"))
             return False
         try:
             int_id = int(self.id)
@@ -218,30 +204,35 @@ class Control(Controller):
         except Exception:
             self.logger.exception("id=%s", self.id)
             message = f"Invalid document id {self.id!r}."
-            return self.bail(message)
+            self.alerts.append(dict(message=message, type="error"))
+            return False
         try:
             last_version, last_pub_version, _ = self.versions
         except Exception:
             message = f"CDR{self.id} not found on {self.tier}."
-            return self.bail(message)
+            self.alerts.append(dict(message=message, type="error"))
+            return False
         if self.version == "pub":
             if last_pub_version < 1:
                 message = (
                     f"CDR{self.id} has no publishable version on {self.tier}."
                 )
-                return self.bail(message)
+                self.alerts.append(dict(message=message, type="error"))
+                return False
             self.version = last_pub_version
         elif self.version == "last":
             if last_version < 1:
                 message = f"CDR{self.id} has no versions on {self.tier}."
-                return self.bail(message)
+                self.alerts.append(dict(message=message, type="error"))
+                return False
             self.version = last_version
         elif self.version:
             try:
                 version = int(self.version)
             except Exception:
                 message = f"Invalid version {self.version!r}."
-                return self.bail(message)
+                self.alerts.append(dict(message=message, type="error"))
+                return False
             if version == 0:
                 self.version = None
             elif version < 0:
@@ -252,7 +243,8 @@ class Control(Controller):
                         f"CDR{self.id} only has {len(versions)} "
                         f"versions on {self.tier}."
                     )
-                    return self.bail(message)
+                    self.alerts.append(dict(message=message, type="error"))
+                    return False
                 self.version = versions[-1][0]
             else:
                 self.version = version
@@ -287,10 +279,12 @@ class Control(Controller):
         except Exception as e:
             self.logger.exception("fetching CDR%s", self.id)
             message = f"Failure fetching CDR{self.id}: {e}"
-            return self.bail(message)
+            self.alerts.append(dict(message=message, type="error"))
+            return None
         if doc.type != "Summary":
             message = f"CDR{self.id} is a {doc.type} document."
-            return self.bail(message)
+            self.alerts.append(dict(message=message, type="error"))
+            return False
         try:
             doc = Doc(self.session, xml=doc.xml)
             xml = etree.tostring(doc.resolved, encoding="utf-8")
@@ -299,7 +293,8 @@ class Control(Controller):
         except Exception as e:
             self.logger.exception("resolving CDR%s", self.id)
             message = f"Failure parsing CDR{self.id}: {e}"
-            return self.bail(message)
+            self.alerts.append(dict(message=message, type="error"))
+            return None
         hp = None
         node = root.find("PatientVersionOf")
         if node is not None:
@@ -310,7 +305,8 @@ class Control(Controller):
                 except Exception as e:
                     message = f"Failure finding {english_hp}: {e}"
                     self.logger.exception(message)
-                    return self.bail(message)
+                    self.alerts.append(dict(message=message, type="error"))
+                    return None
         first = True
         for node in root.findall("SummaryMetaData/MainTopics"):
             if first:

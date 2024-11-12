@@ -43,6 +43,17 @@ class Control(Controller):
         fieldset.append(page.checkbox("language", **opts))
         page.form.append(fieldset)
         fieldset = page.fieldset("Enter Search Terms", id="search-terms")
+        legend = fieldset.find("legend")
+        add_button = page.B.SPAN(
+            page.B.IMG(
+                page.B.CLASS("clickable"),
+                src="/images/add.gif",
+                onclick="add_term_field();",
+                title="Add another term"
+            ),
+            page.B.CLASS("term-button")
+        )
+        legend.append(add_button)
         fieldset.append(page.text_field("term", classes="term"))
         page.form.append(fieldset)
         page.add_output_options(default="html")
@@ -50,30 +61,15 @@ class Control(Controller):
         # Button/script for adding new search term fields.
         page.add_css(".term-button { padding-left: 10px; }")
         page.add_script("""\
-function add_button() {
-  green_button().insertAfter(jQuery(".term").first());
-}
-function green_button() {
-  var span = jQuery("<span>", {class: "term-button"});
-  var img = jQuery("<img>", {
-    src: "/images/add.gif",
-    onclick: "add_term_field()",
-    class: "clickable",
-    title: "Add another term"
-  });
-  span.append(img);
-  return span;
-}
 function add_term_field() {
   var id = "term-" + (jQuery(".term").length + 1);
   var field = jQuery("<div>", {class: "labeled-field"});
-  field.append(jQuery("<label>", {for: id, text: "Term"}));
-  field.append(jQuery("<input>", {class: "term", name: "term", id: id}));
+  var term_classes = "term usa-input usa-input--xl";
+  field.append(jQuery("<label>", {for: id, text: "Term", class: "usa-label"}));
+  field.append(jQuery("<input>", {class: term_classes, name: "term", id: id}));
   jQuery("#search-terms").append(field);
 }
-jQuery(document).ready(function() {
-  add_button();
-});""")
+""")
 
     @property
     def columns(self):

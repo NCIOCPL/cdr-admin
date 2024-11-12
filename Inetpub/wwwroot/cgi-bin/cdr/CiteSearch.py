@@ -3,10 +3,11 @@
 """Search for CDR Citation documents.
 """
 
+from functools import cached_property
 from lxml import etree
 import requests
 from cdr import prepare_pubmed_article_for_import
-from cdrcgi import AdvancedSearch, bail
+from cdrcgi import AdvancedSearch
 from cdrapi.docs import Doc
 
 
@@ -45,19 +46,20 @@ class CitationSearch(AdvancedSearch):
     }
 
     # Add some JavaScript to monitor the Import/Update fields.
-    IMP_BTN = "pubmed-import-button"
     JS = """\
 function chk_cdrid() {
+    console.log("cdr id is " + jQuery("#cdrid").val());
     if (jQuery("#cdrid").val().replace(/\\D/g, "").length === 0)
-        jQuery("#pubmed-import-button input").val("Import");
+        jQuery("#submit-button-import").val("Import");
     else
-        jQuery("#pubmed-import-button input").val("Update");
+        jQuery("#submit-button-import").val("Update");
 }
 function chk_pmid() {
+    console.log("pmid is " + jQuery("#pmid").val().trim());
     if (jQuery("#pmid").val().trim().length === 0)
-        jQuery("#pubmed-import-button input").prop("disabled", true);
+        jQuery("#submit-button-import").prop("disabled", true);
     else
-        jQuery("#pubmed-import-button input").prop("disabled", false);
+        jQuery("#submit-button-import").prop("disabled", false);
 }
 $(function() { chk_cdrid(); chk_pmid(); });
 """
@@ -90,51 +92,55 @@ $(function() { chk_cdrid(); chk_pmid(); });
             except Exception as e:
                 self.session.logger.exception("%s from PubMed", self.request)
                 error = f"Unable to import {self.pmid!r} from PubMed: {e}"
-                bail(error)
+                self.show_form(error=error)
         else:
             AdvancedSearch.run(self)
 
-    @property
+    @cached_property
     def pmid(self):
         """ID of a PubMed article to be imported."""
         return self.fields.getvalue("pmid", "").strip()
 
-    @property
+    @cached_property
     def cdrid(self):
         """ID of an existing Citation document to be updated."""
         cdrid = self.fields.getvalue("cdrid")
         return Doc.extract_id(cdrid) if cdrid else None
-
-    def customize_form(self, page):
-        """Add a button for browsing Pubmed.
-
-        If the user has sufficient permissions, also add fields for
-        importing a new PubMed citation or updating one we have imported
-        in the past.
-        """
-
-        pubmed = f"window.open('{self.PUBMED}', 'pm');"
-        buttons = page.body.xpath("//*[@id='header-buttons']")
-        buttons[0].append(self.button("Search PubMed", onclick=pubmed))
-        if self.session.can_do("ADD DOCUMENT", "Citation"):
-            self.add_import_form(page)
 
     def add_import_form(self, page):
         """Add another fieldset with fields for importing a PubMed document."""
 
         help = "Optionally enter the CDR ID of a document to be updated."
         cdrid_field = self.text_field("cdrid", label="CDR ID", tooltip=help)
-        cdrid_field.set("oninput", "chk_cdrid()")
+        cdrid_field.find("input").set("oninput", "chk_cdrid()")
         pmid_field = self.text_field("pmid", label="PMID")
-        pmid_field.set("oninput", "chk_pmid()")
-        button = self.button("Import")
-        button.set("disabled")
+        pmid_field.find("input").set("oninput", "chk_pmid()")
         fieldset = self.fieldset("Import or Update Citation From PubMed")
         fieldset.append(pmid_field)
         fieldset.append(cdrid_field)
-        fieldset.append(self.B.DIV(button, id=self.IMP_BTN))
         page.form.append(fieldset)
         page.head.append(self.B.SCRIPT(self.JS))
+
+    def show_form(self, message=None, error=None):
+        args = self.session.name, self.SUBTITLE, self.search_fields
+        page = self.Form(*args, control=self)
+        if self.session.can_do("ADD DOCUMENT", "Citation"):
+            self.add_import_form(page)
+        pubmed = f"window.open('{self.PUBMED}', 'pm');"
+        page.form.append(page.button("Search"))
+        page.form.append(page.button("Search PubMed", onclick=pubmed))
+        if self.session.can_do("ADD DOCUMENT", "Citation"):
+            button = self.button("Import")
+            onclick = "jQuery('#primary-form').attr('target', '');"
+            button.set("onclick", onclick)
+            button.set("disabled")
+            page.form.append(button)
+        if message:
+            type = "warning" if "validation errors" in message else "success"
+            page.add_alert(message, type=type)
+        if error:
+            page.add_alert(error, type="error")
+        page.send()
 
 
 class Citation:
@@ -161,7 +167,7 @@ class Citation:
         """
         self.control = control
 
-    @property
+    @cached_property
     def error(self):
         """If there were validation errors, log them and show a big warning."""
 
@@ -171,7 +177,7 @@ class Citation:
             self.control.session.logger.error(str(error))
         return self.ERRORS
 
-    @property
+    @cached_property
     def message(self):
         """Prepare a subtitle showing what we just did."""
 
@@ -189,42 +195,40 @@ class Citation:
         """Save the new or updated Citation document."""
         self.doc.save(**self.SAVE_OPTS)
 
-    @property
+    @cached_property
     def doc(self):
         """Prepare a `cdrapi.Doc` object for saving in the CDR"""
 
-        # We may have already done the work and cached the object.
-        if not hasattr(self, "_doc"):
+        # If we're updating an existing Citation doc, fetch and modify it.
+        if self.control.cdrid:
+            cdrid = self.control.cdrid
+            doc = Doc(self.control.session, id=cdrid)
+            doc.check_out()
+            root = doc.root
+            old_node = root.find("PubmedArticle")
+            if old_node is None:
+                raise Exception(f"{cdrid} is not a PubMed article")
+            root.replace(old_node, self.pubmed_article)
+            doc.xml = etree.tostring(root)
 
-            # If we're updating an existing Citation doc, fetch and modify it.
-            if self.control.cdrid:
-                cdrid = self.control.cdrid
-                doc = Doc(self.control.session, id=cdrid)
-                doc.check_out()
-                root = doc.root
-                old_node = root.find("PubmedArticle")
-                if old_node is None:
-                    raise Exception(f"{cdrid} is not a PubMed article")
-                root.replace(old_node, self.pubmed_article)
-                doc.xml = etree.tostring(root)
+        # Otherwise, build up a new document and insert NLM's info.
+        else:
+            pmid = self.control.pmid
+            cdrid = self.lookup(pmid)
+            if cdrid:
+                raise Exception(f"PMID {pmid} already imported as {cdrid}")
+            root = etree.Element("Citation")
+            details = etree.SubElement(root, "VerificationDetails")
+            etree.SubElement(details, "Verified").text = "Yes"
+            etree.SubElement(details, "VerifiedIn").text = "PubMed"
+            root.append(self.pubmed_article)
+            opts = dict(xml=etree.tostring(root), doctype="Citation")
+            doc = Doc(self.control.session, **opts)
 
-            # Otherwise, build up a new document and insert NLM's info.
-            else:
-                pmid = self.control.pmid
-                cdrid = self.lookup(pmid)
-                if cdrid:
-                    raise Exception(f"PMID {pmid} already imported as {cdrid}")
-                root = etree.Element("Citation")
-                details = etree.SubElement(root, "VerificationDetails")
-                etree.SubElement(details, "Verified").text = "Yes"
-                etree.SubElement(details, "VerifiedIn").text = "PubMed"
-                root.append(self.pubmed_article)
-                opts = dict(xml=etree.tostring(root), doctype="Citation")
-                doc = Doc(self.control.session, **opts)
-            self._doc = doc
-        return self._doc
+        # In either case, return the Doc object.
+        return doc
 
-    @property
+    @cached_property
     def pubmed_article(self):
         """Fetch and prepare PubmedArticle element for import into the CDR
 
@@ -234,17 +238,21 @@ class Citation:
         DTD changes.
         """
 
-        if not hasattr(self, "_pubmed_article"):
-            pmid = self.control.pmid
-            url = f"{self.EFETCH}{pmid}"
-            self.control.session.logger.info("Fetching %r", url)
+        pmid = self.control.pmid
+        url = f"{self.EFETCH}{pmid}"
+        self.control.session.logger.info("Fetching %r", url)
+        response = requests.get(url)
+        root = etree.fromstring(response.content)
+        node = root.find("PubmedArticle")
+        if node is None:
+            args = url, response.content
+            self.control.session.logger.error("url=%s response=%s", *args)
+            sleep(2)
             response = requests.get(url)
             root = etree.fromstring(response.content)
-            node = root.find("PubmedArticle")
-            if node is None:
-                raise Exception(f"PubmedArticle for {self.pmid} not found")
-            self._pubmed_article = prepare_pubmed_article_for_import(node)
-        return self._pubmed_article
+            if root is None:
+                raise Exception(f"PubmedArticle for {pmid} not found")
+        return prepare_pubmed_article_for_import(node)
 
     def lookup(self, pmid):
         """See if we have already imported this article.

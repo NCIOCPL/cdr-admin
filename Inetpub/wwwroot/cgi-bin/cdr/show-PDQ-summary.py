@@ -22,11 +22,13 @@ Created:                              Volker Englisch - 2016-03-23
 History:
 --------
 OCECDR-3856: Create Content Distribution Partner Headstart
+OCECDR-5301: Filter in pdqdocs out of date
 """
 
+from functools import cached_property
 from lxml import etree, html
 from cdrapi.docs import Doc
-from cdrcgi import Controller, sendPage
+from cdrcgi import Controller
 
 
 class Control(Controller):
@@ -46,9 +48,14 @@ class Control(Controller):
         """Override the base class version, as this isn't a tabular report."""
 
         page = self.transform(self.doc_root, section=self.section)
-        sendPage(html.tostring(page, **self.OPTS))
+        self.send_page(html.tostring(page, **self.OPTS))
 
-    @property
+    @cached_property
+    def doc_id(self):
+        """Optional document from the repository (default: summary on disk)."""
+        return self.fields.getvalue("doc-id")
+
+    @cached_property
     def doc_root(self):
         """Parsed summary document."""
 
@@ -56,30 +63,25 @@ class Control(Controller):
             return Doc(self.session, id=self.doc_id).root
         return etree.parse(f"{self.pdqdocs}/{self.DOC}").getroot()
 
-    @property
-    def xsl_root(self):
-        """Parsed filter document."""
-        return etree.parse(f"{self.pdqdocs}/{self.XSL}").getroot()
-
-    @property
+    @cached_property
     def pdqdocs(self):
         """Location of the filter and the default summary document on disk."""
         return f"{self.session.tier.basedir}/{self.PDQDOCS}"
 
-    @property
+    @cached_property
     def section(self):
         """Which part of the summary document to include (default: all)."""
         return self.fields.getvalue("section") or "*"
 
-    @property
-    def doc_id(self):
-        """Optional document from the repository (default: summary on disk)."""
-        return self.fields.getvalue("doc-id")
-
-    @property
+    @cached_property
     def transform(self):
         """Function which performs the XSL/T transformation of the summary."""
         return etree.XSLT(self.xsl_root)
+
+    @cached_property
+    def xsl_root(self):
+        """Parsed filter document."""
+        return etree.parse(f"{self.pdqdocs}/{self.XSL}").getroot()
 
 
 if __name__ == "__main__":

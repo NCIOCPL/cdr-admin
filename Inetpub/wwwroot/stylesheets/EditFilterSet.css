@@ -12,6 +12,7 @@ fieldset li {
     margin-left: -25px;
     width: 550px;
     color: green;
+    cursor: grab;
 }
 ul { margin: 5px auto 10px; }
 li { list-style-type: none; }

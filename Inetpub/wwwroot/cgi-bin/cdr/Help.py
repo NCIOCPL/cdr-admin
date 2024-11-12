@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 
+"""Let the user pick a set of help pages."""
+
+from functools import cached_property
 from cdrcgi import Controller
 from cdrapi.docs import Doc
 
@@ -8,68 +11,68 @@ class Control(Controller):
     """Access to the database and HTML page creation."""
 
     FILTER = "name:Help Table of Contents"
-    HELP = "CDR Help"
+    SUBTITLE = HELP = "CDR Help"
+    PAGES = (
+        (365, "User Help"),
+        (354511, "Operating Instructions"),
+        (256207, "System Information"),
+    )
+    CSS = "\n".join([
+        "form li { list-style-type: none; }",
+    ])
 
-    def show_form(self):
-        """Bypass the form."""
-        self.show_report()
+    def populate_form(self, page):
+        """Show the user the available help pages.
 
-    def show_report(self):
+        Required positional argument:
+          page - instance of the cdrcgi.HTMLPage class
+        """
+
+        fieldset = page.fieldset("Choose Help Page Set")
+        checked = True
+        for id, label in self.PAGES:
+            opts = dict(value=id, label=label, checked=checked)
+            fieldset.append(page.radio_button("id", **opts))
+            checked = False
+        page.form.append(fieldset)
+
+    @cached_property
+    def report(self):
         """Override to bypass the form/table module."""
 
-        buttons = (
-            self.HTMLPage.button(self.SUBMENU),
-            self.HTMLPage.button(self.ADMINMENU),
-            self.HTMLPage.button(self.LOG_OUT),
-        )
         opts = dict(
-            buttons=buttons,
-            session=self.session,
-            action=self.script,
             banner=self.title,
-            footer=None,
             subtitle=self.doc.title.split(";")[0],
+            no_results=None,
+            page_opts=dict(session=self.session),
         )
-        page = self.HTMLPage(self.title, **opts)
+        report = self.Reporter(self.title, [], **opts)
         for menu_list in self.lists:
-            page.body.append(menu_list)
-        page.body.set("class", "admin-menu")
-        page.send()
+            report.page.form.append(menu_list)
+        report.page.add_css(self.CSS)
+        return report
 
-    @property
+    @cached_property
     def lists(self):
         """Nested lists of menu links."""
 
-        if not hasattr(self, "_lists"):
-            root = self.doc.filter(self.FILTER).result_tree.getroot()
-            self._lists = root.findall("body/ul")
-        return self._lists
+        root = self.doc.filter(self.FILTER).result_tree.getroot()
+        return root.findall("body/ul")
 
-    @property
+    @cached_property
     def doc(self):
         """The documentation table of contents document to display."""
         return Doc(self.session, id=self.id)
 
-    @property
+    @cached_property
     def id(self):
         """ID of the table of contents document to render."""
-        return self.fields.getvalue("id", self.default)
+        return self.fields.getvalue("id")
 
-    @property
-    def default(self):
-        """Fallback if an "id" paramater is not present."""
-
-        query = self.Query("query_term", "doc_id")
-        query.where("path = '/DocumentationToC/ToCTitle'")
-        query.where(f"path = '{self.HELP}'")
-        rows = query.execute(self.cursor).fetchall()
-        if not rows:
-            query = self.Query("query_term", "MIN(doc_id) AS doc_id")
-            query.where("path = '/DocumentationToC/ToCTitle'")
-            rows = query.execute(self.cursor).fetchall()
-            if not rows:
-                self.bail("Help system missing")
-        return rows[0].doc_id
+    @cached_property
+    def no_results(self):
+        """Suppress warning that we have no tables. We know."""
+        return None
 
 
 if __name__ == "__main__":

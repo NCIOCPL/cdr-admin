@@ -15,6 +15,7 @@ JIRA::OCECDR-3373
 """
 
 from datetime import date
+from functools import cached_property
 from glob import glob
 from io import BytesIO
 from re import search, IGNORECASE
@@ -52,6 +53,7 @@ class Control(Controller):
         ("MODIFY DOCUMENT", "GlossaryTermName"),
         ("AUDIO IMPORT", None),
     )
+    NONE = "All available audio files sets have been loaded."
 
     def build_tables(self):
         """Assemble the table reporting the documents we created/updated."""
@@ -74,119 +76,111 @@ class Control(Controller):
         for zipfile in self.zipfiles:
             ordered_list.append(page.B.LI(zipfile))
         fieldset.append(ordered_list)
+        if not self.zipfiles:
+            fieldset.append(page.B.P(self.NONE))
         page.form.append(fieldset)
 
-    @property
+    @cached_property
     def columns(self):
         """Column headers for the report."""
 
-        if not hasattr(self, "_columns"):
-            self._columns = (
-                self.Reporter.Column("CDR ID"),
-                self.Reporter.Column("Processing"),
-            )
-        return self._columns
+        return (
+            self.Reporter.Column("CDR ID"),
+            self.Reporter.Column("Processing"),
+        )
 
-    @property
+    @cached_property
     def creator(self):
         """String for the Creator element in the Media document."""
 
-        if not hasattr(self, "_creator"):
-            query = self.Query("ctl", "val")
-            query.where("grp = 'media'")
-            query.where("name = 'audio-pronunciation-creator'")
-            query.where("inactivated IS NULL")
-            rows = query.execute(self.cursor).fetchall()
-            if rows:
-                self._creator = rows[0].val
-            else:
-                self._creator = self.CREATOR
-        return self._creator
+        query = self.Query("ctl", "val")
+        query.where("grp = 'media'")
+        query.where("name = 'audio-pronunciation-creator'")
+        query.where("inactivated IS NULL")
+        rows = query.execute(self.cursor).fetchall()
+        if rows:
+            return rows[0].val
+        else:
+            return self.CREATOR
 
-    @property
+    @cached_property
     def directory(self):
         """Where the ZIP files live."""
         return f"{self.session.tier.basedir}/{self.AUDIO}"
 
-    @property
+    @cached_property
     def rows(self):
         """Table rows reporting what we did for each document."""
+        return []
 
-        if not hasattr(self, "_rows"):
-            self._rows = []
-        return self._rows
-
-    @property
+    @cached_property
     def term_docs(self):
         """Dictionary of term name docs for which we have new MP3 files."""
 
-        # Do all this work only once, caching the resulting dictionary.
-        if not hasattr(self, "_term_docs"):
-            self._term_docs = {}
+        # Handle the case in which nothing is ready to be loaded.
+        if not self.zipfiles:
+            return {}
 
-            # Process each zip archive.
-            for path in self.zipfiles:
-                zipfile = ZipFile(f"{self.directory}/{path}")
+        # Process each zip archive.
+        for path in self.zipfiles:
+            zipfile = ZipFile(f"{self.directory}/{path}")
 
-                # Use these for logging multiple occurrences of values.
-                filenames = set()
-                termnames = set()
+            # Use these for logging multiple occurrences of values.
+            filenames = set()
+            termnames = set()
 
-                # Find the Excel workbook in the zipfile.
-                bookpath = None
-                for name in zipfile.namelist():
-                    if "MACOSX" not in name and name.endswith(".xlsx"):
-                        bookpath = name
-                if bookpath is None:
-                    self.bail(f"no workbook in {path}")
-                opts = dict(read_only=True, data_only=True)
-                book = load_workbook(BytesIO(zipfile.read(bookpath)), **opts)
-                sheet = book.active
-                for row in sheet:
+            # Find the Excel workbook in the zipfile.
+            term_docs = {}
+            bookpath = None
+            for name in zipfile.namelist():
+                if "MACOSX" not in name and name.endswith(".xlsx"):
+                    bookpath = name
+            if bookpath is None:
+                self.bail(f"no workbook in {path}")
+            opts = dict(read_only=True, data_only=True)
+            book = load_workbook(BytesIO(zipfile.read(bookpath)), **opts)
+            sheet = book.active
+            for row in sheet:
 
-                    # Skip over the column header row.
-                    if isinstance(self.get_cell_value(row, 0), (int, float)):
-                        mp3 = AudioFile(self, path, zipfile, row)
+                # Skip over the column header row.
+                if isinstance(self.get_cell_value(row, 0), (int, float)):
+                    mp3 = AudioFile(self, path, zipfile, row)
 
-                        # Check for unexpected multiple occurrences.
-                        key = mp3.filename.lower()
-                        if key in filenames:
-                            self.logger.warning("multiple %r in %s", key, path)
-                        filenames.add(key)
-                        key = (mp3.term_id, mp3.name, mp3.language)
-                        if key in termnames:
-                            self.logger.warning("multiple %r in %s", key, path)
-                        termnames.add(key)
+                    # Check for unexpected multiple occurrences.
+                    key = mp3.filename.lower()
+                    if key in filenames:
+                        self.logger.warning("multiple %r in %s", key, path)
+                    filenames.add(key)
+                    key = (mp3.term_id, mp3.name, mp3.language)
+                    if key in termnames:
+                        self.logger.warning("multiple %r in %s", key, path)
+                    termnames.add(key)
 
-                        # Add the MP3 file to the term document object.
-                        doc = self._term_docs.get(mp3.term_id)
-                        if doc is None:
-                            doc = self._term_docs[mp3.term_id] = TermDoc()
-                        doc.add(mp3)
+                    # Add the MP3 file to the term document object.
+                    doc = term_docs.get(mp3.term_id)
+                    if doc is None:
+                        doc = term_docs[mp3.term_id] = TermDoc()
+                    doc.add(mp3)
 
-            # Save the new or updated Media documents.
-            self.logger.info("term ids: %s", sorted(self._term_docs))
-            old = {}
-            for id in self._term_docs:
-                for mp3 in self._term_docs[id].mp3s:
-                    if mp3.media_id:
-                        old[mp3.media_id] = mp3
-                    mp3.save()
-            if old:
-                Updater(self, old).run()
+        # Save the new or updated Media documents.
+        self.logger.info("term ids: %s", sorted(term_docs))
+        old = {}
+        for term_doc in term_docs.values():
+            for mp3 in term_doc.mp3s:
+                if mp3.media_id:
+                    old[mp3.media_id] = mp3
+                mp3.save()
+        if old:
+            Updater(self, old).run()
 
-        return self._term_docs
+        return term_docs
 
-    @property
+    @cached_property
     def user(self):
         """User login name for this run."""
+        return self.session.User(self.session, id=self.session.user_id).name
 
-        if not hasattr(self, "_user"):
-            user = self.session.User(self.session, id=self.session.user_id)
-            self._user = user.name
-        return self._user
-
-    @property
+    @cached_property
     def zipfiles(self):
         """Most recent set of audio archive files.
 
@@ -213,24 +207,23 @@ class Control(Controller):
                 self.bail("Unauthorized")
 
         # Collect files for each week
-        if not hasattr(self, "_zipfiles"):
-            weeks = {}
-            for path in glob(f"{self.directory}/Week_*.zip"):
-                match = search(f"(({self.WEEK}).*.zip)", path, IGNORECASE)
-                if match:
-                    name = match.group(1)
-                    week = match.group(2).upper()
-                    if week not in weeks:
-                        weeks[week] = []
-                    weeks[week].append(name)
-                else:
-                    self.logger.warning("skipping %r", path)
-            if not weeks:
-                self.bail("Nothing to be loaded")
-            week = sorted(weeks)[-1]
-            self._zipfiles = sorted(weeks[week], key=str.upper)
-            self.logger.info("zipfiles: %s", self._zipfiles)
-        return self._zipfiles
+        weeks = {}
+        for path in glob(f"{self.directory}/Week_*.zip"):
+            match = search(f"(({self.WEEK}).*.zip)", path, IGNORECASE)
+            if match:
+                name = match.group(1)
+                week = match.group(2).upper()
+                if week not in weeks:
+                    weeks[week] = []
+                weeks[week].append(name)
+            else:
+                self.logger.warning("skipping %r", path)
+        if not weeks:
+            return []
+        week = sorted(weeks)[-1]
+        zipfiles = sorted(weeks[week], key=str.upper)
+        self.logger.info("zipfiles: %s", zipfiles)
+        return zipfiles
 
     @staticmethod
     def get_cell_value(row, col):
@@ -380,62 +373,50 @@ class AudioFile:
             sibling.addprevious(comment)
         return verb
 
-    @property
+    @cached_property
     def bytes(self):
         """Binary content of the audio file."""
 
-        if not hasattr(self, "_bytes"):
-            try:
-                self._bytes = self.__zipfile.read(self.filename)
-            except Exception as e:
-                self.__control.logger.exception("fetching mp3 bytes")
-                self.__control.bail(e)
-        return self._bytes
+        try:
+            return self.__zipfile.read(self.filename)
+        except Exception as e:
+            self.__control.logger.exception("fetching mp3 bytes")
+            self.__control.bail(e)
 
-    @property
+    @cached_property
     def created(self):
         """Date string for when the audio file was created."""
 
-        if not hasattr(self, "_created"):
-            info = self.__zipfile.getinfo(self.filename)
-            self._created = "{:04d}-{:02d}-{:02d}".format(*info.date_time[:3])
-        return self._created
+        info = self.__zipfile.getinfo(self.filename)
+        return "{:04d}-{:02d}-{:02d}".format(*info.date_time[:3])
 
-    @property
+    @cached_property
     def duration(self):
         """Runtime length in seconds for the MP3 audio file."""
 
-        if not hasattr(self, "_duration"):
-            mp3 = MP3(BytesIO(self.bytes))
-            self._duration = int(round(mp3.info.length))
-            self.__control.logger.debug("runtime is %s", self._duration)
-        return self._duration
+        mp3 = MP3(BytesIO(self.bytes))
+        duration = int(round(mp3.info.length))
+        self.__control.logger.debug("runtime is %s", duration)
+        return duration
 
-    @property
+    @cached_property
     def filename(self):
         """Where to find the MP3 bytes in the zipfile."""
+        return self.__cell(self.FILENAME)
 
-        if not hasattr(self, "_filename"):
-            self._filename = self.__cell(self.FILENAME)
-        return self._filename
-
-    @property
+    @cached_property
     def language(self):
         """English or Spanish."""
 
-        if not hasattr(self, "_language"):
-            self._language = self.__cell(self.LANGUAGE)
-            if self._language not in ("English", "Spanish"):
-                raise Exception(f"Unexpected language {self._language!r}")
-        return self._language
+        language = self.__cell(self.LANGUAGE)
+        if language not in ("English", "Spanish"):
+            raise ValueError(f"Unexpected language {language!r}")
+        return language
 
-    @property
+    @cached_property
     def langcode(self):
         """ISO code for language (en or es)."""
-
-        if not hasattr(self, "_langcode"):
-            self._langcode = "en" if self.language == "English" else "es"
-        return self._langcode
+        return "en" if self.language == "English" else "es"
 
     @property
     def link_node(self):
@@ -454,73 +435,51 @@ class AudioFile:
         child.set(self.CDR_REF, f"CDR{self.media_id:010d}")
         return element
 
-    @property
+    @cached_property
     def media_id(self):
         """CDR document ID for this pronunciation file."""
 
-        if not hasattr(self, "_media_id"):
-            self._media_id = self.__cell(self.MEDIA_ID)
-            if self._media_id:
-                self._media_id = int(self._media_id)
-        return self._media_id
+        media_id = self.__cell(self.MEDIA_ID)
+        return int(media_id) if media_id else media_id
 
-    @media_id.setter
-    def media_id(self, value):
-        """Set this when the document is created.
-
-        Pass:
-            value - integer for the newly created Media document
-        """
-
-        self._media_id = value
-
-    @property
+    @cached_property
     def name(self):
         """String for the glossary term name being pronounced."""
 
-        if not hasattr(self, "_name"):
-            self._name = self.__cell(self.NAME)
-            if self._name:
-                self._name = self._name.strip()
-        return self._name
+        name = self.__cell(self.NAME)
+        return name.strip() if name else name
 
-    @property
+    @cached_property
     def name_title(self):
         """Full CDR document title for the GlossaryTermName document."""
 
-        if not hasattr(self, "_name_title"):
-            query = self.__control.Query("document", "title")
-            query.where(query.Condition("id", self.term_id))
-            row = query.execute(self.__control.cursor).fetchone()
-            if not row:
-                raise Exception(f"Term name CDR{self.term_id} not found")
-            self._name_title = row.title
-        return self._name_title
+        query = self.__control.Query("document", "title")
+        query.where(query.Condition("id", self.term_id))
+        row = query.execute(self.__control.cursor).fetchone()
+        if not row:
+            raise Exception(f"Term name CDR{self.term_id} not found")
+        return row.title
 
-    @property
+    @cached_property
     def path(self):
         """Name of the zipfile fromwhich we got this MP3."""
         return self.__path
 
-    @property
+    @cached_property
     def term_id(self):
         """CDR ID for the pronunciation's GlossaryTermName document."""
+        return int(self.__cell(self.TERM_ID))
 
-        if not hasattr(self, "_term_id"):
-            self._term_id = int(self.__cell(self.TERM_ID))
-        return self._term_id
-
-    @property
+    @cached_property
     def title(self):
         """String used for the MediaTitle and MediaLink elements."""
 
-        if not hasattr(self, "_title"):
-            self._title = self.name_title.split(";")[0]
-            if self.language == "Spanish":
-                self._title += "-Spanish"
-        return self._title
+        title = self.name_title.split(";")[0]
+        if self.language == "Spanish":
+            title += "-Spanish"
+        return title
 
-    @property
+    @cached_property
     def xml(self):
         """Serialized XML for a new CDR Media document for this audio file."""
 
@@ -579,19 +538,18 @@ class TermDoc:
             self.names[mp3.name] = dict(English=[], Spanish=[])
         self.names[mp3.name][mp3.language].append(mp3)
 
-    @property
+    @cached_property
     def mp3s(self):
         """Sequence of audio files to be saved and linked."""
 
-        if not hasattr(self, "_mp3s"):
-            self._mp3s = []
-            for name in self.names:
-                for language in self.names[name]:
-                    if self.names[name][language]:
-                        self._mp3s.append(self.names[name][language][-1])
-        return self._mp3s
+        mp3s = []
+        for name in self.names:
+            for language in self.names[name]:
+                if self.names[name][language]:
+                    mp3s.append(self.names[name][language][-1])
+        return mp3s
 
-    @property
+    @cached_property
     def names(self):
         """Nested dictionary of `AudioFile` objects.
 
@@ -599,9 +557,7 @@ class TermDoc:
         indexed by language. Populated by calls to the `add()` method.
         """
 
-        if not hasattr(self, "_names"):
-            self._names = {}
-        return self._names
+        return {}
 
 
 class Linker(Job):

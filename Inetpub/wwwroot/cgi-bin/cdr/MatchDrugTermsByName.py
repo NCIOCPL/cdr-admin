@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 """Look for matches by name between EVS concepts and CDR drug term documents.
 
@@ -23,7 +23,8 @@ of the document's anomaly.
 from datetime import datetime
 from functools import cached_property
 from cdrapi.docs import Doc
-from cdrcgi import Controller
+from cdrcgi import Controller, BasicWebPage
+from cdrcgi import FormFieldFactory as Factory
 from nci_thesaurus import EVS, Normalizer, Term
 
 
@@ -33,6 +34,17 @@ class Control(Controller):
     SUBTITLE = "Match Drug Terms By Name"
     LOGNAME = "updates-from-evs"
     CSS = "../../stylesheets/RefreshDrugTermsFromEVS.css"
+    LOAD_FORM = "Load Form"
+    CSS = (
+        "table { width: 100%; margin-top: 2rem; }",
+        "caption { margin-bottom: 1rem; font-size: 1.2em; }",
+        "thead th { font-size: 1.1em; }",
+        ".cb-row th, caption { text-align: left; }",
+        ".cb-row th { border-left: none; border-right: none; }",
+        ".cb-row th { padding: 2rem 0 1rem; }",
+        ".footnote { font-size: .9em; font-style: italic; color: green; }",
+        ".usa-button { margin-top: 2rem; }",
+    )
 
     def populate_form(self, page):
         """Show terms differing from the EVS.
@@ -46,6 +58,11 @@ class Control(Controller):
 
         # Perform and report any requested updates from the EVS.
         start = datetime.now()
+        page = BasicWebPage()
+        url = f"{self.HTMLPage.USWDS}/css/uswds.min.css"
+        page.head.append(page.B.LINK(href=url, rel="stylesheet"))
+        page.head.append(page.B.STYLE("\n".join(self.CSS)))
+        page.wrapper.append(page.B.H1(self.SUBTITLE))
         refreshes = self.fields.getlist("refreshes")
         creates = self.fields.getlist("creates")
         if refreshes or creates:
@@ -105,14 +122,15 @@ class Control(Controller):
                                f"with {ids}")
                     problems.append(problem)
 
-        # Remember where we cached the concepts retrieved from the EVS.
-        page.form.append(page.hidden_field("concepts", self.concepts_path))
-
         # Start building the form.
-        page.head.append(page.B.LINK(href=self.CSS, rel="stylesheet"))
+        form = page.B.FORM(method="POST", action=self.script)
+        page.wrapper.append(form)
+        form.append(Factory.hidden_field(self.SESSION, self.session))
+        form.append(Factory.hidden_field("concepts", self.concepts_path))
+        form.append(Factory.button(self.SUBMIT))
 
         # Create a table showing matches we have found.
-        body = page.B.TBODY()
+        tbody = page.B.TBODY()
         for code, doc_id in matched:
             ok_docs.add(doc_id)
             concept = self.concepts[code]
@@ -121,8 +139,8 @@ class Control(Controller):
             label = f"Match and refresh CDR{doc.cdr_id} from {code} ({name})"
             value = f"{code}-{doc_id}"
             opts = dict(value=value, label=label)
-            checkbox = page.checkbox("refreshes", **opts)
-            body.append(
+            checkbox = Factory.checkbox("refreshes", **opts)
+            tbody.append(
                 page.B.TR(
                     page.B.TH(checkbox, colspan="3"),
                     page.B.CLASS("cb-row")
@@ -133,7 +151,7 @@ class Control(Controller):
                 page.B.TD(doc.name),
                 page.B.TD(concept.name),
             )
-            body.append(row)
+            tbody.append(row)
             c_names = set(concept.normalized_other_names)
             d_names = set(doc.normalized_other_names)
             concept_list = page.B.UL()
@@ -154,7 +172,7 @@ class Control(Controller):
                 page.B.TD(doc_list),
                 page.B.TD(concept_list),
             )
-            body.append(row)
+            tbody.append(row)
             if len(doc.definitions) == 1:
                 old_def = doc.definitions[0]
             else:
@@ -174,7 +192,7 @@ class Control(Controller):
                 page.B.TD(old_def),
                 page.B.TD(new_def),
             )
-            body.append(row)
+            tbody.append(row)
 
         # Assemble the table and connect it to the page.
         count = len(matched)
@@ -188,21 +206,21 @@ class Control(Controller):
                     page.B.TH("EVS"),
                 )
             ),
-            body
+            tbody
         )
-        page.form.append(table)
+        form.append(table)
 
         # Create another table for concepts which have no CDR matches.
-        body = page.B.TBODY()
+        tbody = page.B.TBODY()
         concepts = []
         for code in unmatched:
             concepts.append(self.concepts[code])
         for concept in sorted(concepts):
             label = f"Import concept {concept.code} ({concept.name})"
             opts = dict(value=concept.code, label=label)
-            checkbox = page.checkbox("creates", **opts)
-            page.form.append(checkbox)
-            body.append(
+            checkbox = Factory.checkbox("creates", **opts)
+            form.append(checkbox)
+            tbody.append(
                 page.B.TR(
                     page.B.TH(checkbox, colspan="2"),
                     page.B.CLASS("cb-row")
@@ -216,13 +234,13 @@ class Control(Controller):
                 page.B.TH("Other Names"),
                 page.B.TD(names),
             )
-            body.append(row)
+            tbody.append(row)
             for definition in concept.definitions:
                 row = page.B.TR(
                     page.B.TH("Definition"),
                     page.B.TD(definition),
                 )
-                body.append(row)
+                tbody.append(row)
         count = len(unmatched)
         caption = f"Concepts Importable As New CDR Drug Terms ({count})"
         table = page.B.TABLE(
@@ -233,18 +251,18 @@ class Control(Controller):
                     page.B.TH("Values"),
                 )
             ),
-            body
+            tbody
         )
-        page.form.append(table)
+        form.append(table)
 
         # Show the concepts with problems.
         count = len(problems)
         h2 = page.B.H2(f"Concepts Unable To Be Matched Or Imported ({count})")
-        page.form.append(h2)
+        page.wrapper.append(h2)
         problem_list = page.B.UL()
         for problem in problems:
             problem_list.append(page.B.LI(problem))
-        page.form.append(problem_list)
+        page.wrapper.append(problem_list)
 
         # Finally, figure out which CDR drug term documents can't be matched.
         problems = []
@@ -266,9 +284,8 @@ class Control(Controller):
                 problems.append(problem)
         count = len(problems)
         h2 = page.B.H2(f"CDR Drug Term Documents With Anomalies ({count})")
-        page.form.append(h2)
-        page.form.append(page.B.UL(*problems))
-        elapsed = datetime.now() - start
+        page.wrapper.append(h2)
+        page.wrapper.append(page.B.UL(*problems))
         tasks = [
             f"Checked {len(self.concepts)} EVS concepts",
             f"checked {len(self.docs)} CDR drug term documents",
@@ -288,12 +305,19 @@ class Control(Controller):
             tasks = ", and ".join(tasks)
         else:
             tasks = " and ".join(tasks)
+        elapsed = datetime.now() - start
         message = f"{tasks} in {elapsed}."
-        page.form.append(page.B.P(message, page.B.CLASS("footnote")))
+        page.wrapper.append(page.B.P(message, page.B.CLASS("footnote")))
+        page.send()
 
     def show_report(self):
         """Everything is shown on the form page."""
         self.show_form()
+
+    @cached_property
+    def buttons(self):
+        """Customized button handling."""
+        return []
 
     @cached_property
     def cdr_names(self):

@@ -38,7 +38,7 @@ from functools import cached_property
 from importlib import import_module
 from json import loads, dumps
 from cdrapi import db
-from cdrcgi import Controller, navigateTo
+from cdrcgi import Controller
 from cdr import ordinal
 from sys import path
 
@@ -48,11 +48,6 @@ class Control(Controller):
 
     LOGNAME = "new-schedule-manager"
     SUBTITLE = "Scheduled Jobs"
-    CSS = (
-        "fieldset { width: 1200px; }",
-        "table { width: 100%; }",
-        "th, td { background-color: #e8e8e8; border-color: #ccc; }",
-    )
     UNITS = "hour", "minute", "day_of_week", "day"
     JOBS = "Jobs"
     ADD = "Add New Job"
@@ -87,6 +82,7 @@ class Control(Controller):
             page - HTMLPage object on which to draw the form
         """
 
+        # Display the form for editing or creating a job.
         if self.job:
             fieldset = page.fieldset("Job Settings")
             page.form.append(page.hidden_field("id", self.job.id))
@@ -102,7 +98,7 @@ class Control(Controller):
             counter = 1
             for name in sorted(self.job.opts):
                 fieldset = page.fieldset("Named Job Option")
-                fieldset.set("class", "opt-block")
+                fieldset.set("class", "opt-block usa-fieldset")
                 fieldset.set("id", f"opt-block-{counter}")
                 opts = dict(label="Name", value=name, classes="opt-name")
                 arg = f"opt-name-{counter}"
@@ -116,7 +112,7 @@ class Control(Controller):
             if not self.job.opts:
                 page.form.append(page.hidden_field("num-opts", 1))
                 fieldset = page.fieldset("Named Job Option")
-                fieldset.set("class", "opt-block")
+                fieldset.set("class", "opt-block usa-fieldset")
                 fieldset.set("id", "opt-block-1")
                 opts = dict(label="Name", classes="opt-name")
                 fieldset.append(page.text_field("opt-name-1", **opts))
@@ -135,33 +131,37 @@ class Control(Controller):
             page.form.append(fieldset)
             page.head.append(page.B.SCRIPT(src=self.JS))
             page.add_css(".job-opt-button { padding-left: 10px; }")
+
+        # Show all the jobs.
         else:
-            table = page.B.TABLE(
-                page.B.TR(
-                    page.B.TH("Name"),
-                    page.B.TH("Implemented By"),
-                    page.B.TH("Enabled?"),
-                    page.B.TH("Schedule")
-                )
+            for legend in "Enabled", "Disabled":
+                jobs = page.B.TBODY()
+                for job in self.jobs:
+                    if legend == "Disabled":
+                        if job.enabled:
+                            continue
+                    elif not job.enabled:
+                        continue
+                    try:
+                        schedule = job.formatted_schedule
+                    except Exception:
+                        schedule = job.schedule
+                    url = self.make_url(self.script, id=job.id)
+                    segments = [page.B.A(job.name, href=url)]
+                    if schedule:
+                        segments.append(f" ({schedule})")
+                    opts = dict(title=f"Job class is {job.job_class}.")
+                    jobs.append(page.B.TR(page.B.TD(*segments, **opts)))
+                fieldset = page.fieldset(legend)
+                table = page.B.TABLE(jobs)
+                table.set("class", "usa-table usa-table--borderless")
+                fieldset.append(table)
+                page.form.append(fieldset)
+
+            page.add_css(
+                f".usa-form a:visited {{ color: {page.LINK_COLOR}; }}\n"
+                ".usa-form a { text-decoration: none; }\n"
             )
-            for job in self.jobs:
-                try:
-                    formatted_schedule = job.formatted_schedule
-                except Exception:
-                    formatted_schedule = job.schedule
-                url = self.make_url(self.script, id=job.id)
-                row = page.B.TR(
-                    page.B.TD(page.B.A(job.name, href=url)),
-                    page.B.TD(job.job_class),
-                    page.B.TD("Yes" if job.enabled else "No",
-                              page.B.CLASS("center")),
-                    page.B.TD(formatted_schedule)
-                )
-                table.append(row)
-            fieldset = page.fieldset("Jobs")
-            fieldset.append(table)
-            page.form.append(fieldset)
-            page.add_css("\n".join(self.CSS))
 
     def run(self):
         """Override the base class version as this is not a standard report."""
@@ -172,42 +172,79 @@ class Control(Controller):
         except Exception as e:
             self.bail(e)
         try:
-            if self.request == self.SAVE:
-                self.save_job()
-            elif self.request == self.DELETE:
-                self.delete_job()
-            elif self.request == self.RUN:
-                self.run_job()
-            elif self.request == self.JOBS:
-                navigateTo(self.script, self.session.name)
-            elif self.request == self.JSON:
-                self.json()
-            else:
-                Controller.run(self)
+            match self.request:
+                case self.ADD:
+                    return self.show_form()
+                case self.SAVE:
+                    return self.save_job()
+                case self.DELETE:
+                    return self.delete_job()
+                case self.RUN:
+                    return self.run_job()
+                case self.JOBS:
+                    self.job = None
+                    return self.show_form()
+                case self.JSON:
+                    return self.json()
+                case _:
+                    Controller.run(self)
         except Exception as e:
             self.bail(e)
 
     def save_job(self):
-        """Save the currently edited job and redraw the form."""
+        """Save the currently edited job and redraw the form.
+
+        Make sure you don't reference the `job` property before
+        putting the new values in the database.
+        """
 
         if not self.name:
-            self.bail("Job name is required")
+            self.alerts.append(dict(
+                message="Job name is required.",
+                type="error",
+            ))
         if not self.job_class:
-            self.bail("Class name for job is required")
-        values = [
-            self.name,
-            self.enabled,
-            self.job_class,
-            dumps(self.opts),
-            self.schedule or None,
-        ]
-        if self.id:
-            values.append(self.id)
-            self.cursor.execute(self.UPDATE, values)
-        else:
-            self.cursor.execute(self.INSERT, values)
-            self.id = self.cursor.fetchone().id
-        self.conn.commit()
+            self.alerts.append(dict(
+                message="Class name for job is required.",
+                type="error",
+            ))
+        if not self.alerts:
+            values = [
+                self.name,
+                self.enabled,
+                self.job_class,
+                dumps(self.opts),
+                self.schedule or None,
+            ]
+            try:
+                if self.id:
+                    values.append(self.id)
+                    self.cursor.execute(self.UPDATE, values)
+                else:
+                    self.cursor.execute(self.INSERT, values)
+                    self.id = self.cursor.fetchone().id
+                self.conn.commit()
+                self.logger.info("saved job %s", self.name)
+                enabled = "Enabled" if self.job.enabled else "Disabled"
+                message = f"{enabled} job {self.name!r} saved."
+                if self.job.enabled:
+                    if self.job.formatted_schedule:
+                        when = self.job.formatted_schedule
+                        message = f"{message} Job will run {when}."
+                    else:
+                        message = (
+                            f"Enabled job {self.name!r} will be run but not "
+                            "retained since it has no schedule. In order to "
+                            "have the job retained for future use, save it "
+                            "with a schedule."
+                        )
+                self.alerts.append(dict(message=message, type="success"))
+            except Exception as e:
+                self.logger.exception("save failed")
+                self.alerts.append(dict(
+                    message=f"Unable to save job: {e}",
+                    type="error",
+                ))
         self.show_form()
 
     def run_job(self):
@@ -216,12 +253,24 @@ class Control(Controller):
         Note special handling for stopping the scheduler. See OCECDR-5125.
         """
 
+        # Make sure we have the essential information for running the job.
         if not self.name:
-            self.bail("Job name is required")
+            self.alerts.append(dict(
+                message="Job name is required.",
+                type="error",
+            ))
         if not self.job_class:
-            self.bail("Class name for job is required")
-        if self.job_class == "stop_scheduler.Stop" and "dbserver" in self.opts:
-            conn = db.connect(server=self.opts["dbserver"])
+            self.alerts.append(dict(
+                message="Class name for job is required.",
+                type="error",
+            ))
+        dbserver = self.opts.get("dbserver")
+        if self.alerts:
+            self.show_form()
+
+        # Special handling for the pseudo-job to bounce the scheduler.
+        if self.job_class == "stop_scheduler.Stop" and dbserver:
+            conn = db.connect(server=dbserver)
             cursor = conn.cursor()
             cursor.execute(
                 "INSERT INTO scheduled_job (name, enabled, job_class, opts)"
@@ -230,140 +279,117 @@ class Control(Controller):
             conn.commit()
             self.logger.info("queued stop job in %s db", self.opts["dbserver"])
         else:
-            values = [
-                self.name,
-                True,
-                self.job_class,
-                dumps(self.opts),
-            ]
+            values = self.name, True, self.job_class, dumps(self.opts)
             self.cursor.execute(
                 "INSERT INTO scheduled_job (name, enabled, job_class, opts)"
                 "     VALUES (?, ?, ?, ?)", values)
             self.conn.commit()
+        self.alerts.append(dict(
+            message=f"Job {self.name!r} queued.",
+            type="success",
+        ))
         self.show_form()
 
     def delete_job(self):
-        """Remove the current job and return to the job list."""
+        """Remove the current job and return to the job list.
+
+        It's important that the `jobs` property is not referenced until
+        the row for this job is removed from the database.
+        """
 
         self.cursor.execute("DELETE FROM scheduled_job WHERE id = ?", self.id)
         self.conn.commit()
-        navigateTo(self.script, self.session.name)
+        self.logger.info("Job %s deleted", self.id)
+        self.alerts.append(dict(
+            message=f"Job {self.name} successfully deleted.",
+            type="success",
+        ))
+        self.job = None
+        self.show_form()
 
     def json(self):
         """Send the serialized jobs to the client."""
 
-        rows = self.cursor.execute("SELECT * FROM scheduled_job ORDER BY name")
+        rows = self.query.execute(self.cursor)
         json = dumps([tuple(row[1:]) for row in rows], indent=2)
         self.send_page(json, "json")
 
-    @property
+    @cached_property
     def buttons(self):
         """Customize the set of action buttons displayed."""
 
         if not self.job:
-            return (
-                self.ADD,
-                self.JSON,
-                self.DEVMENU,
-                self.ADMINMENU,
-                self.LOG_OUT,
-            )
-        return (
-            self.SAVE,
-            self.DELETE,
-            self.RUN,
-            self.JOBS,
-            self.DEVMENU,
-            self.ADMINMENU,
-            self.LOG_OUT,
-        )
+            return self.ADD, self.JSON
+        return self.SAVE, self.DELETE, self.RUN, self.JOBS
 
-    @property
+    @cached_property
     def enabled(self):
         """True if the current job is allowed to run."""
 
-        if not hasattr(self, "_enabled"):
-            if self.request == self.ADD:
-                self._enabled = True
-            else:
-                self._enabled = "enabled" in self.fields.getlist("opts")
-        return self._enabled
+        if self.request == self.ADD:
+            return True
+        return "enabled" in self.fields.getlist("opts")
 
-    @property
+    @cached_property
     def id(self):
         """Primary key for the current job."""
+        return self.fields.getvalue("id", "").strip()
 
-        if not hasattr(self, "_id"):
-            self._id = self.fields.getvalue("id", "").strip()
-        return self._id
-
-    @id.setter
-    def id(self, value):
-        """Allow the ID for a newly created job to be set."""
-        self._id = value
-
-    @property
+    @cached_property
     def job(self):
         """Object for the currently displayed job."""
 
-        if not hasattr(self, "_job"):
-            self._job = None
-            if self.request in (self.ADD, self.RUN):
-                self._job = Job(self)
-            elif self.id:
-                query = self.Query("scheduled_job", "*")
-                query.where(query.Condition("id", self.id))
-                row = query.execute(self.cursor).fetchone()
-                if row:
-                    self._job = Job(self, row)
-        return self._job
+        if self.request in (self.ADD, self.RUN):
+            self.logger.info("returning Job(self)")
+            return Job(self)
+        if self.id:
+            query = self.Query("scheduled_job", "*")
+            query.where(query.Condition("id", self.id))
+            row = query.execute(self.cursor).fetchone()
+            if row:
+                self.logger.info("returning Job(self, row)")
+                return Job(self, row)
+        elif self.request == self.SAVE:
+            self.logger.info("returning Job(self) after rejected SAVE")
+            return Job(self)
+        return None
 
-    @property
+    @cached_property
     def job_class(self):
         """String for the job's implementing class (module_name.ClassName)."""
 
-        if not hasattr(self, "_job_class"):
-            self._job_class = self.fields.getvalue("job_class", "").strip()
-            if self._job_class:
-                if self._job_class.count(".") != 1:
-                    self.bail(self.JOB_CLASS_ERROR)
-                module, name = self._job_class.split(".", 1)
-                if not module.strip() or not name.strip():
-                    self.bail(self.JOB_CLASS_ERROR)
-        return self._job_class
+        job_class = self.fields.getvalue("job_class", "").strip()
+        if job_class:
+            if job_class.count(".") != 1:
+                self.bail(self.JOB_CLASS_ERROR)
+            module, name = job_class.split(".", 1)
+            if not module.strip() or not name.strip():
+                self.bail(self.JOB_CLASS_ERROR)
+        return job_class
 
-    @property
+    @cached_property
     def jobs(self):
         """Sequence of `Job` objects.
 
         Skip over the rows which are created for manual job execution.
         """
 
-        if not hasattr(self, "_jobs"):
-            query = self.Query("scheduled_job", "*").order("name")
-            query.where("schedule IS NOT NULL OR enabled = 0")
-            rows = query.execute(self.cursor).fetchall()
-            self._jobs = [Job(self, row) for row in rows]
-        return self._jobs
+        rows = self.query.execute(self.cursor).fetchall()
+        return [Job(self, row) for row in rows]
 
-    @property
+    @cached_property
     def name(self):
         """Required string for the job name."""
+        return self.fields.getvalue("name", "").strip()
 
-        if not hasattr(self, "_name"):
-            self._name = self.fields.getvalue("name", "").strip()
-        return self._name
-
-    @property
+    @cached_property
     def num_opts(self):
         """Integer for the number of job parameters."""
 
-        if not hasattr(self, "_num_opts"):
-            try:
-                self._num_opts = int(self.fields.getvalue("num-opts", "0"))
-            except Exception:
-                self.bail("Internal error (invalid option count)")
-        return self._num_opts
+        try:
+            return int(self.fields.getvalue("num-opts", "0"))
+        except Exception:
+            self.bail("Internal error (invalid option count)")
 
     @cached_property
     def opts(self):
@@ -376,62 +402,67 @@ class Control(Controller):
             value = self.fields.getvalue(f"opt-value-{i:d}", "").strip()
             if name and value:
                 if name in opts:
-                    self.bail(f"Duplicate option {name!r}")
+                    message = f"Duplicate option {name!r}."
+                    self.logger.error(message)
+                    self.alerts.append(dict(message=message, type="error"))
                 elif self.supported_parameters is not None:
                     if name not in self.supported_parameters:
                         message = f"Parameter {name!r} not supported"
                         supported = ", ".join(self.supported_parameters)
                         extra = [f"Supported parameters: {supported}"]
-                        self.bail(message, extra=extra)
+                        self.logger.error(message)
+                        self.alerts.append(dict(
+                            message=message,
+                            extra=extra,
+                            type="error",
+                        ))
+                        continue
                 opts[name] = value
             i += 1
         return opts
 
-    @property
+    @cached_property
+    def query(self):
+        """How we find the jobs which are not ephemeral."""
+
+        scheduled = "schedule IS NOT NULL AND schedule <> '{}'"
+        disabled = "enabled = 0"
+        query = self.Query("scheduled_job", "*").order("name")
+        query.where(f"{scheduled} OR {disabled}")
+        return query
+
+    @cached_property
+    def same_window(self):
+        """Stay on the same browser tab for all but the JSON command."""
+        return self.SAVE, self.DELETE, self.RUN, self.JOBS, self.ADD
+
+    @cached_property
     def schedule(self):
         """Dictionary of values controlling when the job is executed."""
 
-        if not hasattr(self, "_schedule"):
-            values = {}
-            for name in self.UNITS:
-                value = self.fields.getvalue(name, "").strip()
-                if value:
-                    values[name] = value
-            self._schedule = dumps(values)
-        return self._schedule
+        values = {}
+        for name in self.UNITS:
+            value = self.fields.getvalue(name, "").strip()
+            if value:
+                values[name] = value
+        return dumps(values)
 
-    @property
-    def subtitle(self):
-        """Dynamically determine what to display below the main banner."""
-
-        if not hasattr(self, "_subtitle"):
-            if self.request == self.RUN:
-                self._subtitle = f"Job {self.name!r} executed"
-            elif self.request == self.SAVE:
-                self._subtitle = f"Job {self.name!r} saved"
-            else:
-                self._subtitle = self.SUBTITLE
-        return self._subtitle
-
-    @property
+    @cached_property
     def supported_parameters(self):
         """Set of option names allowed for the job (None if unrestricted)."""
 
-        if not hasattr(self, "_supported_parameters"):
-            if "scheduler" not in str(path).lower():
-                path.insert(1, "d:/cdr/Scheduler")
-            self._supported_parameters = None
-            try:
-                module_name, class_name = self.job_class.split(".", 1)
-                module = import_module(f"jobs.{module_name}")
-                job_class = getattr(module, class_name)
-                supported = getattr(job_class, "SUPPORTED_PARAMETERS")
-                self._supported_parameters = supported
-            except Exception as e:
-                args = self.job_class, e
-                self.logger.exception("supported_parameters for %s: %s", *args)
-                self.bail(f"Unable to load jobs.{self.job_class}: {e}")
-        return self._supported_parameters
+        if "scheduler" not in str(path).lower():
+            path.insert(1, "d:/cdr/Scheduler")
+        try:
+            module_name, class_name = self.job_class.split(".", 1)
+            module = import_module(f"jobs.{module_name}")
+            job_class = getattr(module, class_name)
+            supported = getattr(job_class, "SUPPORTED_PARAMETERS")
+            return supported
+        except Exception as e:
+            args = self.job_class, e
+            self.logger.exception("supported_parameters for %s: %s", *args)
+            self.bail(f"Unable to load jobs.{self.job_class}: {e}")
 
 
 class Job:
@@ -442,136 +473,123 @@ class Job:
 
         Pass:
             control - access to the form values and logging
-            row - values from the database for the job (None for new job)
+            row - values from the database for the job
         """
 
-        self.__control = control
-        self.__row = row
+        self.control = control
+        self.row = row
 
-    @property
+    @cached_property
     def id(self):
         """String for the job's primary key."""
+        return self.row.id if self.row else self.control.id
 
-        if not hasattr(self, "_id"):
-            if self.__row:
-                self._id = self.__row.id
-            else:
-                self._id = self.__control.id
-        return self._id
-
-    @property
+    @cached_property
     def name(self):
         """Required string for the job name."""
+        return self.row.name if self.row else self.control.name
 
-        if not hasattr(self, "_name"):
-            if self.__row:
-                self._name = self.__row.name
-            else:
-                self._name = self.__control.name
-        return self._name
-
-    @property
+    @cached_property
     def enabled(self):
         """True if the job is allowed to run."""
 
-        if not hasattr(self, "_enabled"):
-            if self.__row:
-                self._enabled = True if self.__row.enabled else False
-            else:
-                self._enabled = self.__control.enabled
-        return self._enabled
+        if self.row:
+            return True if self.row.enabled else False
+        return self.control.enabled
 
-    @property
+    @cached_property
     def job_class(self):
         """String for the job's implementing class (module_name.ClassName)."""
-
-        if not hasattr(self, "_job_class"):
-            if self.__row:
-                self._job_class = self.__row.job_class
-            else:
-                self._job_class = self.__control.job_class
-        return self._job_class
+        return self.row.job_class if self.row else self.control.job_class
 
     @cached_property
     def opts(self):
         """Dictionary of named job parameters."""
 
-        if not self.__row:
-            return self.__control.opts
-        opts = self.__row.opts or "{}"
+        if not self.row:
+            return self.control.opts
+        opts = self.row.opts or "{}"
         try:
             return loads(opts)
         except Exception:
-            self.__control.logger.exception(opts)
+            self.logger.exception(opts)
             return dict()
 
-    @property
+    @cached_property
     def schedule(self):
         """Dictionary of values controlling when the job is executed."""
 
-        if not hasattr(self, "_schedule"):
-            if self.__row:
-                schedule = self.__row.schedule or "{}"
-            else:
-                schedule = self.__control.schedule
-            try:
-                self._schedule = loads(schedule)
-            except Exception:
-                self.__control.logger.exception(schedule)
-                self._schedule = {}
-        return self._schedule
+        if self.row:
+            schedule = self.row.schedule or "{}"
+        else:
+            schedule = self.control.schedule
+        try:
+            return loads(schedule)
+        except Exception:
+            self.logger.exception(schedule)
+            return {}
 
-    @property
+    @cached_property
     def formatted_schedule(self):
         """User-friendly display of the job's schedule values."""
 
-        if not hasattr(self, "_formatted_schedule"):
-            self._formatted_schedule = ""
-            if len(self.schedule) == 1 and "minute" in self.schedule:
-                minutes = str(self.schedule["minute"])
-                if minutes.startswith("*/"):
-                    minutes = int(minutes[2:])
-                    if minutes == 1:
-                        self._formatted_schedule = "every minute"
-                    elif minutes == 2:
-                        self._formatted_schedule = "every other minute"
+        if len(self.schedule) == 1 and "minute" in self.schedule:
+            minutes = str(self.schedule["minute"])
+            if minutes.startswith("*/"):
+                minutes = int(minutes[2:])
+                if minutes == 1:
+                    return "every minute"
+                if minutes == 2:
+                    return "every other minute"
+                return f"every {ordinal(minutes)} minute"
+            minutes = int(minutes)
+            if not minutes:
+                return "every hour on the hour"
+            if minutes == 1:
+                return "1 minute after the hour"
+            when = f"{minutes} minutes after the hour"
+            return f"every hour at {when}"
+        if "hour" in self.schedule:
+            try:
+                minute = int(self.schedule.get("minute", "0"))
+                hour = str(self.schedule["hour"])
+                if hour.startswith("*/"):
+                    hour = int(hour[2:])
+                    if not minute:
+                        minutes = "on the hour"
+                    elif minutes == 1:
+                        minutes = "at 1 minute after the hour"
                     else:
-                        o = ordinal(minutes)
-                        self._formatted_schedule = f"every {o} minute"
+                        minutes = f"at {minute} minutes after the hour"
+                    if hour == 1:
+                        when = f"every hour {minutes}"
+                    elif hour == 2:
+                        when = f"every other hour {minutes}"
+                    else:
+                        when = f"every {ordinal(hour)} hour {minutes}"
                 else:
-                    minutes = int(minutes)
-                    if not minutes:
-                        self._formatted_schedule = "every hour on the hour"
-                    else:
-                        if minutes == 1:
-                            when = "1 minute after the hour"
-                        else:
-                            when = f"{minutes} minutes after the hour"
-                        self._formatted_schedule = f"every hour at {when}"
-            elif "hour" in self.schedule and "minute" in self.schedule:
-                try:
-                    hour = int(self.schedule["hour"])
-                    minute = int(self.schedule["minute"])
-                    when = f"{hour:02d}:{minute:02d}"
-                    dow_hour_minute = set(["day_of_week", "hour", "minute"])
-                    if set(self.schedule) == dow_hour_minute:
-                        dow = self.schedule["day_of_week"]
-                        dow = [d.capitalize() for d in dow.split(",")]
-                        dow = ", ".join(dow)
-                        self._formatted_schedule = f"every {dow} at {when}"
-                    elif len(self.schedule) == 2:
-                        self._formatted_schedule = f"every day at {when}"
-                    elif len(self.schedule) == 3 and "day" in self.schedule:
-                        day = f"on the {ordinal(self.schedule['day'])}"
-                        fs = f"every month {day} at {when}"
-                        self._formatted_schedule = fs
-                except Exception:
-                    pass
-            if not self._formatted_schedule:
-                keys = sorted(self.schedule)
-                values = [f"{key}={self.schedule[key]}" for key in keys]
-                self._formatted_schedule = " ".join(values)
-        return self._formatted_schedule
+                    when = f"{int(hour):02d}:{minute:02d}"
+                delta = set(self.schedule) - {"hour", "minute"}
+                if not delta:
+                    return f"every day at {when}"
+                if delta == {"day_of_week"}:
+                    dow = self.schedule["day_of_week"]
+                    dow = [d.capitalize() for d in dow.split(",")]
+                    dow = ", ".join(dow)
+                    return f"every {dow} at {when}"
+                if delta == {"day"}:
+                    day = ordinal(self.schedule["day"])
+                    return f"every month on the {day} at {when}"
+            except Exception:
+                self.logger.exception("funky schedule: %s", self.schedule)
+        keys = sorted(self.schedule)
+        values = [f"{key}={self.schedule[key]}" for key in keys]
+        return " ".join(values)
+
+    @cached_property
+    def logger(self):
+        """Keep a record of what we do."""
+        return self.control.logger
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@
 """Report of documents linking to a specified glossary term.
 """
 
+from functools import cached_property
 from cdrcgi import Controller, Reporter
 from cdrapi.docs import Doc
 
@@ -28,8 +29,9 @@ class Control(Controller):
         fieldset.append(page.text_field("name", label="Term Name"))
         page.form.append(fieldset)
 
-    def build_tables(self):
-        """Assemble the report tables, one for each linking document type."""
+    @cached_property
+    def report(self):
+        """Insert a custom table at the top of the report."""
 
         tables = []
         for doctype in sorted(self.types):
@@ -38,38 +40,31 @@ class Control(Controller):
                 rows += linker.rows
             opts = dict(cols=self.COLUMNS, caption=doctype, classes="linkers")
             tables.append(self.Reporter.Table(rows, **opts))
-        return tables
 
-    def show_report(self):
-        """Override the base class version to add a top table and css."""
-
+        opts = dict(
+            banner=self.title,
+            footer=self.footer,
+            subtitle=self.subtitle,
+            page_opts=dict(session=self.session),
+        )
+        report = self.Reporter(self.title, tables, **opts)
+        B = report.page.B
+        table = B.TABLE(
+            B.CAPTION("Glossary Term"),
+            B.TR(B.TH("Name"), B.TD(self.name)),
+            B.TR(B.TH("Source"), B.TD(self.source)),
+            B.CLASS("usa-table usa-table--borderless"),
+            id="top-table"
+        )
+        h1 = report.page.main.find("div/h1")
+        h1.addnext(table)
+        table.addnext(B.H2("Documents Linked to Term Name"))
         css = (
-            "#name-and-source tr * { padding: 2px 5px; }",
-            "#name-and-source { width: auto; }",
-            "#name-and-source th { text-align: right; }",
-            ".doc-id { width: 125px; }",
-            ".doc-title { width: auto; }",
-            ".element-name {width: 150px; }",
-            ".frag-id { width: 100px; }",
-            "table { width: auto; margin-top: 50px; }",
-            "table.linkers { width: 90%; }",
+            "#top-table th { font-weight: bold; text-align: right; }",
+            "form table { width: 100%; }",
         )
-        page = self.report.page
-        h2 = page.B.H2("Documents Linked To Glossary Term Names Report")
-        h2.set("class", "center")
-        page.body.insert(1, h2)
-        table = page.B.TABLE(
-            page.B.CAPTION("Glossary Term"),
-            page.B.TR(page.B.TH("Name"), page.B.TD(self.name)),
-            page.B.TR(page.B.TH("Source"), page.B.TD(self.source))
-        )
-        table.set("id", "name-and-source")
-        page.body.insert(2, table)
-        h4 = page.B.H4("Documents Linked to Term Name")
-        h4.set("class", "center emphasis")
-        page.body.insert(3, h4)
-        self.report.page.add_css("\n".join(css))
-        self.report.send()
+        report.page.add_css("\n".join(css))
+        return report
 
     @property
     def types(self):

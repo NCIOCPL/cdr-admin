@@ -3,6 +3,7 @@
 """Report on invalid or blocked CDR documents.
 """
 
+from functools import cached_property
 from cdrcgi import Controller
 
 
@@ -13,6 +14,10 @@ class Control(Controller):
     def build_tables(self):
         """Assemble the two tables used for this report."""
 
+        if not self.doctype:
+            message = "No document type has been selected."
+            self.alerts.append(dict(message=message, type="warning"))
+            return self.show_form()
         subquery = self.Query("doc_version", "MAX(num)").where("id = v.id")
         fields = "v.id", "v.title", "d.active_status"
         query = self.Query("doc_version v", *fields).order("v.id")
@@ -50,7 +55,7 @@ class Control(Controller):
             fieldset.append(page.radio_button("doctype", **opts))
         page.form.append(fieldset)
 
-    @property
+    @cached_property
     def columns(self):
         """Column headers for the report."""
 
@@ -59,23 +64,26 @@ class Control(Controller):
             self.Reporter.Column("Title", width="950px"),
         )
 
-    @property
+    @cached_property
     def doctype(self):
         """CDR document type selected for the report."""
         return self.fields.getvalue("doctype")
 
-    @property
+    @cached_property
     def doctypes(self):
         """Active document types for the form's picklist."""
 
-        if not hasattr(self, "_doctypes"):
-            query = self.Query("doc_type", "id", "name").order("name")
-            query.where("active = 'Y'")
-            query.where("xml_schema IS NOT NULL")
-            query.where("name NOT IN ('Filter', 'xxtest', 'schema')")
-            rows = query.execute(self.cursor).fetchall()
-            self._doctypes = [tuple(row) for row in rows]
-        return self._doctypes
+        query = self.Query("doc_type", "id", "name").order("name")
+        query.where("active = 'Y'")
+        query.where("xml_schema IS NOT NULL")
+        query.where("name NOT IN ('Filter', 'xxtest', 'schema')")
+        rows = query.execute(self.cursor).fetchall()
+        return [tuple(row) for row in rows]
+
+    @cached_property
+    def same_window(self):
+        """Don't open more than one new browser tab."""
+        return [self.SUBMIT] if self.request else []
 
 
 if __name__ == "__main__":

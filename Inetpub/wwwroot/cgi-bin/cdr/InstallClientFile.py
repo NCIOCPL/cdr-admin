@@ -40,12 +40,6 @@ class Control(Controller):
         fieldset.append(page.file_field("file"))
         fieldset.append(page.text_field("location"))
         page.form.append(fieldset)
-        if self.logs is not None:
-            fieldset = page.fieldset("Processing Logs")
-            fieldset.append(self.logs)
-            page.form.append(fieldset)
-            page.add_css("fieldset { width: 600px } #comment { width: 450px }")
-            page.add_css("pre { color: green }")
         page.form.set("enctype", "multipart/form-data")
 
     def show_report(self):
@@ -53,9 +47,9 @@ class Control(Controller):
         self.show_form()
 
     @cached_property
-    def buttons(self):
-        """Customize the action buttons on the banner bar."""
-        return self.SUBMIT, self.DEVMENU, self.ADMINMENU, self.LOG_OUT
+    def same_window(self):
+        """Don't open a new tab when processing the form."""
+        return [self.SUBMIT]
 
     @cached_property
     def client_files(self):
@@ -98,25 +92,30 @@ class Control(Controller):
         return location or None
 
     @cached_property
-    def logs(self):
+    def alerts(self):
         """Log output describing the outcome of the operation."""
 
         if self.file_bytes and self.location:
             if not self.session.can_do("MANAGE CLIENT FILES"):
-                error = "Account not authorized for managing client files."
-                self.bail(error)
+                message = "Account not authorized for managing client files."
+                return [dict(message=message, type="warning")]
             path = self.client_files / self.location
             try:
                 path.parent.mkdir(parents=True, exist_ok=True)
             except Exception as e:
                 self.logger.exception("creating directories for %s", path)
-                self.bail(e)
+                message = f"Failure creating directories for {path}: {e}"
+                return [dict(message=message, type="error")]
             try:
                 path.write_bytes(self.file_bytes)
             except Exception as e:
                 self.logger.exception("writing to %s", path)
-                self.bail(e)
+                return [dict(
+                    message=f"Failure writing {path}: {e}",
+                    type="error",
+                )]
             run_command(f"fix-permissions.cmd {self.client_files}")
+            return self.__refresh_manifest(path)
             message = "\n\n".join([
                 f"Saved {path}.",
                 self.__refresh_manifest().strip(),
@@ -124,9 +123,14 @@ class Control(Controller):
                 f"Elapsed: {self.elapsed}",
             ])
             return self.HTMLPage.B.PRE(message)
-        return None
+        elif self.file_bytes or self.location:
+            return [dict(
+                message="File and Location fields are both required.",
+                type="warning",
+            )]
+        return []
 
-    def __refresh_manifest(self):
+    def __refresh_manifest(self, path):
         """Rebuild the client manifest file.
 
         Return:
@@ -137,9 +141,13 @@ class Control(Controller):
         result = run_command(cmd, merge_output=True)
         if result.returncode:
             output = result.stdout
-            raise Exception(f"Manifest refresh failure: {output}")
+            return [dict(
+                message=f"Manifest refresh failure: {output}",
+                type="error",
+            )]
         self.logger.info("Manifest updated")
-        return "Running RefreshManifest.py ...\n" + result.stdout
+        message = f"{path} successfully installed in {self.elapsed}."
+        return [dict(message=message, type="success")]
 
 
 if __name__ == "__main__":

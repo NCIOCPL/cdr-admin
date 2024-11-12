@@ -8,6 +8,7 @@ frame. The report will be separated into English and Spanish.
 New 'documents modified' reports for restructured glossary documents."
 """
 
+from functools import cached_property
 from cdrcgi import Controller
 from cdrapi.docs import Doc
 import datetime
@@ -17,14 +18,14 @@ from openpyxl.styles import Alignment
 class Control(Controller):
     """Access to database, session, and report/form building."""
 
-    SUBTITLE = "Glossary Concept Documents Modified Report"
+    SUBTITLE = "GTC Documents Modified Report"
     AUDIENCES = ("Patient", "Health professional")
     LANGUAGES = (("en", "English"), ("es", "Spanish"))
 
     def build_tables(self):
         """Assemble the table for the report."""
 
-        opts = dict(columns=self.columns, sheet_name="GlossaryTerm")
+        opts = dict(columns=self.columns, sheet_name="Glossary Term Concepts")
         return self.Reporter.Table(self.rows, **opts)
 
     def populate_form(self, page):
@@ -58,22 +59,25 @@ class Control(Controller):
         fieldset.append(page.B.P(
             "Specify the date range for the versions to be examined "
             "for the report. The required language and audience choices "
-            "determine which comments will be included in the report."
+            "determine which comments will be included in the report. "
+            "This report is generated as an Excel workbook, directly "
+            "downloaded to your workstation."
         ))
         page.form.append(fieldset)
 
-    @property
+    @cached_property
     def audience(self):
         """Audience for the report."""
         return self.fields.getvalue("audience")
 
-    @property
+    @cached_property
     def audience_display(self):
         """Audience display for the comment column."""
+
         display = {'Patient': 'PT', 'Health professional': 'HP'}
         return display[self.audience]
 
-    @property
+    @cached_property
     def columns(self):
         """Column headers for the report."""
 
@@ -86,7 +90,7 @@ class Control(Controller):
                                  width="450px")
         )
 
-    @property
+    @cached_property
     def docs(self):
         """GlossaryTermConcept documents to be included in this report."""
 
@@ -96,7 +100,7 @@ class Control(Controller):
         query.where("d.active_status = 'A'")
         query.where("t.name = 'GlossaryTermConcept'")
         if self.start:
-            query.where(query.Condition("v.dt", self.start, ">="))
+            query.where(query.Condition("v.dt", str(self.start), ">="))
         if self.end:
             query.where(query.Condition("v.dt", f"{self.end} 23:59:59", "<="))
         query.group("v.id")
@@ -104,22 +108,22 @@ class Control(Controller):
         docs = [GlossaryTermConcept(self, row) for row in rows]
         return sorted(docs)
 
-    @property
+    @cached_property
     def end(self):
         """End of the date range for the report."""
-        return self.fields.getvalue("end_date")
+        return self.parse_date(self.fields.getvalue("end_date"))
 
-    @property
+    @cached_property
     def format(self):
         """Override to get an Excel report."""
         return "excel"
 
-    @property
+    @cached_property
     def language(self):
         """Language code selected for the report (en or es)."""
         return self.fields.getvalue("language")
 
-    @property
+    @cached_property
     def rows(self):
         """Values for the report's table."""
 
@@ -134,7 +138,7 @@ class Control(Controller):
     @property
     def start(self):
         """Beginning of the date range for the report."""
-        return self.fields.getvalue("start_date")
+        return self.parse_date(self.fields.getvalue("start_date"))
 
 
 class GlossaryTermConcept:
@@ -161,7 +165,7 @@ class GlossaryTermConcept:
         """Support sorting the documents by title."""
         return self.doc.title < other.doc.title
 
-    @property
+    @cached_property
     def doc(self):
         """`Doc` object for the glossary term concept document."""
 
@@ -170,64 +174,53 @@ class GlossaryTermConcept:
             self._doc = Doc(self.__control.session, **opts)
         return self._doc
 
-    @property
+    @cached_property
     def comment(self):
         """First comment for the definition selected for the report."""
 
-        if not hasattr(self, "_comment"):
-            self._comment = None
-            if self.definition is not None:
-                node = self.definition.find("Comment")
-                if node is not None:
-                    self._comment = self.Comment(node)
-        return self._comment
+        if self.definition is not None:
+            node = self.definition.find("Comment")
+            if node is not None:
+                return self.Comment(node)
+        return None
 
-    @property
+    @cached_property
     def date_first_published(self):
         """Date of first publication of any linked term name document."""
 
-        if not hasattr(self, "_date_first_published"):
-            self._date_first_published = ""
-            query = self.__control.Query("document d", "MIN(d.first_pub) fp")
-            query.join("query_term n", "n.doc_id = d.id")
-            query.where(f"n.path = '{self.NAME_PATH}'")
-            query.where(query.Condition("n.int_val", self.doc.id))
-            row = query.execute(self.__control.cursor).fetchone()
-            if row and row.fp:
-                self._date_first_published = str(row.fp)[:10]
-        return self._date_first_published
+        query = self.__control.Query("document d", "MIN(d.first_pub) fp")
+        query.join("query_term n", "n.doc_id = d.id")
+        query.where(f"n.path = '{self.NAME_PATH}'")
+        query.where(query.Condition("n.int_val", self.doc.id))
+        row = query.execute(self.__control.cursor).fetchone()
+        return str(row.fp)[:10] if row and row.fp else ""
 
-    @property
+    @cached_property
     def date_last_modified(self):
         """Date the definition for this report was last modified."""
 
-        if not hasattr(self, "_date_last_modified"):
-            self._date_last_modified = ""
-            if self.definition is not None:
-                node = self.definition.find("DateLastModified")
-                self._date_last_modified = Doc.get_text(node, "")[:10]
-        return self._date_last_modified
+        if self.definition is not None:
+            node = self.definition.find("DateLastModified")
+            return Doc.get_text(node, "")[:10]
+        return ""
 
-    @property
+    @cached_property
     def definition(self):
         """Definition matching the report's language and audience."""
 
-        if not hasattr(self, "_definition"):
-            self._definition = None
-            path = self.DEFINITION_PATHS[self.__control.language]
-            for node in self.doc.root.findall(path):
-                audiences = [a.text for a in node.findall("Audience")]
-                if self.__control.audience in audiences:
-                    self._definition = node
-                    return node
-        return self._definition
+        path = self.DEFINITION_PATHS[self.__control.language]
+        for node in self.doc.root.findall(path):
+            audiences = [a.text for a in node.findall("Audience")]
+            if self.__control.audience in audiences:
+                return node
+        return None
 
-    @property
+    @cached_property
     def publishable(self):
         """String 'Y' or 'N' depending on whether the version is publshable."""
         return "Y" if self.doc.publishable else "N"
 
-    @property
+    @cached_property
     def row(self):
         "Serialize the concept information to the report table row."
 
@@ -252,22 +245,22 @@ class GlossaryTermConcept:
 
             self.__node = node
 
-        @property
+        @cached_property
         def text(self):
             """String for the comment text."""
             return Doc.get_text(self.__node)
 
-        @property
+        @cached_property
         def date(self):
             """String for the date the comment was entered."""
             return self.__node.get("date")
 
-        @property
+        @cached_property
         def audience(self):
             """String for the audience of the comment (internal or external)"""
             return self.__node.get("audience")
 
-        @property
+        @cached_property
         def user(self):
             """String for the account name of the user entering the comment."""
             return self.__node.get("user")

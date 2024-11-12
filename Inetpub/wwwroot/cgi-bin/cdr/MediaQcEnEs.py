@@ -4,9 +4,9 @@
 """
 
 from cdrcgi import Controller
-from cdr import exNormalize
 from cdrapi.docs import Doc
 from cdrapi.users import Session
+from functools import cached_property
 from lxml import html
 from lxml.html import builder
 import sys
@@ -29,44 +29,37 @@ class Control(Controller):
 
         self.media.show_report()
 
-    @property
+    @cached_property
     def media(self):
         """Subject of the report."""
+        return Media(self) if self.idpair else None
 
-        if not hasattr(self, "_media"):
-            self._media = Media(self) if self.idpair else None
-        return self._media
-
-    @property
+    @cached_property
     def idpair(self):
         """CDR Media document ID pair - returning a list [EN, ES]."""
 
-        # Find Spanish document when using the English version
-        if not hasattr(self, "_idpair"):
-            cdrId = self.fields.getvalue("DocId")
-            _id = exNormalize(cdrId)[1]
+        # Find Spanish document when given the English version.
+        value = self.fields.getvalue("DocId")
+        if not value:
+            self.bail("Missing document ID.")
+        doc_id = Doc.extract_id(value)
 
-            query = self.Query("query_term", "doc_id", "int_val")
-            query.where(query.Condition("path", self.TRANSLATION_OF))
-            query.where(query.Condition("int_val", _id))
-            rows = query.execute(self.cursor).fetchall()
+        query = self.Query("query_term", "doc_id", "int_val")
+        query.where(query.Condition("path", self.TRANSLATION_OF))
+        query.where(query.Condition("int_val", doc_id))
+        rows = query.execute(self.cursor).fetchall()
+        if rows:
+            return [rows[0][1], rows[0][0]]
 
-            # Find English document when using the Spanish version
-            if not rows:
-                queryES = self.Query("query_term", "doc_id", "int_val")
-                queryES.where(query.Condition("path", self.TRANSLATION_OF))
-                queryES.where(query.Condition("doc_id", _id))
-                rowsES = queryES.execute(self.cursor).fetchall()
-
-                if not rowsES:
-                    message = "No Spanish translation found for image document"
-                    self.bail(message)
-
-                self._idpair = [rowsES[0][1], rowsES[0][0]] or None
-                return self._idpair
-
-            self._idpair = [rows[0][1], rows[0][0]] or None
-        return self._idpair
+        # Find English document when given the Spanish version.
+        query = self.Query("query_term", "doc_id", "int_val")
+        query.where(query.Condition("path", self.TRANSLATION_OF))
+        query.where(query.Condition("doc_id", doc_id))
+        rows = query.execute(self.cursor).fetchall()
+        if not rows:
+            message = "No Spanish translation found for image document"
+            self.bail(message)
+        return [rows[0][1], rows[0][0]] or None
 
 
 class Media:
@@ -77,7 +70,6 @@ class Media:
     MEDIA_ELEMENTS = "ContentDescription", "MediaCaption"
     GUEST = Session("guest")
     LANGUAGES = dict(en="English", es="Spanish")
-    # AUDIENCES = "Patients", "Health_professionals"
     AUDIENCES = "Patients",
     FILTER = "set:QC Media Set"
     EN_INGLES = " (en ingl\xe9s)"
@@ -90,7 +82,7 @@ class Media:
             control - access to the database and the report parameters
         """
 
-        self.__control = control
+        self.control = control
 
     def show_report(self):
         """Send the report back to the browser."""
@@ -104,113 +96,99 @@ class Media:
         sys.stdout.buffer.write(html.tostring(self.report, **opts))
         sys.exit(0)
 
-    @property
-    def control(self):
-        """Access to all the information we need for the report."""
-        return self.__control
-
-    @property
+    @cached_property
     def doc(self):
         """CDR `Doc` objects for the Media document."""
 
-        if not hasattr(self, "_doc"):
-            self._doc_en = Doc(self.control.session, id=self.control.idpair[0])
-            self._doc_es = Doc(self.control.session, id=self.control.idpair[1])
-            # self._doc = Doc(self.control.session, id=self.control.id)
-            if self._doc_en.doctype.name != "Media":
-                self.control.bail("Not a Media document")
-            self._doc = [self._doc_en, self._doc_es]
-        return self._doc
+        doc_en = Doc(self.control.session, id=self.control.idpair[0])
+        doc_es = Doc(self.control.session, id=self.control.idpair[1])
+        if doc_en.doctype.name != "Media":
+            self.control.bail("Not a Media document")
+        return [doc_en, doc_es]
 
-    @property
+    @cached_property
     def report(self):
         """`HTMLPage` object for the report."""
 
-        if not hasattr(self, "_report"):
-            B = builder
-            meta = B.META(charset="utf-8")
-            link = B.LINK(href=self.CSS, rel="stylesheet")
-            icon = B.LINK(href="/favicon.ico", rel="icon")
-            head = B.HEAD(meta, B.TITLE(self.TITLE), icon, link)
-            time = B.SPAN(self.control.started.ctime())
-            args = self.SUBTITLE, B.BR(), "Side-by-Side", B.BR(), time
-            cdrId = self.control.fields.getvalue("DocId")
-            orig_id = B.P(f"{cdrId}", id="media-id")
-            wrapper = body = B.BODY(B.E("header", B.H1(*args)), orig_id)
-            self._report = B.HTML(head, body)
-            # for langcode in sorted(self.captions):
-            for cdrdoc in self.doc:
-                # language = self.LANGUAGES[langcode]
-                media_id = B.P(f"CDR{self.doc[0].id}", id="media-id")
-                wrapper = B.DIV(B.CLASS("lang-wrapper"))
-                body.append(wrapper)
-                # self.control.bail(self.control.id)
-                # for caption in self.captions[langcode]:
+        B = builder
+        meta = B.META(charset="utf-8")
+        link = B.LINK(href=self.CSS, rel="stylesheet")
+        icon = B.LINK(href="/favicon.ico", rel="icon")
+        head = B.HEAD(meta, B.TITLE(self.TITLE), icon, link)
+        time = B.SPAN(self.control.started.ctime())
+        args = self.SUBTITLE, B.BR(), "Side-by-Side", B.BR(), time
+        cdrId = self.control.fields.getvalue("DocId")
+        orig_id = B.P(f"{cdrId}", id="media-id")
+        wrapper = body = B.BODY(B.E("header", B.H1(*args)), orig_id)
+        report = B.HTML(head, body)
+        for cdrdoc in self.doc:
+            media_id = B.P(f"CDR{self.doc[0].id}", id="media-id")
+            wrapper = B.DIV(B.CLASS("lang-wrapper"))
+            body.append(wrapper)
 
-                # Display the language if uniquely identified
-                lang = self.getLanguage(cdrdoc.id)
-                if not lang:
-                    self.control.bail("Found none or multiple languages")
-                # wrapper.append(B.H2(section))
+            # Display the language if uniquely identified
+            lang = self.getLanguage(cdrdoc.id)
+            if not lang:
+                self.control.bail("Found none or multiple languages")
 
-                # Display the CDR-ID
-                media_id = B.P(f"{lang} - CDR{cdrdoc.id}", id="media-id")
-                wrapper.append(media_id)
+            # Display the CDR-ID
+            media_id = B.P(f"{lang} - CDR{cdrdoc.id}", id="media-id")
+            wrapper.append(media_id)
 
-                # Display the image title
-                media_title = self.getTitle(cdrdoc.id)
-                media_id = B.P(media_title, B.CLASS("media-title"))
-                wrapper.append(media_id)
+            # Display the image title
+            media_title = self.getTitle(cdrdoc.id)
+            media_id = B.P(media_title, B.CLASS("media-title"))
+            wrapper.append(media_id)
 
-                # Display the image
-                if self.isImage(cdrdoc.id):
-                    image = ("/cgi-bin/cdr/GetCdrImage.py"
-                             f"?id=CDR{cdrdoc.id}-400.jpg")
-                    wrapper.append(B.IMG(src=image))
-                else:
-                    host_id = self.getHostID(cdrdoc.id)
-                    image = (f"https://img.youtube.com/vi/{host_id}"
-                             "/hqdefault.jpg")
-                    wrapper.append(B.P(B.IMG(src=image)))
+            # Display the image
+            if self.isImage(cdrdoc.id):
+                image = ("/cgi-bin/cdr/GetCdrImage.py"
+                         f"?id=CDR{cdrdoc.id}-400.jpg")
+                wrapper.append(B.IMG(src=image))
+            else:
+                host_id = self.getHostID(cdrdoc.id)
+                image = (f"https://img.youtube.com/vi/{host_id}"
+                         "/hqdefault.jpg")
+                wrapper.append(B.P(B.IMG(src=image)))
 
-                # Display the image labels
-                label_hdr = B.P("Label", B.CLASS("section-hdr"))
+            # Display the image labels
+            label_hdr = B.P("Label", B.CLASS("section-hdr"))
 
-                labels = self.getLabel(cdrdoc.id)
-                if labels:
-                    ul = B.UL()
-                    for label in labels:
-                        ul.append(B.LI(label))
-                    wrapper.append(label_hdr)
-                    wrapper.append(ul)
+            labels = self.getLabel(cdrdoc.id)
+            if labels:
+                ul = B.UL()
+                for label in labels:
+                    ul.append(B.LI(label))
+                wrapper.append(label_hdr)
+                wrapper.append(ul)
 
-                desc_hdr = B.P("Content Description", B.CLASS("section-hdr"))
-                wrapper.append(desc_hdr)
-                base_path = "/Media/MediaContent"
-                description_path = "/ContentDescriptions/ContentDescription"
-                caption_path = "/Captions/MediaCaption"
+            desc_hdr = B.P("Content Description", B.CLASS("section-hdr"))
+            wrapper.append(desc_hdr)
+            base_path = "/Media/MediaContent"
+            description_path = "/ContentDescriptions/ContentDescription"
+            caption_path = "/Captions/MediaCaption"
 
-                descriptions = self.getInfo(cdrdoc.id,
-                                            f"{base_path}{description_path}")
+            descriptions = self.getInfo(cdrdoc.id,
+                                        f"{base_path}{description_path}")
 
-                if descriptions:
-                    for description in descriptions:
-                        wrapper.append(B.P(B.B(f"{description[0]}:"),
-                                           B.BR(),
-                                           f" {description[1]}"))
+            if descriptions:
+                for description in descriptions:
+                    wrapper.append(B.P(B.B(f"{description[0]}:"),
+                                       B.BR(),
+                                       f" {description[1]}"))
 
-                caption_hdr = B.P("Caption", B.CLASS("section-hdr"))
-                wrapper.append(caption_hdr)
-                captions = self.getInfo(cdrdoc.id,
-                                        f"{base_path}{caption_path}")
+            caption_hdr = B.P("Caption", B.CLASS("section-hdr"))
+            wrapper.append(caption_hdr)
+            captions = self.getInfo(cdrdoc.id,
+                                    f"{base_path}{caption_path}")
 
-                if captions:
-                    for caption in captions:
-                        wrapper.append(B.P(B.B(f"{caption[0]}:"),
-                                           B.BR(),
-                                           f"  {caption[1]}"))
+            if captions:
+                for caption in captions:
+                    wrapper.append(B.P(B.B(f"{caption[0]}:"),
+                                       B.BR(),
+                                       f"  {caption[1]}"))
 
-        return self._report
+        return report
 
     # Select the language of the document.  Each document for which
     # this report is used should only include one language code (en/es)

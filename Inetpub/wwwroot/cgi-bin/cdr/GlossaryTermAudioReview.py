@@ -67,6 +67,7 @@ from cdr import run_command
 from cdrcgi import Controller, Excel
 from cdrapi.settings import Tier
 from datetime import datetime
+from functools import cached_property
 from io import BytesIO
 from os import scandir
 from sys import stdout
@@ -128,11 +129,11 @@ class Control(Controller):
             page - HTMLPage object on which we draw the form
         """
 
-        # Set the table background to match the rest of the form page.
-        rules = ["td, th { background:#e8e8e8; }"]
-
         # Show the review form for an audio file set if one has been picked.
+        rules = []
         if self.audio_set:
+
+            # Assemble the instructions for using the form.
             instructions = (
                 "Click a hyperlinked mp3 filename to play the sound in "
                 "your browser-configured mp3 player (files which have "
@@ -145,18 +146,33 @@ class Control(Controller):
                 "rejected terms will be created and displayed on your "
                 "workstation. Please save it for future use.",
             )
-            page.form.append(page.hidden_field("id", self.audio_set.id))
             fieldset = page.fieldset("Instructions")
             for paragraph in instructions:
                 fieldset.append(page.B.P(paragraph))
-            page.form.append(fieldset)
+
+            # Force the page object to assemble the DOM elements for the main
+            # block. We need to move the very wide form out from the grid
+            # container.
+            grid_container = None
+            if page.main is not None:
+                grid_container = page.form.getparent()
+            page.form.append(page.hidden_field("id", self.audio_set.id))
+            if grid_container is not None:
+                grid_container.append(fieldset)
+                grid_container.addnext(page.form)
+            else:
+                page.form.append(fieldset)
+                message = "Unable to widen the form."
+                header = "Internal error"
+                alert = dict(header=header, message=message, type="warning")
+                self.alerts.append(alert)
+            page.form.append(page.button(self.SAVE))
             page.form.append(self.audio_set.table)
+            page.form.set("target", "_self")
             rules += (
-                "td, th { border-color:#888; }",
-                "fieldset{ width: 900px; }",
-                ".status-buttons { width: 86px; white-space: nowrap; }",
-                ".status-buttons input { padding-left: 10px; }",
-                "td:last-child: padding: 0 2px; }",
+                "#primary-form table { width: 100%; }",
+                ".usa-table td.status-buttons { padding: 0 1rem .8rem; }",
+                "#primary-form { width: 90%; margin: 2rem; }",
             )
 
         # Otherwise, show the list of all the sets on the disk.
@@ -171,15 +187,18 @@ class Control(Controller):
             page.form.append(fieldset)
             columns = "File name", "Review status", "Date modified"
             columns = [page.B.TH(column) for column in columns]
-            table = page.B.TABLE(page.B.TR(*columns))
+            thead = page.B.THEAD(page.B.TR(*columns))
+            classes = "usa-table usa-table--borderless"
+            table = page.B.TABLE(thead, page.B.CLASS(classes))
             for zipfile in self.zipfiles_on_disk:
                 table.append(zipfile.row)
             fieldset = page.fieldset("Audio Zip Files")
             fieldset.append(table)
             page.form.append(fieldset)
+            color = f"color: {page.LINK_COLOR};"
             rules += [
-                "td, th { border-color: #bbb; }",
-                "table { width: 95%; }",
+                f".usa-form td a {{ text-decoration: None; {color} }}",
+                f".usa-form td a:visited {{ {color} }}",
             ]
         page.add_css("\n".join(rules))
 
@@ -207,6 +226,7 @@ class Control(Controller):
             self.logger.info("updated %d mp3 rows", updates)
             self.conn.commit()
         if self.audio_set.done:
+            self.suppress_sidenav = False
             book_name = self.audio_set.close()
             legend = f"Audio Set {self.audio_set.name} Review Complete"
             fieldset = self.form_page.fieldset(legend)
@@ -231,7 +251,8 @@ class Control(Controller):
             self.audio_set = None
         else:
             if updates:
-                self.subtitle = f"Saved updates for {updates} recording(s)"
+                message = f"Saved updates for {updates} recording(s)."
+                self.alerts.append(dict(message=message, type="success"))
         self.show_form()
 
     def send_book(self):
@@ -275,29 +296,17 @@ class Control(Controller):
             mp3_bytes = zipfile.read(mp3_name)
         self.send_bytes(mp3_bytes, mp3_name, "audio/mpeg")
 
-    @property
+    @cached_property
     def audio_set(self):
         """Information about the set of MP3 files being reviewed."""
 
-        if not hasattr(self, "_audio_set"):
-            self._audio_set = None
-            if self.name:
-                self._audio_set = AudioSet(self, name=self.name)
-            elif self.id:
-                self._audio_set = AudioSet(self, id=self.id)
-        return self._audio_set
+        if self.name:
+            return AudioSet(self, name=self.name)
+        elif self.id:
+            return AudioSet(self, id=self.id)
+        return None
 
-    @audio_set.setter
-    def audio_set(self, value):
-        """Allow the audio_set to be reset after review is done.
-
-        Pass:
-            value - new value for the property (will be None in this case)
-        """
-
-        self._audio_set = value
-
-    @property
+    @cached_property
     def book(self):
         """Name of new workbook with rejected audio files.
 
@@ -305,30 +314,27 @@ class Control(Controller):
         """
         return self.fields.getvalue("book")
 
-    @property
+    @cached_property
     def buttons(self):
-        """Customize the action list (this isn't a report)."""
-        if not self.audio_set:
-            return self.ADMINMENU, self.LOG_OUT
-        else:
-            return self.SAVE, self.ADMINMENU, self.LOG_OUT
+        """We'll put the button at the top in populate_form()."""
+        return []
 
-    @property
+    @cached_property
     def id(self):
         """ID of the MP3 file set's row in the database table."""
         return self.fields.getvalue("id")
 
-    @property
+    @cached_property
     def mp3(self):
         """ID of the MP3 file the reviewer wishes to hear."""
         return self.fields.getvalue("mp3")
 
-    @property
+    @cached_property
     def name(self):
         """File name for the selected MP3 file set to be reviewed."""
         return self.fields.getvalue("name")
 
-    @property
+    @cached_property
     def name_counts(self):
         """Index of integers for new MP3 names.
 
@@ -336,34 +342,19 @@ class Control(Controller):
         are multiple Spanish names for the same term.
         """
 
-        if not hasattr(self, "_name_counts"):
-            self._name_counts = dict()
-        return self._name_counts
+        return {}
 
-    @property
-    def subtitle(self):
-        """String to be displayed under the main banner."""
+    @cached_property
+    def suppress_sidenav(self):
+        """Use the full grid container width for the second form."""
+        return True if self.audio_set else False
 
-        if not hasattr(self, "_subtitle"):
-            self._subtitle = self.SUBTITLE
-        return self._subtitle
-
-    @subtitle.setter
-    def subtitle(self, value):
-        """Allow the display to be overriden after saving reviews.
-
-        Pass:
-            value - new string to be displayed under the banner
-        """
-
-        self._subtitle = value
-
-    @property
+    @cached_property
     def user_id(self):
         """Account ID for the current CDR user."""
         return self.session.user_id
 
-    @property
+    @cached_property
     def zipfiles(self):
         """Load the complete set of term audio zipfiles from the database.
 
@@ -379,217 +370,192 @@ class Control(Controller):
         zipfiles on this script's initial page.
         """
 
-        if not hasattr(self, "_zipfiles"):
+        class ZipFiles:
+            """ID and name indexes to the term audio zipfiles."""
 
-            class ZipFiles:
-                """ID and name indexes to the term audio zipfiles."""
+            def __init__(self, control):
+                """Save the reference to the control object.
 
-                def __init__(self, control):
-                    """Save the reference to the control object.
+                Pass:
+                    control - access to the DB and the HTML builder class
+                """
+
+                self.control = control
+
+            @cached_property
+            def files(self):
+                """Sequence of `ZipFile` objects."""
+
+                query = self.control.Query("term_audio_zipfile", "*")
+                rows = query.execute(self.control.cursor).fetchall()
+                return [self.ZipFile(self.control, row) for row in rows]
+
+            @cached_property
+            def ids(self):
+                """Dictionary of zipfiles by primary key."""
+                return dict([(file.id, file) for file in self.files])
+
+            @cached_property
+            def names(self):
+                """Dictionary of zipfiles by primary key."""
+                return dict([(f.filename, f) for f in self.files])
+
+            class ZipFile:
+                """Information about a single archive of audio files.
+
+                This is a simpler class than the global `AudioSet`
+                class. That class has information about the audio
+                files in the zip file. This class has just enough
+                information to meet the needs of the page which
+                displays all of the zipfiles.
+
+                Properties:
+                    id - integer primary key for the zipfile record
+                    filename - string for the zipfile's name
+                    filedate - date/time stamp for the zipfile
+                    complete - Boolean indicating whether reviews are done
+                """
+
+                PROPS = "id", "filename", "filedate", "complete"
+
+                def __init__(self, control, row):
+                    """Capture the caller's information.
 
                     Pass:
-                        control - access to the DB and the HTML builder class
+                        control - access to the HTML builder class
+                        row - result set row from the SQL query
                     """
 
-                    self.__control = control
+                    self.control = control
+                    self.row = row
 
-                @property
-                def files(self):
-                    """Sequence of `ZipFile` objects."""
+                def __getattr__(self, name):
+                    """Return the other properties directly."""
+                    return getattr(self.row, name)
 
-                    if not hasattr(self, "_files"):
-                        ctrl = self.__control
-                        query = ctrl.Query("term_audio_zipfile", "*")
-                        rows = query.execute(ctrl.cursor).fetchall()
-                        self._files = [self.ZipFile(ctrl, row) for row in rows]
-                    return self._files
+                def __str__(self):
+                    """String for debugging/logging."""
 
-                @property
-                def ids(self):
-                    """Dictionary of zipfiles by primary key."""
+                    props = [f"{n}={getattr(self, n)}" for n in self.PROPS]
+                    return " ".join(props)
 
-                    if not hasattr(self, "_ids"):
-                        ids = dict([(file.id, file) for file in self.files])
-                        self._ids = ids
-                    return self._ids
+                @cached_property
+                def complete(self):
+                    """True if all the audio files have been reviewed."""
+                    return self.row.complete == "Y"
 
-                @property
-                def names(self):
-                    """Dictionary of zipfiles by primary key."""
+        zipfiles = {}
+        for zipfile in ZipFiles(self).files:
+            zipfiles[zipfile.filename.lower()] = zipfile
+        return zipfiles
 
-                    if not hasattr(self, "_names"):
-                        names = dict([(f.filename, f) for f in self.files])
-                        self._names = names
-                    return self._names
-
-                class ZipFile:
-                    """Information about a single archive of audio files.
-
-                    This is a simpler class than the global `AudioSet`
-                    class. That class has information about the audio
-                    files in the zip file. This class has just enough
-                    information to meet the needs of the page which
-                    displays all of the zipfiles.
-
-                    Properties:
-                        id - integer primary key for the zipfile record
-                        filename - string for the zipfile's name
-                        filedate - date/time stamp for the zipfile
-                        complete - Boolean indicating whether reviews are done
-                    """
-
-                    PROPS = "id", "filename", "filedate", "complete"
-
-                    def __init__(self, control, row):
-                        """Capture the caller's information.
-
-                        Pass:
-                            control - access to the HTML builder class
-                            row - result set row from the SQL query
-                        """
-
-                        self.__control = control
-                        self.__row = row
-
-                    def __getattr__(self, name):
-                        """Return the other properties directly."""
-                        return getattr(self.__row, name)
-
-                    def __str__(self):
-                        """String for debugging/logging."""
-
-                        if not hasattr(self, "_str"):
-                            names = self.PROPS
-                            props = [f"{n}={getattr(self, n)}" for n in names]
-                            self._str = " ".join(props)
-                        return self._str
-
-                    @property
-                    def complete(self):
-                        """True if all the audio files have been reviewed."""
-                        return self.__row.complete == "Y"
-
-            self.__zipfiles = ZipFiles(self)
-            self._zipfiles = {}
-            for zipfile in self.__zipfiles.files:
-                self._zipfiles[zipfile.filename.lower()] = zipfile
-        return self._zipfiles
-
-    @property
+    @cached_property
     def zipfile_names(self):
         """Index by name of all the audio set zipfiles on the disk."""
 
-        if not hasattr(self, "_zipfile_names"):
-            self._zipfile_names = {}
-            for zipfile in self.zipfiles_on_disk:
-                self._zipfile_names[zipfile.key] = zipfile
-        return self._zipfile_names
+        by_name = {}
+        for zipfile in self.zipfiles_on_disk:
+            by_name[zipfile.key] = zipfile
+        return by_name
 
-    @property
+    @cached_property
     def zipfiles_on_disk(self):
         """Zipfiles in the file system."""
 
-        if not hasattr(self, "_zipfiles_on_disk"):
+        class DiskFile:
+            STARTED = "Started"
+            UNREVIEWED = "Unreviewed"
+            COMPLETED = "Completed"
+            STATUS_SORT = {STARTED: 1, UNREVIEWED: 2, COMPLETED: 3}
 
-            class DiskFile:
-                STARTED = "Started"
-                UNREVIEWED = "Unreviewed"
-                COMPLETED = "Completed"
-                STATUS_SORT = {STARTED: 1, UNREVIEWED: 2, COMPLETED: 3}
+            def __init__(self, control, entry):
+                self.control = control
+                self.entry = entry
 
-                def __init__(self, control, entry):
-                    self.__control = control
-                    self.__entry = entry
+            def __lt__(self, other):
+                """Sort by status then by filename."""
+                return self.sortkey < other.sortkey
 
-                def __lt__(self, other):
-                    """Sort by status then by filename."""
-                    return self.sortkey < other.sortkey
+            @cached_property
+            def datetime(self):
+                """When was the file last modified?"""
+                return datetime.fromtimestamp(self.entry.stat().st_mtime)
 
-                @property
-                def control(self):
-                    return self.__control
+            @cached_property
+            def db_info(self):
+                """Information about this file from the database."""
+                return self.control.zipfiles.get(self.key)
 
-                @property
-                def datetime(self):
-                    if not hasattr(self, "_datetime"):
-                        mtime = self.__entry.stat().st_mtime
-                        self._datetime = datetime.fromtimestamp(mtime)
-                    return self._datetime
+            @cached_property
+            def name(self):
+                """Base name for the file."""
+                return self.entry.name
 
-                @property
-                def db_info(self):
-                    """Information about this file from the database."""
-                    if not hasattr(self, "_db_info"):
-                        self._db_info = self.control.zipfiles.get(self.key)
-                    return self._db_info
+            @cached_property
+            def path(self):
+                """Location of the file."""
+                return self.entry.path.replace("\\", "/")
 
-                @property
-                def name(self):
-                    return self.__entry.name
+            @cached_property
+            def key(self):
+                """Used by the sort key."""
+                return self.name.lower()
 
-                @property
-                def path(self):
-                    if not hasattr(self, "_path"):
-                        self._path = self.__entry.path.replace("\\", "/")
-                    return self._path
+            @cached_property
+            def sortkey(self):
+                "Major sort by status, subsort by filename"
+                return self.STATUS_SORT[self.status], self.key
 
-                @property
-                def key(self):
-                    if not hasattr(self, "_key"):
-                        self._key = self.name.lower()
-                    return self._key
+            @cached_property
+            def status(self):
+                """Review status for the set."""
 
-                @property
-                def sortkey(self):
-                    "Major sort by status, subsort by filename"
+                if not self.db_info:
+                    return self.UNREVIEWED
+                elif self.db_info.complete:
+                    return self.COMPLETED
+                else:
+                    return self.STARTED
 
-                    if not hasattr(self, "_sortkey"):
-                        self._sortkey = self.STATUS_SORT[self.status], self.key
-                    return self._sortkey
+            @cached_property
+            def row(self):
+                """Table row for showing the available sets."""
 
-                @property
-                def status(self):
-                    if not hasattr(self, "_status"):
-                        if not self.db_info:
-                            self._status = self.UNREVIEWED
-                        elif self.db_info.complete:
-                            self._status = self.COMPLETED
-                        else:
-                            self._status = self.STARTED
-                    return self._status
-
-                @property
-                def row(self):
-                    if not hasattr(self, "_row"):
-                        B = self.control.HTMLPage.B
-                        filename = self.__entry.name
-                        if self.status != self.COMPLETED:
-                            script = self.control.script
-                            if self.status == self.UNREVIEWED:
-                                params = dict(name=self.name)
-                            else:
-                                params = dict(id=self.db_info.id)
-                            url = self.control.make_url(script, **params)
-                            filename = B.A(filename, href=url)
-                        filename = B.TD(filename)
-                        status = B.TD(self.status, B.CLASS("center"))
-                        modified = str(self.datetime)[:19]
-                        modified = B.TD(modified, B.CLASS("center"))
-                        self._row = B.TR(filename, status, modified)
-                    return self._row
-
-            files = []
-            for entry in scandir(self.ZIPDIR):
-                key = entry.name.lower()
-                if key.startswith("week") and key.endswith(".zip"):
-                    if self.NAMEPAT.match(entry.name):
-                        files.append(DiskFile(self, entry))
+                B = self.control.HTMLPage.B
+                filename = self.entry.name
+                if self.status != self.COMPLETED:
+                    script = self.control.script
+                    if self.status == self.UNREVIEWED:
+                        params = dict(name=self.name)
                     else:
-                        message = f"Found file {entry.name!r}."
-                        self.logger.warning(message)
-                        self.bail(message, extra=self.FIXNAME_INSTRUCTIONS)
-            self._zipfiles_on_disk = sorted(files)
-        return self._zipfiles_on_disk
+                        params = dict(id=self.db_info.id)
+                    url = self.control.make_url(script, **params)
+                    filename = B.A(filename, href=url, target=self.target)
+                filename = B.TD(filename)
+                status = B.TD(self.status)
+                modified = str(self.datetime)[:19]
+                modified = B.TD(modified)
+                return B.TR(filename, status, modified)
+
+            @cached_property
+            def target(self):
+                """Don't open new browser tabs indefinitely."""
+
+                if self.control.request == Control.SAVE:
+                    return "_self"
+                return "_blank"
+
+        files = []
+        for entry in scandir(self.ZIPDIR):
+            key = entry.name.lower()
+            if key.startswith("week") and key.endswith(".zip"):
+                if self.NAMEPAT.match(entry.name):
+                    files.append(DiskFile(self, entry))
+                else:
+                    message = f"Found file {entry.name!r}."
+                    self.logger.warning(message)
+                    self.bail(message, extra=self.FIXNAME_INSTRUCTIONS)
+        return sorted(files)
 
 
 class AudioSet:
@@ -610,7 +576,7 @@ class AudioSet:
         "review_date",
     )
     HEADERS = (
-        "Appr/Rej/None",
+        "Disposition",
         "CDR ID",
         "Term name",
         "Lang",
@@ -667,7 +633,7 @@ class AudioSet:
 
     @property
     def audio_files(self):
-        """Sequence of `MP3` files in this set."""
+        """Sequence of `MP3` files in this set (manually cached)."""
 
         if "audio_files" not in self.__cache:
             query = self.control.Query("term_audio_mp3", "*")
@@ -678,12 +644,12 @@ class AudioSet:
             self.__cache["audio_files"] = audio_files
         return self.__cache["audio_files"]
 
-    @property
+    @cached_property
     def control(self):
         """Access to the database, runtime parameters, and logging."""
         return self.__control
 
-    @property
+    @cached_property
     def cursor(self):
         """Access to the database."""
         return self.control.cursor
@@ -700,111 +666,103 @@ class AudioSet:
         del self.__cache["audio_files"]
         return all([(mp3.review_status in "AR") for mp3 in self.audio_files])
 
-    @property
+    @cached_property
     def filename(self):
         """The name of the zip file (without its directory)."""
         return self.row.filename
 
-    @property
+    @cached_property
     def id(self):
         """Primary key for the set's row in the term_audio_zipfile table."""
         return self.row.id
 
-    @property
+    @cached_property
     def name(self):
         """Alias for self.filename."""
         return self.filename
 
-    @property
+    @cached_property
     def new_name(self):
         """Filename for a new Excel workbook for rejected audio files."""
 
-        if not hasattr(self, "_new_name"):
-            match = Control.NAMEPAT.match(self.filename)
-            base = match.group("base")
-            suffix = match.group("rev")
-            revision = 1
-            if suffix:
-                match = Control.REVPAT.match(suffix)
-                revision = int(match.group("num")) + 1
-            self._new_name = f"{base}_Rev{revision:d}"
-        return self._new_name
+        match = Control.NAMEPAT.match(self.filename)
+        base = match.group("base")
+        suffix = match.group("rev")
+        revision = 1
+        if suffix:
+            match = Control.REVPAT.match(suffix)
+            revision = int(match.group("num")) + 1
+        return f"{base}_Rev{revision:d}"
 
-    @property
+    @cached_property
     def new_workbook(self):
         """New Excel workbook for the rejected audio files."""
 
-        if not hasattr(self, "_new_workbook"):
-            self._new_workbook = book = Excel(self.new_name)
-            book.add_sheet("Term Names")
-            styles = dict(alignment=book.center, font=book.bold)
-            col = 1
-            for name, width in self.COLUMNS:
-                book.set_width(col, width)
-                book.write(1, col, name, styles)
-                col += 1
-            row = 2
-            for mp3 in self.rejects:
-                book.write(row, 1, mp3.cdr_id)
-                book.write(row, 2, mp3.term_name)
-                book.write(row, 3, mp3.language)
-                book.write(row, 4, mp3.pronunciation)
-                book.write(row, 5, mp3.new_mp3_name)
-                book.write(row, 6, mp3.reader_note)
-                book.write(row, 7, mp3.reviewer_note)
-                if mp3.reuse_media_id:
-                    book.write(row, 8, mp3.reuse_media_id)
-                row += 1
-        return self._new_workbook
+        book = Excel(self.new_name)
+        book.add_sheet("Term Names")
+        styles = dict(alignment=book.center, font=book.bold)
+        col = 1
+        for name, width in self.COLUMNS:
+            book.set_width(col, width)
+            book.write(1, col, name, styles)
+            col += 1
+        row = 2
+        for mp3 in self.rejects:
+            book.write(row, 1, mp3.cdr_id)
+            book.write(row, 2, mp3.term_name)
+            book.write(row, 3, mp3.language)
+            book.write(row, 4, mp3.pronunciation)
+            book.write(row, 5, mp3.new_mp3_name)
+            book.write(row, 6, mp3.reader_note)
+            book.write(row, 7, mp3.reviewer_note)
+            if mp3.reuse_media_id:
+                book.write(row, 8, mp3.reuse_media_id)
+            row += 1
+        return book
 
-    @property
+    @cached_property
     def rejects(self):
         """Audio files which need to be re-done."""
 
-        if not hasattr(self, "_rejects"):
-            self._rejects = []
-            for mp3 in self.audio_files:
-                if mp3.review_status == "R":
-                    self._rejects.append(mp3)
-        return self._rejects
+        rejects = []
+        for mp3 in self.audio_files:
+            if mp3.review_status == "R":
+                rejects.append(mp3)
+        return rejects
 
-    @property
+    @cached_property
     def row(self):
         """Database row for set (may have to create it first)."""
 
-        if not hasattr(self, "_row"):
-            self._row = None
-            id = self.__opts.get("id")
-            if not id:
-                name = self.__opts.get("name")
-                if not name:
-                    self.control.bail("No ID or name for MP3 set")
-                query = self.control.Query("term_audio_zipfile", "id")
-                query.where(query.Condition("filename", name))
-                rows = query.execute(self.cursor).fetchall()
-                if rows:
-                    id = rows[0].id
-                else:
-                    try:
-                        id = self.__install_set(name)
-                    except Exception as e:
-                        self.control.logger.exception("Installing set")
-                        self.control.bail(e)
-            query = self.control.Query("term_audio_zipfile", "*")
-            query.where(query.Condition("id", id))
-            self.__row = query.execute(self.cursor).fetchall()[0]
-        return self.__row
+        id = self.__opts.get("id")
+        if not id:
+            name = self.__opts.get("name")
+            if not name:
+                self.control.bail("No ID or name for MP3 set")
+            query = self.control.Query("term_audio_zipfile", "id")
+            query.where(query.Condition("filename", name))
+            rows = query.execute(self.cursor).fetchall()
+            if rows:
+                id = rows[0].id
+            else:
+                try:
+                    id = self.__install_set(name)
+                except Exception as e:
+                    self.control.logger.exception("Installing set")
+                    self.control.bail(e)
+        query = self.control.Query("term_audio_zipfile", "*")
+        query.where(query.Condition("id", id))
+        return query.execute(self.cursor).fetchall()[0]
 
-    @property
+    @cached_property
     def table(self):
         """Display the MP3 files for this set, with decision form fields."""
 
-        if not hasattr(self, "_table"):
-            B = self.control.HTMLPage.B
-            cols = [B.TH(col) for col in self.HEADERS]
-            rows = [mp3.row for mp3 in sorted(self.audio_files)]
-            self._table = B.TABLE(B.TR(*cols), *rows)
-        return self._table
+        B = self.control.HTMLPage.B
+        cols = [B.TH(col) for col in self.HEADERS]
+        rows = [mp3.row for mp3 in sorted(self.audio_files)]
+        classes = "usa-table usa-table--borderless"
+        return B.TABLE(B.THEAD(B.TR(*cols)), B.TBODY(*rows), B.CLASS(classes))
 
     def __install_set(self, name):
         """Add the rows for this set to the database.
@@ -878,7 +836,7 @@ class AudioSet:
     class MP3:
         """A glossary term name audio pronunciation file to be reviewed."""
 
-        STATUSES = "ARU"
+        STATUSES = "Approved", "Rejected", "Unreviewed"
         STATUS_ORDER = dict(U=1, R=2, A=3)
         FIELDS = "review_status", "reviewer_note", "reviewer_id", "review_date"
         FIELDS = ", ".join(f"{name} = ?" for name in FIELDS)
@@ -906,13 +864,11 @@ class AudioSet:
         def __str__(self):
             """String for debugging/logging."""
 
-            if not hasattr(self, "_str"):
-                names = AudioSet.FIELDS
-                props = [f"{n}={getattr(self, n)}" for n in names]
-                props.insert(0, f"id={self.id}")
-                props.insert(2, f"review_status={self.review_status}")
-                self._str = " ".join(props)
-            return self._str
+            names = AudioSet.FIELDS
+            props = [f"{n}={getattr(self, n)}" for n in names]
+            props.insert(0, f"id={self.id}")
+            props.insert(2, f"review_status={self.review_status}")
+            return " ".join(props)
 
         def update(self, status, note):
             """Save change to status and/or reviewer note.
@@ -928,76 +884,64 @@ class AudioSet:
             args = values + [self.id]
             self.control.cursor.execute(self.UPDATE, args)
 
-        @property
+        @cached_property
         def control(self):
             """Access to the database and logging."""
             return self.__control
 
-        @property
+        @cached_property
         def langcode(self):
             """Used for generating a new name for a rejected pronunciation."""
             return "en" if self.language == "English" else "es"
 
-        @property
+        @cached_property
         def new_mp3_name(self):
             """Name to be added to the spreadsheet of rejected MP3 files."""
 
-            if not hasattr(self, "_new_mp3_name"):
-                book_name = self.control.audio_set.new_name
-                name = f"{self.cdr_id:d}_{self.langcode}"
-                n = ""
-                if name in self.control.name_counts:
-                    self.control.name_counts[name] += 1
-                    n = self.control.name_counts[name]
-                else:
-                    self.control.name_counts[name] = 1
-                self._new_mp3_name = f"{book_name}/{name}{n}.mp3"
-            return self._new_mp3_name
+            book_name = self.control.audio_set.new_name
+            name = f"{self.cdr_id:d}_{self.langcode}"
+            n = ""
+            if name in self.control.name_counts:
+                self.control.name_counts[name] += 1
+                n = self.control.name_counts[name]
+            else:
+                self.control.name_counts[name] = 1
+            return f"{book_name}/{name}{n}.mp3"
 
-        @property
+        @cached_property
         def row(self):
             """Table columns for this MP3 file."""
 
-            if not hasattr(self, "_row"):
-                B = self.control.HTMLPage.B
-                buttons = []
-                spacer = "\xa0" * 2
-                for status in self.STATUSES:
-                    name = f"status-{self.id:d}"
-                    button = B.INPUT(type="radio", name=name, value=status)
-                    if self.review_status.upper() == status:
-                        button.set("checked")
-                    buttons.append(spacer)
-                    buttons.append(button)
-                buttons.append(spacer)
-                url = self.control.make_url(self.control.script, mp3=self.id)
-                note_opts = dict(rows="1", cols="40", name=f"note-{self.id:d}")
-                cells = [
-                    B.TD(*buttons, B.CLASS("status-buttons")),
-                    B.TD(str(self.cdr_id), B.CLASS("center")),
-                    B.TD(self.term_name),
-                    B.TD(self.language, B.CLASS("center")),
-                    B.TD(self.pronunciation or ""),
-                    B.TD(B.A(self.mp3_name, href=url, target="_blank")),
-                    B.TD(self.reader_note or ""),
-                    B.TD(B.TEXTAREA(self.reviewer_note or "", **note_opts)),
-                ]
-                self._row = B.TR(*cells)
-            return self._row
+            Page = self.control.HTMLPage
+            B = Page.B
+            buttons = []
+            review_status = self.review_status.upper() or "U"
+            for status in self.STATUSES:
+                name = f"status-{self.id:d}"
+                opts = dict(value=status[0], label=status)
+                if review_status == status[0]:
+                    opts["checked"] = True
+                buttons.append(Page.radio_button(name, **opts))
+            url = self.control.make_url(self.control.script, mp3=self.id)
+            note_opts = dict(rows="4", cols="30", name=f"note-{self.id:d}")
+            cells = [
+                B.TD(*buttons, B.CLASS("status-buttons")),
+                B.TD(str(self.cdr_id), B.CLASS("center")),
+                B.TD(self.term_name),
+                B.TD(self.language, B.CLASS("center")),
+                B.TD(self.pronunciation or ""),
+                B.TD(B.A(self.mp3_name, href=url, target="_blank")),
+                B.TD(self.reader_note or ""),
+                B.TD(B.TEXTAREA(self.reviewer_note or "", **note_opts)),
+            ]
+            return B.TR(*cells)
 
-        @property
+        @cached_property
         def sortkey(self):
             """Sort by status, then by glossary term ID, then by language."""
 
-            if not hasattr(self, "_sortkey"):
-                status_order = self.STATUS_ORDER[self.review_status]
-                self._sortkey = (
-                    status_order,
-                    self.cdr_id,
-                    self.language,
-                    self.mp3_name,
-                )
-            return self._sortkey
+            status_order = self.STATUS_ORDER[self.review_status]
+            return status_order, self.cdr_id, self.language, self.mp3_name
 
 
 if __name__ == "__main__":

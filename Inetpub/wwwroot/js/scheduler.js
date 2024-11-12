@@ -6,9 +6,9 @@
 function add_buttons() {
     console.log("start add_buttons()")
     jQuery(".job-opt-button").remove();
-    green_button().insertAfter(jQuery(".opt-name").last());
-    jQuery(".opt-name").each(function(i) {
-        red_button(i).insertAfter(jQuery(this));
+    jQuery(".opt-block legend").last().append(green_button());
+    jQuery(".opt-block legend").each(function(i) {
+        jQuery(this).append(red_button(i));
     });
     console.log("done add_buttons()")
 }
@@ -42,9 +42,11 @@ function red_button(i) {
 // Add a new block, possibly with existing options.
 function add_option_block(i, name, value) {
     var id = i ? i : jQuery(".opt-name").length + 1;
-    var attrs = {class: "opt-block", id: "opt-block-" + id};
+    var attrs = {class: "opt-block usa-fieldset", id: "opt-block-" + id};
     var fieldset = jQuery("<fieldset>", attrs);
-    fieldset.append(jQuery("<legend>Named Job Option</legend>"));
+    var legend = jQuery("<legend>Named Job Option</legend>");
+    legend.attr("class", "usa-legend");
+    fieldset.append(legend);
     fieldset.append(make_field("name", id, "Name", name));
     fieldset.append(make_field("value", id, "Value", value));
     //jQuery("form").append(fieldset);
@@ -65,6 +67,9 @@ function remove_option(id) {
     jQuery.each(blocks, function(i, block) {
         add_option_block(i + 1, block["name"], block["value"]);
     });
+    if (blocks.length === 0) {
+        add_option_block();
+    }
     add_buttons();
 }
 
@@ -72,9 +77,9 @@ function remove_option(id) {
 function make_field(name, id, label, value) {
     var id = "opt-" + name + "-" + id;
     var field = jQuery("<div>", {class: "labeled-field"});
-    field.append(jQuery("<label>", {for: id, text: label}));
+    field.append(jQuery("<label>", {for: id, text: label, class: "usa-label"}));
     field.append(jQuery("<input>", {
-        class: "opt-" + name,
+        class: "usa-input usa-input--xl opt-" + name,
         name: id,
         id: id,
         value: value

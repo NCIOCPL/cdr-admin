@@ -78,12 +78,12 @@ class Control(Controller):
             fieldset = page.fieldset("Linking Documents")
             opts = dict(label="Doc Type", options=[("", "Any")]+self.doctypes)
             fieldset.append(page.select("linking_type", **opts))
-            subset = page.fieldset("Links From Blocked Documents")
+            page.form.append(fieldset)
+            fieldset = page.fieldset("Links From Blocked Documents")
             opts = dict(label="Include", value="Y")
-            subset.append(page.radio_button("with_blocked", **opts))
+            fieldset.append(page.radio_button("with_blocked", **opts))
             opts = dict(label="Exclude", value="N", checked=True)
-            subset.append(page.radio_button("with_blocked", **opts))
-            fieldset.append(subset)
+            fieldset.append(page.radio_button("with_blocked", **opts))
             page.form.append(fieldset)
 
     @property

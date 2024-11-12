@@ -3,6 +3,7 @@
 """Manage the CDR control values.
 """
 
+from functools import cached_property
 from json import dumps
 from cdrcgi import Controller
 from cdrapi.db import Query
@@ -24,19 +25,31 @@ class Control(Controller):
     )
     URL = "CdrQueries.py?query=Active Control Values&Request=Run"
 
-    def run(self):
-        """Override so we can handle some custom commands."""
+    def inactivate(self):
+        """Suppress a value which is no longer needed."""
 
-        if not self.session.can_do("SET_SYS_VALUE"):
-            self.bail("Not authorized to manage control values")
-        if self.request == self.SAVE:
-            self.save()
-        elif self.request == self.DELETE:
-            self.inactivate()
-        elif self.request == self.JSON:
-            self.json()
-        else:
-            Controller.run(self)
+        group = self.fields.getvalue("group")
+        name = self.fields.getvalue("name")
+        if not (group and name):
+            message = "Nothing to inactivate."
+            return self.alerts.append(dict(message=message, type="warning"))
+        args = self.session, group, name
+        try:
+            self.session.tier.inactivate_control_value(*args)
+        except Exception as e:
+            self.logger.exception("Control deletion failure")
+            return self.alerts.append(dict(message=str(e), type="error"))
+        self.groups = Groups()
+        for name in "_group", "_name", "_value", "_comment":
+            if hasattr(self, name):
+                delattr(self, name)
+        message = "Value successfully dropped."
+        self.alerts.append(dict(message=message, type="success"))
+        self.show_form()
+
+    def json(self):
+        """Send the serialized active values to the client."""
+        self.send_page(self.groups.json, "json")
 
     def populate_form(self, page):
         """Add the field groups to the tool's form.
@@ -115,19 +128,35 @@ function check_name() {{
         lines = 50;
     jQuery("#value").attr("rows", lines);
 }}
+/*
 jQuery(function() {{
     jQuery("input[value='{self.SHOW}']").click(function() {{
-        window.open("{self.URL}", "ControlValues");
+        window.open("{self.URL}", "_blank");
     }});
-}});""")
+}}); */""")
 
-        # Customize the display widths, fonts.
-        page.add_css("""\
-fieldset { width: 800px; }
-.labeled-field input,
-.labeled-field textarea,
-.labeled-field select { width: 650px; }
-#value { font-family: Courier; }""")
+        # Customize the fonts.
+        page.add_css("#value { font-family: Courier; }")
+
+    def run(self):
+        """Override so we can handle some custom commands."""
+
+        if not self.session.can_do("SET_SYS_VALUE"):
+            self.bail("Not authorized to manage control values")
+        try:
+            if self.request == self.SHOW:
+                params = dict(query="Active Control Values", Request="Run")
+                self.redirect("CdrQueries.py", **params)
+            if self.request == self.SAVE:
+                return self.save()
+            elif self.request == self.DELETE:
+                return self.inactivate()
+            elif self.request == self.JSON:
+                return self.json()
+        except Exception as e:
+            self.logger.exception("Control value editing failure")
+            self.bail(e)
+        Controller.run(self)
 
     def save(self):
         """Save a new or updated control value."""
@@ -139,96 +168,74 @@ fieldset { width: 800px; }
         if not name and self.group:
             name = self.group[self.name].name
         if not (group and name):
-            self.bail("Can't save without both a group and a name.")
+            message = "Can't save without both a group and a name."
+            return self.alerts.append(dict(message=message, type="warning"))
         args = self.session, group, name, self.value
         opts = dict(comment=self.comment)
         try:
             self.session.tier.set_control_value(*args, **opts)
         except Exception as e:
-            self.bail(str(e))
-        self._groups = Groups()
+            self.logger.exception("Control save failure")
+            return self.alerts.append(dict(message=str(e), type="error"))
+        self.groups = Groups()
         self._group = self.groups[group.lower()]
         self._name = name.lower()
-        self.subtitle = "Value successfully saved"
+        message = "Value successfully saved."
+        self.alerts.append(dict(message=message, type="success"))
         self.show_form()
 
-    def inactivate(self):
-        """Suppress a value which is no longer needed."""
-
-        group = self.fields.getvalue("group")
-        name = self.fields.getvalue("name")
-        if not (group and name):
-            self.bail("Nothing to inactivate")
-        args = self.session, group, name
-        try:
-            self.session.tier.inactivate_control_value(*args)
-        except Exception as e:
-            self.bail(str(e))
-        names = "_group", "_name", "_value", "_comment"
-        self._groups = Groups()
-        for name in names:
-            if hasattr(self, name):
-                delattr(self, name)
-        self.subtitle = "Value successfully deleted"
-        self.show_form()
-
-    def json(self):
-        """Send the serialized active values to the client."""
-        self.send_page(self.groups.json, "json")
-
-    @property
+    @cached_property
     def buttons(self):
         """Supply a customized set of action buttons."""
-
-        return (
-            self.SAVE,
-            self.DELETE,
-            self.JSON,
-            self.SHOW,
-            self.DEVMENU,
-            self.ADMINMENU,
-            self.LOG_OUT,
-        )
+        return self.SAVE, self.DELETE, self.JSON, self.SHOW
 
     @property
     def comment(self):
-        """The string value for the current comment."""
+        """The string value for the current comment.
+
+        The manual caching is deliberate. Don't use @cached_property.
+        """
 
         if not hasattr(self, "_comment"):
             if self.request == self.DELETE:
                 self._comment = None
             else:
-                self._comment = self.fields.getvalue("comment")
+                self._comment = self.fields.getvalue("comment", "").strip()
+            if self.request == self.SAVE:
+                return self._comment
             if not self._comment and self.group and self.name:
                 self._comment = self.group.values[self.name].comment
         return self._comment
 
     @property
     def group(self):
-        """Tuple of group name and value dictionaries."""
+        """Tuple of group name and value dictionaries.
+
+        The manual caching is deliberate. Don't use @cached_property.
+        """
 
         if not hasattr(self, "_group"):
             self._group = group_name = None
             if self.request != self.DELETE:
                 group_name = self.fields.getvalue("group")
             if group_name:
-                gkey = group_name.lower()
-                self._group = self.groups[gkey]
+                key = group_name.lower()
+                self._group = self.groups[key]
             if not self._group and self.groups:
                 self._group = self.groups.default
         return self._group
 
-    @property
+    @cached_property
     def groups(self):
         """Dictionary of all active control values."""
-
-        if not hasattr(self, "_groups"):
-            self._groups = Groups()
-        return self._groups
+        return Groups()
 
     @property
     def name(self):
-        """Name of the current value."""
+        """Name of the current value.
+
+        The manual caching is deliberate. Don't use @cached_property.
+        """
 
         if not hasattr(self, "_name"):
             if self.request == self.DELETE:
@@ -239,32 +246,27 @@ fieldset { width: 800px; }
                 self._name = self.group.keys[0]
         return self._name
 
-    @property
+    @cached_property
     def new_group(self):
         """Group for which to store a new row in the ctl table."""
         return self.fields.getvalue("new_group", "").strip()
 
-    @property
+    @cached_property
     def new_name(self):
         """Name for which to store a new row in the ctl table."""
         return self.fields.getvalue("new_name", "").strip()
 
-    @property
-    def subtitle(self):
-        """String to be displayed under the primary banner."""
-
-        if not hasattr(self, "_subtitle"):
-            self.subtitle = self.SUBTITLE
-        return self._subtitle
-
-    @subtitle.setter
-    def subtitle(self, value):
-        """Allow the subtitle to be updated dynamically."""
-        self._subtitle = value
+    @cached_property
+    def same_window(self):
+        """Avoid opening a new tab for these commands."""
+        return "Save", "Delete"
 
     @property
     def value(self):
-        """Current value string."""
+        """Current value string.
+
+        The manual caching is deliberate. Don't use @cached_property.
+        """
 
         if not hasattr(self, "_value"):
             if self.request == self.DELETE:
@@ -294,31 +296,21 @@ class Groups:
             group.values[value.key] = value
         self.groups = groups
 
-    @property
+    @cached_property
     def options(self):
         """Tuples of value/label suitable for a picklist."""
 
-        if not hasattr(self, "_options"):
-            options = []
-            for group in self.groups.values():
-                options.append((group.key, group.name))
-            self._options = sorted(options)
-        return self._options
+        options = []
+        for group in self.groups.values():
+            options.append((group.key, group.name))
+        return sorted(options)
 
-    @property
+    @cached_property
     def default(self):
         """Group with the first key."""
+        return self.groups[self.keys[0]] if self.groups else None
 
-        if not self.groups:
-            return None
-        return self.groups[self.keys[0]]
-
-    @property
-    def keys(self):
-        """Machine names for the groups."""
-        return sorted(self.groups)
-
-    @property
+    @cached_property
     def json(self):
         """Convert the object to a format usable by client-side scripting."""
 
@@ -330,6 +322,11 @@ class Groups:
             options = [dict(key=opt[0], name=opt[1]) for opt in group.options]
             groups[group.key] = dict(options=options, values=values)
         return dumps(groups, indent=2)
+
+    @cached_property
+    def keys(self):
+        """Machine names for the groups."""
+        return sorted(self.groups)
 
     def __len__(self):
         """Support boolean testing."""
@@ -347,18 +344,16 @@ class Groups:
             self.key = key
             self.values = {}
 
-        @property
+        @cached_property
         def options(self):
             """Tuples of value/label suitable for a picklist."""
 
-            if not hasattr(self, "_options"):
-                options = []
-                for value in self.values.values():
-                    options.append((value.key, value.name))
-                self._options = sorted(options)
-            return self._options
+            options = []
+            for value in self.values.values():
+                options.append((value.key, value.name))
+            return sorted(options)
 
-        @property
+        @cached_property
         def keys(self):
             """Canonical names for the values."""
             return sorted(self.values)
@@ -377,13 +372,10 @@ class Groups:
             self.value = value
             self.comment = comment
 
-        @property
+        @cached_property
         def key(self):
             """Lowercase version of value name."""
-
-            if not hasattr(self, "_key"):
-                self._key = self.name.lower()
-            return self._key
+            return self.name.lower()
 
 
 if __name__ == "__main__":

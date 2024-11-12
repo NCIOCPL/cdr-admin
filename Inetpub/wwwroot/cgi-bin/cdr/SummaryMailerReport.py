@@ -7,6 +7,7 @@ Two flavors of the report are available, standard, and historical.
 
 from collections import UserDict
 from datetime import date
+from functools import cached_property
 from cdr import Board
 from cdrapi.docs import Doc
 from cdrcgi import Controller
@@ -16,7 +17,6 @@ class Control(Controller):
     """Access to the database and report-building tools."""
 
     LOGNAME = "SummaryMailerReport"
-    SUBMENU = "Mailer Menu"
     MEMBER_SORT = "member"
     SUMMARY_SORT = "summary"
     CDR_REF = f"{{{Doc.NS}}}ref"
@@ -48,7 +48,7 @@ class Control(Controller):
         "Changes",
         "Comments",
     )
-    assert(len(WIDTHS) == len(HEADERS))
+    assert len(WIDTHS) == len(HEADERS)
 
     def build_tables(self):
         """Assemble the report's single table."""
@@ -98,114 +98,98 @@ class Control(Controller):
             page.form.append(fieldset)
         page.add_css("fieldset { width: 650px; }")
 
-    @property
+    @cached_property
     def board(self):
         """Integer CDR document ID for the report's selected board."""
 
-        if not hasattr(self, "_board"):
-            try:
-                self._board = int(self.fields.getvalue("board"))
-                if self._board not in self.boards:
-                    self.bail()
-            except Exception:
-                self._board = None
-        return self._board
+        try:
+            board = int(self.fields.getvalue("board"))
+            if board not in self.boards:
+                self.bail()
+            return board
+        except Exception:
+            return None
 
-    @property
+    @cached_property
     def boards(self):
         """Dictionary of PDQ boards for the form's radio buttons."""
+        return Board.get_boards(None, self.cursor)
 
-        if not hasattr(self, "_boards"):
-            self._boards = Board.get_boards(None, self.cursor)
-        return self._boards
-
-    @property
+    @cached_property
     def board_members(self):
         """Dictionary of `BoardMember` objects, indexed by Person doc ID."""
 
-        if not hasattr(self, "_board_members"):
-            for create_sql in self.CREATE_TABLES:
-                self.cursor.execute(create_sql)
-            query = self.Query("query_term m", "m.int_val", "m.doc_id")
-            query.join("query_term b", "b.doc_id = m.doc_id")
-            query.join("active_doc d", "d.id = m.doc_id")
-            query.where(f"m.path = '{self.MEMBER_PATH}'")
-            query.where(f"b.path = '{self.BOARD_PATH}'")
-            query.where(f"b.int_val = {self.board}")
-            query.unique()
-            self.cursor.execute(f"INSERT INTO #board_member {query}")
-            query = self.Query("query_term", "doc_id").unique()
-            query.where(f"path = '{self.SUMMARY_PATH}'")
-            query.where(f"int_val = {self.board}")
-            self.cursor.execute(f"INSERT INTO #board_summary {query}")
-            self.conn.commit()
-            query = self.Query("#board_member", "person_id", "member_id")
-            self._board_members = {}
-            for row in query.execute(self.cursor).fetchall():
-                self._board_members[row.person_id] = BoardMember(self, row)
-        return self._board_members
+        for create_sql in self.CREATE_TABLES:
+            self.cursor.execute(create_sql)
+        query = self.Query("query_term m", "m.int_val", "m.doc_id")
+        query.join("query_term b", "b.doc_id = m.doc_id")
+        query.join("active_doc d", "d.id = m.doc_id")
+        query.where(f"m.path = '{self.MEMBER_PATH}'")
+        query.where(f"b.path = '{self.BOARD_PATH}'")
+        query.where(f"b.int_val = {self.board}")
+        query.unique()
+        self.cursor.execute(f"INSERT INTO #board_member {query}")
+        query = self.Query("query_term", "doc_id").unique()
+        query.where(f"path = '{self.SUMMARY_PATH}'")
+        query.where(f"int_val = {self.board}")
+        self.cursor.execute(f"INSERT INTO #board_summary {query}")
+        self.conn.commit()
+        query = self.Query("#board_member", "person_id", "member_id")
+        board_members = {}
+        for row in query.execute(self.cursor).fetchall():
+            board_members[row.person_id] = BoardMember(self, row)
+        return board_members
 
-    @property
+    @cached_property
     def caption(self):
         """What we display at the top of the report."""
 
-        if not hasattr(self, "_caption"):
-            if self.historical:
-                title = "Summary Mailer History Report ({} - {})"
-                title = title.format(self.start, self.end)
-            elif self.show == self.LAST:
-                title = "Summary Mailer Report (Last)"
-            else:
-                title = "Summary Mailer Report (Last Checked In)"
-            board_name = self.boards[self.board].name
-            self._caption = f"{title} - {board_name} - {date.today()}"
-        return self._caption
+        if self.historical:
+            title = "Summary Mailer History Report ({} - {})"
+            title = title.format(self.start, self.end)
+        elif self.show == self.LAST:
+            title = "Summary Mailer Report (Last)"
+        else:
+            title = "Summary Mailer Report (Last Checked In)"
+        board_name = self.boards[self.board].name
+        return f"{title} - {board_name} - {date.today()}"
 
-    @property
+    @cached_property
     def columns(self):
         """Headers we display at the top of each report table column."""
 
-        if not hasattr(self, "_columns"):
-            self._columns = []
-            for i, header in enumerate(self.HEADERS):
-                opts = dict(width=f"{self.WIDTHS[i]:d}px")
-                self._columns.append(self.Reporter.Column(header, **opts))
-        return self._columns
+        columns = []
+        for i, header in enumerate(self.HEADERS):
+            opts = dict(width=f"{self.WIDTHS[i]:d}px")
+            columns.append(self.Reporter.Column(header, **opts))
+        return columns
 
-    @property
+    @cached_property
     def end(self):
         """End of the report's date range."""
 
-        if not hasattr(self, "_end"):
-            try:
-                value = self.fields.getvalue("end", str(date.today()))
-                self._end = self.parse_date(value)
-            except Exception:
-                self.bail("Invalid date")
-        return self._end
+        try:
+            value = self.fields.getvalue("end", str(date.today()))
+            return self.parse_date(value)
+        except Exception:
+            self.bail("Invalid date")
 
-    @property
+    @cached_property
     def flavor(self):
         """Is this the 'standard' or the 'historical' version of the report?"""
+        return self.fields.getvalue("flavor", "standard")
 
-        if not hasattr(self, "_flavor"):
-            self._flavor = self.fields.getvalue("flavor", "standard")
-        return self._flavor
-
-    @property
+    @cached_property
     def format(self):
         """This is an Excel report."""
         return "excel"
 
-    @property
+    @cached_property
     def historical(self):
         """True if we're running the historical flavor of the report."""
+        return "histor" in self.flavor
 
-        if not hasattr(self, "_historical"):
-            self._historical = "histor" in self.flavor
-        return self._historical
-
-    @property
+    @cached_property
     def mailers(self):
         """The documents on which we're reporting.
 
@@ -214,152 +198,135 @@ class Control(Controller):
         used.
         """
 
-        if not hasattr(self, "_mailers"):
-            if not self.board_members:
-                self.bail("Internal failure")
-            fields = (
-                "s.doc_id AS mailer_id",
-                "s.int_val AS summary_id",
-                "d.value AS date",
-                "r.int_val AS recipient_id",
-            )
-            date_path = "/Mailer/Sent"
-            if not self.historical and self.show == self.LAST_CHECKED_IN:
-                date_path = "/Mailer/Response/Received"
-            query = self.Query("query_term s", *fields)
-            query.where("s.path = '/Mailer/Document/@cdr:ref'")
-            query.join("query_term r", "r.doc_id = s.doc_id")
-            query.where("r.path = '/Mailer/Recipient/@cdr:ref'")
-            query.join("query_term d", "d.doc_id = s.doc_id")
-            query.where(f"d.path = '{date_path}'")
-            query.join("#board_member m", "m.person_id = r.int_val")
-            query.join("#board_summary b", "b.doc_id = s.int_val")
-            if self.historical:
-                start, end = self.start, f"{self.end} 23:59:59"
-                query.where(query.Condition("d.value", start, ">="))
-                query.where(query.Condition("d.value", end, "<="))
-            mailers = [] if self.historical else {}
-            for row in query.execute(self.cursor).fetchall():
-                member = self.board_members[row.recipient_id]
-                if row.date and member.was_active(row.date):
-                    if self.historical:
-                        mailers.append(Mailer(self, row.mailer_id))
-                    else:
-                        key = row.recipient_id, row.summary_id
-                        if key not in mailers or mailers[key][1] < row.date:
-                            mailers[key] = row.mailer_id, row.date
-            if self.historical:
-                self._mailers = mailers
-            else:
-                self._mailers = [Mailer(self, v[0]) for v in mailers.values()]
-        return self._mailers
+        if not self.board_members:
+            self.bail("Internal failure")
+        fields = (
+            "s.doc_id AS mailer_id",
+            "s.int_val AS summary_id",
+            "d.value AS date",
+            "r.int_val AS recipient_id",
+        )
+        date_path = "/Mailer/Sent"
+        if not self.historical and self.show == self.LAST_CHECKED_IN:
+            date_path = "/Mailer/Response/Received"
+        query = self.Query("query_term s", *fields)
+        query.where("s.path = '/Mailer/Document/@cdr:ref'")
+        query.join("query_term r", "r.doc_id = s.doc_id")
+        query.where("r.path = '/Mailer/Recipient/@cdr:ref'")
+        query.join("query_term d", "d.doc_id = s.doc_id")
+        query.where(f"d.path = '{date_path}'")
+        query.join("#board_member m", "m.person_id = r.int_val")
+        query.join("#board_summary b", "b.doc_id = s.int_val")
+        if self.historical:
+            start, end = self.start, f"{self.end} 23:59:59"
+            query.where(query.Condition("d.value", start, ">="))
+            query.where(query.Condition("d.value", end, "<="))
+        mailers = [] if self.historical else {}
+        for row in query.execute(self.cursor).fetchall():
+            member = self.board_members[row.recipient_id]
+            if row.date and member.was_active(row.date):
+                if self.historical:
+                    mailers.append(Mailer(self, row.mailer_id))
+                else:
+                    key = row.recipient_id, row.summary_id
+                    if key not in mailers or mailers[key][1] < row.date:
+                        mailers[key] = row.mailer_id, row.date
+        if self.historical:
+            return mailers
+        return [Mailer(self, v[0]) for v in mailers.values()]
 
-    @property
+    @cached_property
     def order(self):
         """How should we sort the report?"""
 
-        if not hasattr(self, "_order"):
-            self._order = self.fields.getvalue("sort", self.MEMBER_SORT)
-            if self._order not in [values[0] for values in self.SORTS]:
-                self.bail()
-        return self._order
+        order = self.fields.getvalue("sort", self.MEMBER_SORT)
+        if order not in [values[0] for values in self.SORTS]:
+            self.bail()
+        return order
 
-    @property
+    @cached_property
     def recipients(self):
         """Cached lookup of mailer recipient names by CDR Person ID.
 
         This is an alias for the base class method which does cached
         lookup of document titles.
         """
+
         return self.doc_titles
 
-    @property
+    @cached_property
     def rows(self):
         """One for each mailer in the report."""
 
-        if not hasattr(self, "_rows"):
-            self._rows = []
-            for mailer in sorted(self.mailers):
-                self._rows.append([
-                    self.Reporter.Cell(mailer.id, center=True),
-                    mailer.recipient,
-                    mailer.summary,
-                    self.Reporter.Cell(mailer.sent, center=True),
-                    self.Reporter.Cell(mailer.response, center=True),
-                    "\n".join(mailer.changes),
-                    "\n".join(mailer.comments),
-                ])
-        return self._rows
+        rows = []
+        for mailer in sorted(self.mailers):
+            rows.append([
+                self.Reporter.Cell(mailer.id, center=True),
+                mailer.recipient,
+                mailer.summary,
+                self.Reporter.Cell(mailer.sent, center=True),
+                self.Reporter.Cell(mailer.response, center=True),
+                "\n".join(mailer.changes),
+                "\n".join(mailer.comments),
+            ])
+        return rows
 
-    @property
+    @cached_property
     def sheet_name(self):
         """String for the report's tab."""
+        return self.subtitle
+
+    @cached_property
+    def show(self):
+        """Last mailer or last checked-in mailer?"""
+
+        show = self.fields.getvalue("show", self.LAST)
+        if show not in [values[0] for values in self.SHOW]:
+            self.bail()
+        return show
+
+    @cached_property
+    def start(self):
+        """Beginning of the report's date range."""
+
+        value = self.fields.getvalue("start", "2000-01-01")
+        try:
+            start = self.parse_date(value)
+        except Exception:
+            self.bail("Invalid date")
+        return start
+
+    @cached_property
+    def subtitle(self):
+        """What we display at the top of the page."""
 
         if self.historical:
             return "Summary Mailer History Report"
         return "Summary Mailer Report"
 
-    @property
-    def show(self):
-        """Last mailer or last checked-in mailer?"""
-
-        if not hasattr(self, "_show"):
-            self._show = self.fields.getvalue("show", self.LAST)
-            if self._show not in [values[0] for values in self.SHOW]:
-                self.bail()
-        return self._show
-
-    @property
-    def start(self):
-        """Beginning of the report's date range."""
-
-        if not hasattr(self, "_start"):
-            value = self.fields.getvalue("start", "2000-01-01")
-            try:
-                self._start = self.parse_date(value)
-            except Exception:
-                self.bail("Invalid date")
-        return self._start
-
-    @property
-    def subtitle(self):
-        """What we display below the main banner."""
-
-        if not hasattr(self, "_subtitle"):
-            if self.historical:
-                self._subtitle = "Summary Mailer History Report"
-            else:
-                self._subtitle = "Summary Mailer Report"
-        return self._subtitle
-
-    @property
+    @cached_property
     def summaries(self):
         """Cached lookup of PDQ summary title by CDR document ID."""
 
-        if not hasattr(self, "_summaries"):
-            class Summaries(UserDict):
-                def __init__(self, control):
-                    self.__control = control
-                    UserDict.__init__(self)
+        class Summaries(UserDict):
+            def __init__(self, control):
+                self.__control = control
+                UserDict.__init__(self)
 
-                def __getitem__(self, key):
-                    if key not in self.data:
-                        query = self.__control.Query("query_term", "value")
-                        query.where("path = '/Summary/SummaryTitle'")
-                        query.where(f"doc_id = {key}")
-                        row = query.execute(self.__control.cursor).fetchone()
-                        self.data[key] = row.value if row else None
-                    return self.data[key]
-            self._summaries = Summaries(self)
-        return self._summaries
+            def __getitem__(self, key):
+                if key not in self.data:
+                    query = self.__control.Query("query_term", "value")
+                    query.where("path = '/Summary/SummaryTitle'")
+                    query.where(f"doc_id = {key}")
+                    row = query.execute(self.__control.cursor).fetchone()
+                    self.data[key] = row.value if row else None
+                return self.data[key]
+        return Summaries(self)
 
-    @property
+    @cached_property
     def title(self):
         """Depends on whether we're showing the form or the report."""
-
-        if self.request == self.SUBMIT:
-            return self.subtitle
-        return self.TITLE
+        return self.subtitle if self.request else self.TITLE
 
 
 class BoardMember:
@@ -373,8 +340,8 @@ class BoardMember:
             row - CDR document IDs for the board member
         """
 
-        self.__control = control
-        self.__row = row
+        self.control = control
+        self.row = row
 
     def was_active(self, when):
         """True if the board member was an active member of the board.
@@ -393,28 +360,27 @@ class BoardMember:
                     return True
         return False
 
-    @property
+    @cached_property
     def member_id(self):
         """Integer ID for the board member's CDR `PDQBoardMemberInfo` doc."""
-        return self.__row.member_id
+        return self.row.member_id
 
-    @property
+    @cached_property
     def person_id(self):
         """Integer ID for the board member's CDR `Person` document."""
-        return self.__row.person_id
+        return self.row.person_id
 
-    @property
+    @cached_property
     def terms(self):
         """Membership terms for the board member."""
 
-        if not hasattr(self, "_terms"):
-            self._terms = []
-            doc = Doc(self.__control.session, id=self.member_id)
-            for node in doc.root.findall("BoardMembershipDetails"):
-                term = self.MembershipTerm(node)
-                if term.board == self.__control.board and term.start:
-                    self._terms.append(term)
-        return self._terms
+        terms = []
+        doc = Doc(self.control.session, id=self.member_id)
+        for node in doc.root.findall("BoardMembershipDetails"):
+            term = self.MembershipTerm(node)
+            if term.board == self.control.board and term.start:
+                terms.append(term)
+        return terms
 
     class MembershipTerm:
         """Date range and board ID for a PDQ board membership term."""
@@ -426,41 +392,35 @@ class BoardMember:
                 node - XML doc node from which the properties can be pulled
             """
 
-            self.__node = node
+            self.node = node
 
-        @property
+        @cached_property
         def board(self):
             """CDR Organization document integer ID for the PDQ board."""
 
-            if not hasattr(self, "_board"):
-                try:
-                    ref = self.__node.find("BoardName").get(Control.CDR_REF)
-                    self._board = Doc.extract_id(ref)
-                except Exception:
-                    self._board = None
-            return self._board
+            try:
+                ref = self.node.find("BoardName").get(Control.CDR_REF)
+                return Doc.extract_id(ref)
+            except Exception:
+                return None
 
-        @property
+        @cached_property
         def end(self):
             """When this membership term ended, if applicable."""
 
-            if not hasattr(self, "_end"):
-                self._end = None
-                node = self.__node.find("TerminationDate")
-                if node is not None and node.text is not None:
-                    self._end = node.text
-            return self._end
+            node = self.node.find("TerminationDate")
+            if node is not None and node.text is not None:
+                return node.text
+            return None
 
-        @property
+        @cached_property
         def start(self):
             """When this membership term started."""
 
-            if not hasattr(self, "_start"):
-                self._start = None
-                node = self.__node.find("TermStartDate")
-                if node is not None and node.text is not None:
-                    self._start = node.text
-            return self._start
+            node = self.node.find("TermStartDate")
+            if node is not None and node.text is not None:
+                return node.text
+            return None
 
 
 class Mailer:
@@ -474,108 +434,87 @@ class Mailer:
             id - integer for the unique ID of the CDR `Mailer` document
         """
 
-        self.__control = control
-        self.__id = id
+        self.control = control
+        self.id = id
 
     def __lt__(self, other):
         """Sorting depends on the `key` property, determined by report type."""
         return self.key < other.key
 
-    @property
+    @cached_property
     def changes(self):
         """Categories of changes reflected in the recipient's response."""
 
-        if not hasattr(self, "_changes"):
-            self._changes = []
-            for node in self.doc.root.findall("Response/ChangesCategory"):
-                change = node.text.strip() if node.text else ""
-                if change:
-                    self._changes.append(change)
-        return self._changes
+        changes = []
+        for node in self.doc.root.findall("Response/ChangesCategory"):
+            change = node.text.strip() if node.text else ""
+            if change:
+                changes.append(change)
+        return changes
 
-    @property
+    @cached_property
     def comments(self):
         """Additional notes supplied byu the mailer recipient."""
 
-        if not hasattr(self, "_comments"):
-            self._comments = []
-            for node in self.doc.root.findall("Response/Comment"):
-                comment = node.text.strip() if node.text else ""
-                if comment:
-                    self._comments.append(comment)
-        return self._comments
+        comments = []
+        for node in self.doc.root.findall("Response/Comment"):
+            comment = node.text.strip() if node.text else ""
+            if comment:
+                comments.append(comment)
+        return comments
 
-    @property
+    @cached_property
     def doc(self):
         """`Doc` object for the mailer."""
+        return Doc(self.control.session, id=self.id)
 
-        if not hasattr(self, "_doc"):
-            self._doc = Doc(self.__control.session, id=self.id)
-        return self._doc
-
-    @property
-    def id(self):
-        """CDR document ID integer for the mailer."""
-        return self.__id
-
-    @property
+    @cached_property
     def key(self):
         """Sorting support, adjusted for the type of report."""
 
-        if not hasattr(self, "_key"):
-            if self.__control.order == Control.MEMBER_SORT:
-                self._key = self.recipient.lower(), self.summary.lower()
-            else:
-                self._key = self.summary.lower(), self.recipient.lower()
-        return self._key
+        if self.control.order == Control.MEMBER_SORT:
+            return self.recipient.lower(), self.summary.lower()
+        return self.summary.lower(), self.recipient.lower()
 
-    @property
+    @cached_property
     def recipient(self):
         """Name of the person who got the mailer."""
 
-        if not hasattr(self, "_recipient"):
-            node = self.doc.root.find("Recipient")
-            try:
-                doc_id = Doc.extract_id(node.get(Control.CDR_REF))
-                self._recipient = self.__control.recipients[doc_id]
-            except Exception:
-                self._recipient = None
-        return self._recipient
+        node = self.doc.root.find("Recipient")
+        try:
+            doc_id = Doc.extract_id(node.get(Control.CDR_REF))
+            return self.control.recipients[doc_id]
+        except Exception:
+            return None
 
-    @property
+    @cached_property
     def response(self):
         """When the recipient's response was received."""
 
-        if not hasattr(self, "_response"):
-            self._response = None
-            for node in self.doc.root.findall("Response/Received"):
-                if node.text:
-                    self._response = node.text.strip()[:10]
-        return self._response
+        for node in self.doc.root.findall("Response/Received"):
+            if node.text:
+                return node.text.strip()[:10]
+        return None
 
-    @property
+    @cached_property
     def sent(self):
         """The date the summary mailer was mailed."""
 
-        if not hasattr(self, "_sent"):
-            self._sent = None
-            node = self.doc.root.find("Sent")
-            if node is not None and node.text is not None:
-                self._sent = node.text[:10]
-        return self._sent
+        node = self.doc.root.find("Sent")
+        if node is not None and node.text is not None:
+            return node.text[:10]
+        return None
 
-    @property
+    @cached_property
     def summary(self):
         """Document title of the PDQ summary behind this mailer."""
 
-        if not hasattr(self, "_summary"):
-            node = self.doc.root.find("Document")
-            try:
-                doc_id = Doc.extract_id(node.get(Control.CDR_REF))
-                self._summary = self.__control.summaries[doc_id]
-            except Exception:
-                self._summary = None
-        return self._summary
+        node = self.doc.root.find("Document")
+        try:
+            doc_id = Doc.extract_id(node.get(Control.CDR_REF))
+            return self.control.summaries[doc_id]
+        except Exception:
+            return None
 
 
 if __name__ == "__main__":

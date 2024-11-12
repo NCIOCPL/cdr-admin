@@ -3,6 +3,7 @@
 """Show which Summaries (DIS & CIS) are on the Drupal CMS
 """
 
+from functools import cached_property
 from cdrcgi import Controller
 from cdrapi.docs import Doc
 from cdrapi.publishing import DrupalClient
@@ -32,23 +33,19 @@ class Control(Controller):
         page.form.append(fieldset)
         page.add_output_options(default="html")
 
-    @property
+    @cached_property
     def docs(self):
         """PDQ Summary documents on the Drupal host."""
 
-        if not hasattr(self, "_docs"):
-            client = DrupalClient(self.session, base=f"https://{self.host}")
-            self._docs = [self.Summary(self, doc) for doc in client.list()]
-        return self._docs
+        client = DrupalClient(self.session, base=f"https://{self.host}")
+        return [self.Summary(self, doc) for doc in client.list()]
 
-    @property
+    @cached_property
     def host(self):
         """Drupal host to query."""
 
-        if not hasattr(self, "_host"):
-            default = self.session.tier.hosts.get("DRUPAL")
-            self._host = self.fields.getvalue("host") or default
-        return self._host
+        default = self.session.tier.hosts.get("DRUPAL")
+        return self.fields.getvalue("host") or default
 
     class Summary:
         """PDQ summary document for the report."""
@@ -64,29 +61,33 @@ class Control(Controller):
             self.__control = control
             self.__doc = doc
 
-        @property
+        @cached_property
         def row(self):
             """Table row for the report."""
             return self.id, self.title, self.type, self.language
 
-        @property
+        @cached_property
         def id(self):
             """CDR document ID for the summary."""
             return f"CDR{self.__doc.cdr_id:d}"
 
-        @property
+        @cached_property
         def title(self):
             """Short title for the PDQ summary document."""
 
             doc = Doc(self.__control.session, id=self.__doc.cdr_id)
+            if not doc.title:
+                Cell = self.__control.Reporter.Cell
+                title = "[NO TITLE FOUND -- POSSIBLY FROM ANOTHER TIER?]"
+                return Cell(title, classes="error")
             return doc.title.split(";")[0].strip()
 
-        @property
+        @cached_property
         def type(self):
             """DIS or CIS (for Drug|Cancer Information Summary)."""
             return "DIS" if "drug" in self.__doc.type else "CIS"
 
-        @property
+        @cached_property
         def language(self):
             """English or Spanish."""
             return "English" if self.__doc.langcode == "en" else "Spanish"
