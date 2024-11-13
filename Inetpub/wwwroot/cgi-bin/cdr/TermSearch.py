@@ -13,7 +13,7 @@ class TermSearch(AdvancedSearch):
     DOCTYPE = "Term"
     SUBTITLE = DOCTYPE
     FILTER = "set:QC Term Set"
-    NCIT = "https://nciterms.nci.nih.gov"
+    NCIT = "https://evsexplore.semantics.cancer.gov/evsexplore/welcome"
     PATHS = dict(
         name="/Term/PreferredName",
         other_name="/Term/OtherName/OtherTermName",
