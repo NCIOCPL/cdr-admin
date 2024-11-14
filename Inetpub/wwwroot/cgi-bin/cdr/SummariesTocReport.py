@@ -594,7 +594,7 @@ class Summary:
         """Unique CDR ID for the summary."""
         return self.row.doc_id
 
-    @cached_property
+    @property
     def nodes(self):
         """Sequence of HTML elements to be added to the report.
 
