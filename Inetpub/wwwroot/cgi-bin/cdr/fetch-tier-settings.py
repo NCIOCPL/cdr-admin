@@ -110,7 +110,7 @@ class Settings:
 
         doctypes = {}
         path = self.basedir / "ClientFiles" / "CdrDocTypes.xml"
-        root = etree.parse(path).getroot()
+        root = etree.parse(str(path)).getroot()
         for node in root.findall("CdrGetDocTypeResp"):
             key = node.get("Type")
             doctypes[key] = {}
@@ -166,7 +166,7 @@ class Settings:
             @cached_property
             def values(self):
                 """Parse the configuration document."""
-                root = etree.parse(self.path).getroot()
+                root = etree.parse(str(self.path)).getroot()
                 return {root.tag: self.parse(root)}
 
             def parse(self, node):
