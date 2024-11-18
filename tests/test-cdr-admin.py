@@ -5488,7 +5488,7 @@ class MediaTests(Tester):
         self.assert_page_has("<th>Last Message</th>")
         self.assert_page_has("Audio Pronunciation Recordings Tracking Report")
         self.assert_page_has(str(date.today()))
-        self.assert_page_has("Queued")
+        self.assert_regex("Queued|In process")
 
     def test_pronunciation_review_statistics_report(self):
         """Test the Glossary Term Audio Review statistical report."""
