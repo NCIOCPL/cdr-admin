@@ -17,17 +17,19 @@ Finally, you will need to use a CDR account which has all of the permissions
 needed to use every page in the administrative menu system. Any account which
 has membership in the Developers group should work.
 
-The DNS name for the CDR server which is being tested must be provided, as
+The DNS name for the CDR servers which are being tested must be provided, as
 well as the name of a currently active session on that server. For obvious
 reasons, the tests cannot be run against the production server.
 
 $ ./test-cdr-admin.py --help
-usage: test-cdr-admin.py [-h] --host HOST --session SESSION [--verbose]
+usage: test-cdr-admin.py [-h] --host HOST --api API --session SESSION
+                         [--verbose]
                          [--tests [TESTS ...]]
 
 options:
   -h, --help            show this help message and exit
   --host HOST
+  --api API
   --session SESSION
   --verbose, -v
   --tests [TESTS ...], -t [TESTS ...]
@@ -4997,7 +4999,8 @@ class MediaTests(Tester):
         self.assert_title("Create Audio Pronunciation Test Data")
         self.submit_form(new_tab=False)
         self.assert_title("Create Audio Pronunciation Test Data")
-        audio_directory = "/sftp/sftphome/cdrstaging/ciat/dev/Audio"
+        tier = "qa" if "qa" in self.HOST else "dev"
+        audio_directory = f"/sftp/sftphome/cdrstaging/ciat/{tier}/Audio"
         source_directory = f"{audio_directory}/Term_Audio"
         path = f"{source_directory}/Week_2099_01.zip"
         self.assert_page_has(f"Successfully stored {path}.")
@@ -5213,7 +5216,7 @@ class MediaTests(Tester):
         self.assert_title("Remove Audio Pronunciation Test Data")
         self.submit_form(new_tab=False)
         alerts = (
-           "Removed remote /sftp/sftphome/cdrstaging/ciat/dev/Audio"
+           f"Removed remote /sftp/sftphome/cdrstaging/ciat/{tier}/Audio"
            "/Audio_Transferred/Week_2099_01.zip.",
            r"Removed local D:\cdr\Audio_from_CIPSFTP\Week_2099_01.zip.",
            "Removed 2 rows from the term_audio_mp3 table.",
@@ -7565,11 +7568,13 @@ if __name__ == "__main__":
 
     parser = ArgumentParser()
     parser.add_argument("--host", required=True)
+    parser.add_argument("--api", required=True)
     parser.add_argument("--session", required=True)
     parser.add_argument("--verbose", "-v", action="store_true")
     parser.add_argument("--tests", "-t", nargs="*")
     opts = parser.parse_args()
     Tester.HOST = opts.host
+    Tester.API = opts.api
     Tester.SESSION = opts.session
     Tester.LOGGER.info("-" * 40)
     Tester.LOGGER.info("Tests started using %s", opts.host)
