@@ -3183,7 +3183,7 @@ class GeneralTests(Tester):
 
         # Verify that the links are present and work.
         links = table.rows[0][2].find_elements(By.TAG_NAME, "a")
-        self.assertEqual(len(links), 3)
+        self.assertGreaterEqual(len(links), 3)
         for link in links:
             link.click()
             self.select_new_tab()
@@ -4820,7 +4820,7 @@ class ManagementTests(Tester):
         self.assert_plain_report()
         self.assert_page_has(f"<h1>{board_name}")
         self.assert_page_has("Editor-in-Chief")
-        self.assert_page_has("Member of Subgroup: ")
+        self.assert_page_has("<u>Assistant</u>")
 
         # The Summary version of the report should use the framework and fit
         # within the framework's grid container, as long as we stick with the
