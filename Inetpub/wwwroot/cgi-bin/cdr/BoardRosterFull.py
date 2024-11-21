@@ -383,6 +383,7 @@ class Board:
         def html(self):
             """Filtered member document."""
 
+            self.control.logger.info("filtering %s", self.doc.cdr_id)
             result = self.doc.filter(*self.filters, parms=self.PARAMS)
             html_root = html.fromstring(str(result.result_tree))
             for node in html_root:
