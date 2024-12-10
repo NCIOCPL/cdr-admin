@@ -657,7 +657,7 @@ class Control(Controller):
             case "Summary":
                 if self.doc:
                     path = "SummaryMetaData/SummaryAudience"
-                    if Doc.get_text(self.doc.root.find(path)) == "Patient":
+                    if Doc.get_text(self.doc.root.find(path)) == "Patients":
                         return "pat"
         return None
 
