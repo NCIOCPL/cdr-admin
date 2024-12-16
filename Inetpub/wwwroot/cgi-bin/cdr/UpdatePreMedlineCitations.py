@@ -11,7 +11,7 @@ from copy import deepcopy
 from datetime import datetime
 from functools import cached_property
 from time import sleep
-from cdrcgi import Controller
+from cdrcgi import Controller, HTMLPage
 from cdrapi.docs import Doc
 from cdr import prepare_pubmed_article_for_import
 from lxml import etree
@@ -24,26 +24,61 @@ class Control(Controller):
     SUBTITLE = "Citation Status Changes"
     LOGNAME = "UpdatePreMedlineCitations"
     SUBMIT = "Update"
+    CHECK = "Check"
     URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
     COLUMNS = "PMID", "CDR ID", "Old Status", "New Status", "Notes"
     PMID_PATH = "/Citation/PubmedArticle/MedlineCitation/PMID"
     STATUS_PATH = "/Citation/PubmedArticle/MedlineCitation/@Status"
     STATUSES = "In-Process", "Publisher", "In-data-review"
     CAPTION = "{:d} Pre-Medline Citations Examined -- {:d} Statuses Changed"
+
+    B = HTMLPage.B
     INSTRUCTIONS = (
-        "This utility checks to see if any of the Citation documents in "
-        "the CDR with a pre-Medline status have a new status at NLM, so that "
-        "the documents can be refreshed. Note that the report will be "
-        "displayed in a new browser tab after a successful refresh of the "
-        "citation statuses, in order to preserve the menu links on this "
-        "page, but the displayed list of available updates will no longer be "
-        "valid, so you should refresh this form at that point in order to "
-        "view an accurate list of what is available to be refreshed."
+        B.P(
+            "This utility checks to see if any of the ",
+            B.CODE("Citation"),
+            " documents in the CDR with a pre-Medline status have a"
+            " new status at NLM, so that the documents can be refreshed"
+            " with any new or corrected bibliographic information.",
+        ),
+        B.UL(
+            B.LI(
+                "Click the ",
+                B.STRONG(CHECK),
+                " button to generate the list of ",
+                B.CODE("Citation"),
+                " documents ready to be updated.",
+            ),
+            B.LI(
+                "If there are any such documents, they will be displayed"
+                " in a list below with an ",
+                B.STRONG(SUBMIT),
+                " button.",
+            ),
+            B.LI(
+                "Upon clicking the ",
+                B.STRONG(SUBMIT),
+                " button, the ",
+                B.CODE("Citation"),
+                " documents will be updated, and a report will be displayed"
+                " in a new browser tab.",
+            ),
+            B.LI(
+                "Close the report browser tab and if that report indicated"
+                " that any updates failed, you can click the ",
+                B.STRONG(CHECK),
+                " button again to update the list on this page and optionally"
+                " try again (after possibly removing any obstacles, such"
+                " as locked documents).",
+            ),
+        ),
     )
 
     def build_tables(self):
         """Assemble the table showing what we did and return it."""
 
+        if self.request == self.CHECK:
+            return self.show_form()
         if not self.session.can_do("MODIFY DOCUMENT", "Citation"):
             self.bail("You must be authorized to replace Citation documents "
                       "to run this script.")
@@ -58,28 +93,36 @@ class Control(Controller):
         """
 
         fieldset = page.fieldset("Instructions")
-        fieldset.append(page.B.P(self.INSTRUCTIONS))
+        for element in self.INSTRUCTIONS:
+            fieldset.append(element)
         page.form.append(fieldset)
-        if not self.changed:
-            message = (
-                "No pre-Medline citations found with updated statuses "
-                "available."
-            )
-            self.alerts.append(dict(message=message, type="info"))
-        else:
-            for pmid in sorted(self.skipped):
-                page.form.append(page.hidden_field("skipped", pmid))
-            fieldset = page.fieldset("Available For Refresh")
-            available = page.B.UL()
-            for citation in self.changed:
-                available.append(page.B.LI(citation.description))
-            fieldset.append(available)
-            page.form.append(fieldset)
+        if self.request == self.CHECK:
+            if not self.changed:
+                message = (
+                    "No pre-Medline citations found with updated statuses "
+                    "available."
+                )
+                self.alerts.append(dict(message=message, type="info"))
+            else:
+                for pmid in sorted(self.skipped):
+                    page.form.append(page.hidden_field("skipped", pmid))
+                fieldset = page.fieldset("Available For Refresh")
+                available = page.B.UL()
+                for citation in self.changed:
+                    available.append(page.B.LI(citation.description))
+                fieldset.append(available)
+                page.form.append(fieldset)
+        page.add_css("code { color: brown; }")
 
     @cached_property
     def buttons(self):
-        """Only show the Update button if there are changes to import."""
-        return [self.SUBMIT] if self.changed else []
+        """Show the buttons which are appropriate."""
+
+        if self.request == self.SUBMIT:
+            return []
+        if self.request == self.CHECK and self.changed:
+            return [self.CHECK, self.SUBMIT]
+        return [self.CHECK]
 
     @cached_property
     def caption(self):
@@ -212,6 +255,11 @@ class Control(Controller):
                 row.append(self.Reporter.Cell("failed", classes="error"))
             rows.append(row)
         return rows
+
+    @cached_property
+    def same_window(self):
+        """Determine whether to open another browser tab."""
+        return [self.CHECK]
 
     @cached_property
     def skipped(self):
