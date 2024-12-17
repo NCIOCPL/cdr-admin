@@ -77,6 +77,11 @@ fieldset > ul > li > span { font-weight: bold; }
             ul.append(page.B.LI(*content))
         return ul
 
+    @cached_property
+    def buttons(self):
+        """No buttons are needed on this page."""
+        return []
+
 
 # Only execute if loaded as a script.
 if __name__ == "__main__":
