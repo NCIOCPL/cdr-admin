@@ -3,6 +3,7 @@
 """Find phrases in Glossary documents.
 """
 
+from functools import cached_property
 from cdrcgi import Controller
 from cdrapi.docs import Doc
 from lxml import etree
@@ -21,7 +22,9 @@ class Control(Controller):
         """Assemble the report."""
 
         if not self.terms:
-            self.bail("No search terms specified")
+            message = "At least one search term is required."
+            self.alerts.append(dict(message=message, type="warning"))
+            return self.show_form()
         return self.Reporter.Table(self.rows, columns=self.columns)
 
     def populate_form(self, page):
@@ -41,6 +44,17 @@ class Control(Controller):
         fieldset.append(page.select("audience", **opts))
         page.form.append(fieldset)
         fieldset = page.fieldset("Enter Search Terms", id="search-terms")
+        legend = fieldset.find("legend")
+        add_button = page.B.SPAN(
+            page.B.IMG(
+                page.B.CLASS("clickable"),
+                src="/images/add.gif",
+                onclick="add_term_field();",
+                title="Add another term"
+            ),
+            page.B.CLASS("term-button")
+        )
+        legend.append(add_button)
         fieldset.append(page.text_field("term", classes="term"))
         page.form.append(fieldset)
         page.add_output_options(default="html")
@@ -48,40 +62,22 @@ class Control(Controller):
         # Button/script for adding new search term fields.
         page.add_css(".term-button { padding-left: 10px; }")
         page.add_script("""\
-function add_button() {
-  green_button().insertAfter(jQuery(".term").first());
-}
-function green_button() {
-  var span = jQuery("<span>", {class: "term-button"});
-  var img = jQuery("<img>", {
-    src: "/images/add.gif",
-    onclick: "add_term_field()",
-    class: "clickable",
-    title: "Add another term"
-  });
-  span.append(img);
-  return span;
-}
 function add_term_field() {
   var id = "term-" + (jQuery(".term").length + 1);
   var field = jQuery("<div>", {class: "labeled-field"});
-  field.append(jQuery("<label>", {for: id, text: "Term"}));
-  field.append(jQuery("<input>", {class: "term", name: "term", id: id}));
+  var cls = "term usa-input usa-input--xl";
+  field.append(jQuery("<label>", {for: id, text: "Term", class: "usa-label"}));
+  field.append(jQuery("<input>", {class: cls, name: "term", id: id}));
   jQuery("#search-terms").append(field);
 }
-jQuery(document).ready(function() {
-  add_button();
-});""")
+""")
 
-    @property
+    @cached_property
     def audience(self):
         """Optional audience for narrowing the report."""
+        return self.fields.getvalue("audience")
 
-        if not hasattr(self, "_audience"):
-            self._audience = self.fields.getvalue("audience")
-        return self._audience
-
-    @property
+    @cached_property
     def columns(self):
         """Headers for the report's table."""
 
@@ -92,35 +88,30 @@ jQuery(document).ready(function() {
             self.Reporter.Column("Definitions", width="600px"),
         )
 
-    @property
+    @cached_property
     def docs(self):
         """Sequence of GlossaryDoc objects containing the user's term(s)."""
 
-        if not hasattr(self, "_docs"):
-            self._docs = []
-            query = self.Query("pub_proc_cg p", "p.id", "c.int_val", "p.xml")
-            query.join("query_term_pub c", "c.doc_id = p.id")
-            query.where(query.Condition("c.path", self.CONCEPT_PATH))
-            row = query.execute(self.cursor).fetchone()
-            while row:
-                doc = GlossaryDoc(self, row.id, row.int_val, row.xml)
-                if doc.row:
-                    self._docs.append(doc)
-                row = self.cursor.fetchone()
-        return self._docs
+        docs = []
+        query = self.Query("pub_proc_cg p", "p.id", "c.int_val", "p.xml")
+        query.join("query_term_pub c", "c.doc_id = p.id")
+        query.where(query.Condition("c.path", self.CONCEPT_PATH))
+        row = query.execute(self.cursor).fetchone()
+        while row:
+            doc = GlossaryDoc(self, row.id, row.int_val, row.xml)
+            if doc.row:
+                docs.append(doc)
+            row = self.cursor.fetchone()
+        return docs
 
-    @property
+    @cached_property
     def language(self):
         """Optional language for narrowing the report."""
 
-        if not hasattr(self, "_language"):
-            self._language = None
-            language = self.fields.getvalue("language")
-            if language in ("English", "Spanish"):
-                self._language = language
-        return self._language
+        language = self.fields.getvalue("language")
+        return language if language in ("English", "Spanish") else None
 
-    @property
+    @cached_property
     def regex(self):
         """
         Create a compiled regular expression for finding the caller's phrases.
@@ -136,40 +127,34 @@ jQuery(document).ready(function() {
         does).
         """
 
-        if not hasattr(self, "_regex"):
-            phrases = [GlossaryDoc.normalize(phrase) for phrase in self.terms]
-            phrases = sorted(phrases, key=len, reverse=True)
-            expressions = []
-            for phrase in phrases:
-                expressions.append(phrase
-                                   .replace("\\", r"\\")
-                                   .replace("+",  r"\+")
-                                   .replace(" ",  r"\s+")
-                                   .replace(".",  r"\.")
-                                   .replace("^",  r"\^")
-                                   .replace("$",  r"\$")
-                                   .replace("*",  r"\*")
-                                   .replace("?",  r"\?")
-                                   .replace("{",  r"\{")
-                                   .replace("}",  r"\}")
-                                   .replace("[",  r"\[")
-                                   .replace("]",  r"\]")
-                                   .replace("|",  r"\|")
-                                   .replace("(",  r"\(")
-                                   .replace(")",  r"\)")
-                                   .replace("'",  "['\u2019]"))
-            expressions = "|".join(expressions)
-            expression = f"(?<!\\w)({expressions})(?!\\w)"
-            self._regex = compile(expression, self.REGEX_FLAGS)
-        return self._regex
+        phrases = [GlossaryDoc.normalize(phrase) for phrase in self.terms]
+        expressions = []
+        for phrase in sorted(phrases, key=len, reverse=True):
+            expressions.append(phrase
+                               .replace("\\", r"\\")
+                               .replace("+",  r"\+")
+                               .replace(" ",  r"\s+")
+                               .replace(".",  r"\.")
+                               .replace("^",  r"\^")
+                               .replace("$",  r"\$")
+                               .replace("*",  r"\*")
+                               .replace("?",  r"\?")
+                               .replace("{",  r"\{")
+                               .replace("}",  r"\}")
+                               .replace("[",  r"\[")
+                               .replace("]",  r"\]")
+                               .replace("|",  r"\|")
+                               .replace("(",  r"\(")
+                               .replace(")",  r"\)")
+                               .replace("'",  "['\u2019]"))
+        expressions = "|".join(expressions)
+        expression = f"(?<!\\w)({expressions})(?!\\w)"
+        return compile(expression, self.REGEX_FLAGS)
 
-    @property
+    @cached_property
     def rows(self):
         """Rows for the report's table."""
-
-        if not hasattr(self, "_rows"):
-            self._rows = [doc.row for doc in sorted(self.docs)]
-        return self._rows
+        return [doc.row for doc in sorted(self.docs)]
 
     @property
     def terms(self):
@@ -182,6 +167,11 @@ jQuery(document).ready(function() {
                 if term:
                     self._terms.append(term)
         return self._terms
+
+    @cached_property
+    def wide_css(self):
+        """Use the entire browser page width for the report table."""
+        return self.Reporter.Table.WIDE_CSS
 
 
 class GlossaryDoc:

@@ -6,6 +6,7 @@ The documents aren't actually deleted, but instead their active_status
 column is set to 'D'.
 """
 
+from functools import cached_property
 from cdrcgi import Controller
 from cdrapi.docs import Doc
 
@@ -14,7 +15,7 @@ class Control(Controller):
 
     SUBTITLE = "CDR Document Restoration"
     LOGNAME = "DocumentRestoration"
-    LEGEND = "Select Documents To Restore (with optional comment)"
+    LEGEND = "Select Documents To Restore"
     REASON = "Restored using the CDR Admin interface"
     INSTRUCTIONS = "Enter document IDs separated by spaces and/or line breaks."
 
@@ -29,8 +30,9 @@ class Control(Controller):
         fieldset.append(page.B.P(self.INSTRUCTIONS))
         page.form.append(fieldset)
         fieldset = page.fieldset(self.LEGEND)
-        fieldset.append(page.textarea("ids", label="CDR IDs", rows=3))
-        fieldset.append(page.textarea("reason", label="Comment"))
+        fieldset.append(page.textarea("ids", label="CDR IDs"))
+        opts = dict(label="Comment (optional)", value=self.reason)
+        fieldset.append(page.textarea("reason", **opts))
         page.form.append(fieldset)
         fieldset = page.fieldset("New Status")
         opts = dict(value="I", label="Inactive", checked=True)
@@ -38,88 +40,92 @@ class Control(Controller):
         opts = dict(value="A", label="Active", checked=False)
         fieldset.append(page.radio_button("status", **opts))
         page.form.append(fieldset)
-        if self.results is not None:
-            fieldset = page.fieldset("Processing Results")
-            fieldset.append(self.results)
-            page.form.append(fieldset)
 
     def show_report(self):
-        """Override to handle everything on the form page."""
+        """Process the requests and redraw the form."""
+
+        # Make sure we have something to do.
+        if not self.ids:
+            self.alerts.append(dict(
+                message="No document IDs entered.",
+                type="warning",
+            ))
+
+        else:
+
+            # Log the values.
+            status = "Active" if self.status == "A" else "Blocked"
+            self.logger.info(" session: %r", self.session)
+            self.logger.info("    user: %r", self.session.user_name)
+            self.logger.info("  status: %r", status)
+            self.logger.info("  reason: %r", self.reason)
+
+            # Walk through the documents.
+            for id in self.ids:
+                doc = Doc(self.session, id=id)
+                try:
+                    active_status = doc.active_status
+                except Exception:
+                    self.logger.exception(str(id))
+                    self.alerts.append(dict(
+                        message=f"CDR{id:010d} not found.",
+                        type="error",
+                    ))
+                    continue
+                if active_status != Doc.DELETED:
+                    message = f"{doc.cdr_id} already restored."
+                    self.logger.warning(message)
+                    self.alerts.append(dict(message=message, type="warning"))
+                    continue
+                try:
+                    doc.set_status(self.status, comment=self.reason)
+                    message = f"{doc.cdr_id} restored successfully."
+                    self.logger.warning(message)
+                    self.alerts.append(dict(message=message, type="success"))
+                    for error in doc.errors:
+                        message = f"{doc.cdr_id}: {error}"
+                        self.logger.warning(message)
+                        self.alerts.append(dict(message=message, type="error"))
+                except Exception as e:
+                    self.logger.exception(doc.cdr_id)
+                    self.alerts.append(dict(
+                        message=f"{doc.cdr_id}: {e}",
+                        type="error",
+                    ))
+
+        # In any case, redraw the form.
         self.show_form()
 
-    @property
-    def buttons(self):
-        """Customize the action buttons on the banner bar."""
-        return self.SUBMIT, self.DEVMENU, self.ADMINMENU, self.LOG_OUT
-
-    @property
+    @cached_property
     def ids(self):
         """CDR IDs of documents which are to be marked as restored."""
 
-        if not hasattr(self, "_ids"):
-            self._ids = []
-            ids = self.fields.getvalue("ids")
-            if ids:
-                for id in ids.split():
-                    try:
-                        self._ids.append(Doc.extract_id(id))
-                    except Exception:
-                        self.bail("Invalid document ID")
-        return self._ids
+        ids = []
+        for id in self.fields.getvalue("ids", "").split():
+            try:
+                ids.append(Doc.extract_id(id))
+            except Exception:
+                self.bail("Invalid document ID")
+        return ids
 
-    @property
+    @cached_property
     def reason(self):
         """Explanation for the deletions."""
+        return self.fields.getvalue("reason", self.REASON)
 
-        if not hasattr(self, "_reason"):
-            self._reason = self.fields.getvalue("reason", self.REASON)
-        return self._reason
+    @cached_property
+    def same_window(self):
+        """Limit the number of new browser tabs."""
+        return [self.SUBMIT]
 
-    @property
-    def results(self):
-        """Processing results from any deletion requests."""
-
-        if not hasattr(self, "_results"):
-            self._results = None
-            if self.ids:
-                status = "Active" if self.status == "A" else "Blocked"
-                self.logger.info(" session: %r", self.session)
-                self.logger.info("    user: %r", self.session.user_name)
-                self.logger.info("  status: %r", status)
-                self.logger.info("  reason: %r", self.reason)
-                B = self.HTMLPage.B
-                items = []
-                for id in self.ids:
-                    doc = Doc(self.session, id=id)
-                    cdr_id = doc.cdr_id
-                    if doc.active_status != Doc.DELETED:
-                        message = f"{cdr_id} already restored"
-                        self.logger.warning(message)
-                        items.append(B.LI(message, B.CLASS("error")))
-                        continue
-                    try:
-                        doc.set_status(self.status, comment=self.reason)
-                        self.logger.info("Restored %s", cdr_id)
-                        message = f"{cdr_id} restored successfully"
-                        items.append(B.LI(message, B.CLASS("info")))
-                        for error in doc.errors:
-                            message = f"{cdr_id}: {error}"
-                            self.logger.warning(message)
-                            items.append(B.LI(message, B.CLASS("error")))
-                    except Exception as e:
-                        self.logger.exception(cdr_id)
-                        items.append(B.LI(f"{cdr_id}: {e}", B.CLASS("error")))
-                self._results = B.UL(*items)
-        return self._results
-
-    @property
+    @cached_property
     def status(self):
         """New status for the documents (Active or Inactive)."""
-        if not hasattr(self, "_status"):
-            self._status = self.fields.getvalue("status", "I")
-            if self._status not in "IA":
-                self.bail()
-        return self._status
+
+        status = self.fields.getvalue("status", "I")
+        if status not in "IA":
+            self.bail()
+        return status
 
 
 if __name__ == "__main__":

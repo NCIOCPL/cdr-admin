@@ -3,7 +3,8 @@
 """Menu of existing filter sets.
 """
 
-from cdrcgi import Controller, navigateTo
+from functools import cached_property
+from cdrcgi import Controller
 from cdrapi.docs import FilterSet
 
 
@@ -26,50 +27,42 @@ class Control(Controller):
 
         page.body.set("class", "admin-menu")
         fieldset = page.fieldset("Filter Sets (click to edit)")
-        fieldset.set("class", "flexlinks")
+        fieldset.set("class", "flexlinks usa-fieldset")
         script = self.EDIT_FILTER_SET
         ul = page.B.UL()
+        ul.set("class", "usa-list usa-list--unstyled margin-top-2")
         for id, name in FilterSet.get_filter_sets(self.session):
-            ul.append(page.B.LI(page.menu_link(script, name, id=id)))
+            link = page.menu_link(script, name, id=id)
+            link.set("target", "_blank")
+            ul.append(page.B.LI(link))
         fieldset.append(ul)
         page.form.append(fieldset)
+        if self.deleted:
+            message = f"Successfully deleted {self.deleted}."
+            self.alerts.append(dict(message=message, type="success"))
 
     def run(self):
         """Override base class to add action for new button."""
 
         if self.request == self.ADD:
-            navigateTo(self.EDIT_FILTER_SET, self.session.name)
+            self.navigate_to(self.EDIT_FILTER_SET, self.session.name)
         elif self.request == self.DEEP:
-            navigateTo(self.SHOW_SETS, self.session.name)
+            self.navigate_to(self.SHOW_SETS, self.session.name)
         elif self.request == self.REPORT:
-            navigateTo(self.SHOW_SETS, self.session.name, depth="shallow")
+            opts = dict(depth="shallow")
+            self.navigate_to(self.SHOW_SETS, self.session.name, **opts)
         else:
             Controller.run(self)
 
     @property
     def buttons(self):
         """Override to specify custom buttons for this page."""
+        return (self.DEEP, self.REPORT, self.ADD)
 
-        return (
-            self.DEEP,
-            self.REPORT,
-            self.ADD,
-            self.DEVMENU,
-            self.ADMINMENU,
-            self.LOG_OUT
-        )
-
-    @property
-    def subtitle(self):
-        """Dynamically determine what to display under the main banner."""
-
-        if not hasattr(self, "_subtitle"):
-            set_name = self.fields.getvalue("deleted")
-            if set_name:
-                self._subtitle = f"Successfully deleted {set_name!r}"
-            else:
-                self._subtitle = self.SUBTITLE
-        return self._subtitle
+    @cached_property
+    def deleted(self):
+        """Name of set which has just been deleted."""
+        return self.fields.getvalue("deleted")
 
 
 if __name__ == "__main__":

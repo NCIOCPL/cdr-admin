@@ -10,7 +10,7 @@ from functools import cached_property
 from urllib.parse import urlparse
 from dateutil.relativedelta import relativedelta
 from cdr import URDATE
-from cdrcgi import Controller
+from cdrcgi import Controller, BasicWebPage
 
 
 class Control(Controller):
@@ -24,6 +24,12 @@ class Control(Controller):
         url="Include summary URL",
         publishable="Display whether the summary is publishable",
     )
+
+    def build_tables(self):
+        """Assemble the report's table."""
+
+        rows = [summary.row for summary in self.summaries]
+        return self.Reporter.Table(rows, caption=self.caption, cols=self.cols)
 
     def populate_form(self, page):
         """Add the fields to the report form.
@@ -49,11 +55,17 @@ class Control(Controller):
         page.form.append(fieldset)
         page.add_output_options("html")
 
-    def build_tables(self):
-        """Assemble the report's table."""
+    def show_report(self):
+        """Report tables are too wide for the standard HTML layout."""
 
-        rows = [summary.row for summary in self.summaries]
-        return self.Reporter.Table(rows, caption=self.caption, cols=self.cols)
+        if self.format == "excel":
+            return self.report.send("excel")
+        report = BasicWebPage()
+        report.wrapper.append(report.B.H1(self.SUBTITLE))
+        report.wrapper.append(self.build_tables().node)
+        report.wrapper.append(self.footer)
+        report.head.append(report.B.STYLE("table { width: 100%; }"))
+        report.send()
 
     @cached_property
     def caption(self):
@@ -86,6 +98,8 @@ class Control(Controller):
             cols.append(Column("URL", width="300px"))
         if "publishable" in self.opts:
             cols.append(Column("Publishable?", width="100px"))
+        if self.format == "html":
+            return [col.name for col in cols]
         return cols
 
     @cached_property
@@ -201,7 +215,8 @@ class Summary:
         pub_date = self.__row.pub_date
         if not pub_date:
             return ""
-        return self.__control.Reporter.Cell(str(pub_date)[:10], center=True)
+        opts = dict(center=True, classes="nowrap")
+        return self.__control.Reporter.Cell(str(pub_date)[:10], **opts)
 
     @cached_property
     def publishable(self):

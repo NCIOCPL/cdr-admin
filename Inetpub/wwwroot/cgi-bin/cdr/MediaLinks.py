@@ -56,8 +56,6 @@ class Control(Controller):
         d_path = "/GlossaryTermConcept/TermDefinition/DefinitionText"
         fields = "d.doc_id", "d.value"
         query = self.Query("query_term_pub d", *fields).unique()
-        #query.join("query_term_pub o", "o.doc_id = d.doc_id")
-        #query.join("query_term_pub m", "m.doc_id = o.int_val")
         query.join("query_term_pub m", "m.doc_id = d.doc_id")
         query.where(f"d.path = '{d_path}'")
         query.where("m.path LIKE '/GlossaryTermConcept/%MediaID/@cdr:ref'")

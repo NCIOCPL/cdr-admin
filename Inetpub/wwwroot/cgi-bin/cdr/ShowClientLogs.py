@@ -7,7 +7,7 @@ from functools import cached_property
 from io import BytesIO
 from sys import stdout
 from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
-from cdrcgi import Controller, HTMLPage
+from cdrcgi import Controller, BasicWebPage
 
 
 class Control(Controller):
@@ -18,76 +18,13 @@ class Control(Controller):
     OLDEST_FIRST = "Oldest first"
     LATEST_FIRST = "Most recent first"
     DIR = "cdr-client-logs"
-
-    def populate_form(self, page):
-        """Find out which logs the user wants to see.
-
-        Pass:
-            page - HTMLPage object where we communicate with the user.
-        """
-
-        fieldset = page.fieldset("Filter Options")
-        opts = dict(options=self.users, default="Any")
-        fieldset.append(page.select("user", **opts))
-        today = date.today()
-        yesterday = today - timedelta(1)
-        opts = dict(start_date=yesterday, end_date=today)
-        fieldset.append(page.date_range("date_range", **opts))
-        page.form.append(fieldset)
-        fieldset = page.fieldset("Maximum Number Of Logs")
-        fieldset.set("class", "radio-buttons")
-        checked = True
-        for value in self.MAX_LOGS:
-            opts = dict(value=value, checked=checked)
-            checked = False
-            fieldset.append(page.radio_button("max-logs", **opts))
-        page.form.append(fieldset)
-        fieldset = page.fieldset("Sort Order")
-        fieldset.set("class", "radio-buttons")
-        opts = dict(value=self.LATEST_FIRST, checked=True)
-        fieldset.append(page.radio_button("sort-order", **opts))
-        opts = dict(value=self.OLDEST_FIRST, checked=False)
-        fieldset.append(page.radio_button("sort-order", **opts))
-        page.form.append(fieldset)
-        page.add_css("""\
-.radio-buttons > div {
-    display: inline-block;
-    padding-right: 1rem;
-}
-.date-range span.date-range-sep { padding: 0 27px }
-""")
-
-    def build_tables(self):
-        """Create table-like objects with the log data."""
-
-        class TablePlus:
-            def __init__(self, div):
-                self.node = div
-        tables = []
-        B = self.HTMLPage.B
-        for log in self.logs:
-            saved = str(log.log_saved)
-            if "." in saved and saved.endswith("000"):
-                saved = saved[:-3]
-            div = B.DIV(
-                B.TABLE(
-                    B.TR(
-                        B.TH("User"),
-                        B.TD(log.cdr_user),
-                    ),
-                    B.TR(
-                        B.TH("Session"),
-                        B.TD(log.session_id),
-                    ),
-                    B.TR(
-                        B.TH("Saved"),
-                        B.TD(saved),
-                    ),
-                ),
-                B.PRE(log.log_data),
-            )
-            tables.append(TablePlus(div))
-        return tables
+    CSS = """\
+.log-block { margin: 2rem 0 3rem; }
+th, td { border: none; }
+th { text-align: right; color: maroon; padding-left: 1rem; }
+th::after { content: ":"; }
+td { padding-right: 1rem; }
+"""
 
     def download(self):
         """Hidden option to download the logs as a ZIP file."""
@@ -113,18 +50,48 @@ Content-Length: {len(zip_bytes)}
         stdout.buffer.write(zip_bytes)
         exit()
 
+    def populate_form(self, page):
+        """Find out which logs the user wants to see.
+
+        Pass:
+            page - HTMLPage object where we communicate with the user.
+        """
+
+        fieldset = page.fieldset("Filter Options")
+        opts = dict(options=self.users, default="Any")
+        fieldset.append(page.select("user", **opts))
+        today = date.today()
+        yesterday = today - timedelta(1)
+        opts = dict(start_date=yesterday, end_date=today)
+        fieldset.append(page.date_range("date_range", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Maximum Number Of Logs")
+        checked = True
+        for value in self.MAX_LOGS:
+            opts = dict(value=value, checked=checked)
+            checked = False
+            fieldset.append(page.radio_button("max-logs", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Sort Order")
+        opts = dict(value=self.LATEST_FIRST, checked=True)
+        fieldset.append(page.radio_button("sort-order", **opts))
+        opts = dict(value=self.OLDEST_FIRST, checked=False)
+        fieldset.append(page.radio_button("sort-order", **opts))
+        page.form.append(fieldset)
+
     def show_report(self):
         """Override the default implementation so we can add some CSS."""
 
         if self.fields.getvalue("download"):
             self.download()
-        elapsed = self.report.page.html.get_element_by_id("elapsed", None)
-        if elapsed is not None:
-            elapsed.text = str(self.elapsed)
-        self.report.page.add_css("""\
-p { border: solid maroon 2px; padding: .5rem; }
-""")
-        self.report.send(self.format)
+        report = BasicWebPage()
+        report.wrapper.append(report.B.H1(self.SUBTITLE))
+        for table in self.tables:
+            report.wrapper.append(table.node)
+            report.wrapper.append(report.B.HR())
+        report.wrapper.append(self.footer)
+        report.head.append(report.B.STYLE(self.CSS))
+        report.send()
 
     @cached_property
     def end(self):
@@ -165,6 +132,40 @@ p { border: solid maroon 2px; padding: .5rem; }
     def start(self):
         """Start of date range used to filter the logs."""
         return self.fields.getvalue("date_range-start")
+
+    @cached_property
+    def tables(self):
+        """Create table-like objects with the log data."""
+
+        class TablePlus:
+            def __init__(self, div):
+                self.node = div
+        tables = []
+        B = BasicWebPage.B
+        for log in self.logs:
+            saved = str(log.log_saved)
+            if "." in saved and saved.endswith("000"):
+                saved = saved[:-3]
+            div = B.DIV(
+                B.TABLE(
+                    B.TR(
+                        B.TH("Session"),
+                        B.TD(log.session_id),
+                    ),
+                    B.TR(
+                        B.TH("Saved"),
+                        B.TD(saved),
+                    ),
+                    B.TR(
+                        B.TH("User"),
+                        B.TD(log.cdr_user),
+                    ),
+                ),
+                B.PRE(log.log_data),
+                B.CLASS("log-block")
+            )
+            tables.append(TablePlus(div))
+        return tables
 
     @cached_property
     def user(self):

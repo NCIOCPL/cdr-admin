@@ -3,6 +3,7 @@
 """Show all references cited in a selected cancer information summary.
 """
 
+from functools import cached_property
 from locale import LC_COLLATE, setlocale, strcoll
 from cdrcgi import Controller
 from cdrapi.docs import Doc
@@ -40,7 +41,6 @@ class Control(Controller):
                 opts = dict(value=title.id, label=title.label)
                 fieldset.append(page.radio_button("DocId", **opts))
             page.form.append(fieldset)
-            page.add_css("fieldset { width: 1000px; }")
         else:
             fieldset = page.fieldset("Select a Document")
             fieldset.append(page.text_field("DocTitle", label="Title"))
@@ -71,77 +71,97 @@ class Control(Controller):
             page.form.append(page.B.P("No references found"))
         self.report.send()
 
-    @property
+    @cached_property
     def id(self):
         """Integer for the selected summary's CDR ID."""
 
-        if not hasattr(self, "_id"):
-            self._id = self.fields.getvalue("DocId")
-            if self._id:
-                self._id = Doc.extract_id(self._id)
-            elif len(self.titles) == 1:
-                self._id = self.titles[0].id
-        return self._id
+        id = self.fields.getvalue("DocId")
+        if id:
+            return Doc.extract_id(id)
+        elif len(self.titles) == 1:
+            return self.titles[0].id
+        return None
 
-    @property
+    @cached_property
     def modules(self):
         """True if references from linked modules should be included."""
         return self.fields.getvalue("modules") == "Y"
 
-    @property
+    @cached_property
     def no_results(self):
         """Suppress message about lack of tables."""
         return None
 
-    @property
+    @cached_property
     def parsed(self):
         """Remember summaries we've already parsed."""
+        return set()
 
-        if not hasattr(self, "_parsed"):
-            self._parsed = set()
-        return self._parsed
+    @cached_property
+    def same_window(self):
+        """Go easy on the new browser tab creation."""
+        return [self.SUBMIT] if self.request else []
 
-    @property
+    @cached_property
     def summary(self):
         """PDQ summary selected for the report."""
 
-        if not hasattr(self, "_summary"):
-            self._summary = None
-            if self.id and self.version is not None:
+        if self.id:
+            doc = Doc(self.session, id=self.id)
+            try:
+                if doc.doctype.name != "Summary":
+                    message = f"CDR{doc.id} is a {doc.doctype} document."
+                    self.logger.warning(message)
+                    self.alerts.append(dict(message=message, type="warning"))
+                    self.id = None
+                    return None
+            except Exception:
+                self.logger.exception("checking doctype")
+                message = f"Document {self.id} was not found."
+                self.alerts.append(dict(message=message, type="warning"))
+                self.id = None
+                return None
+            if self.version is not None:
                 version = self.version if self.version > 0 else None
-                self._summary = Summary(self, self.id, version)
-        return self._summary
+                return Summary(self, self.id, version)
+            return None
+        if self.request:
+            if not self.title_fragment:
+                message = "You must enter an ID or a title fragment."
+                self.alerts.append(dict(message=message, type="error"))
+            elif not self.titles:
+                message = f"No summaries match {self.title_fragment!r}."
+                self.alerts.append(dict(message=message, type="warning"))
+            else:
+                message = f"Multiple summaries match {self.title_fragment!r}."
+                self.alerts.append(dict(message=message, type="info"))
+        return None
 
-    @property
+    @cached_property
     def title_fragment(self):
         """String for selecting summary by title fragment."""
+        return self.fields.getvalue("DocTitle", "").strip()
 
-        if not hasattr(self, "_title_fragment"):
-            self._title_fragment = self.fields.getvalue("DocTitle", "").strip()
-        return self._title_fragment
-
-    @property
+    @cached_property
     def titles(self):
         """Find the summaries matching the user's title fragment."""
 
-        if not hasattr(self, "_titles"):
-            self._titles = []
-            if self.title_fragment:
-                fragment = f"{self.title_fragment}%"
-                query = self.Query("document d", "d.id", "d.title")
-                query.join("doc_type t", "t.id = d.doc_type")
-                query.where("t.name = 'Summary'")
-                query.where(query.Condition("d.title", fragment, "LIKE"))
-                rows = query.order("d.id").execute(self.cursor).fetchall()
+        if not self.title_fragment:
+            return []
+        fragment = f"{self.title_fragment}%"
+        query = self.Query("document d", "d.id", "d.title")
+        query.join("doc_type t", "t.id = d.doc_type")
+        query.where("t.name = 'Summary'")
+        query.where(query.Condition("d.title", fragment, "LIKE"))
+        rows = query.order("d.id").execute(self.cursor).fetchall()
 
-                class Doc:
-                    def __init__(self, row):
-                        self.id = row.id
-                        self.label = f"[CDR{row.id:010d}] {row.title}"
-                self._titles = [Doc(row) for row in rows]
-        return self._titles
+        class Doc:
+            def __init__(self, row):
+                self.id = row.id
+                self.label = f"[CDR{row.id:010d}] {row.title}"
+        return [Doc(row) for row in rows]
 
-    @property
+    @cached_property
     def version(self):
         """Summary document's version selected for the report.
 
@@ -151,36 +171,31 @@ class Control(Controller):
         a version is still to be selected.
         """
 
-        if not hasattr(self, "_version"):
-            if len(self.versions) == 1:
-                self._version = 0
-            else:
-                self._version = self.fields.getvalue("DocVersion")
-                if self._version:
-                    try:
-                        self._version = int(self._version)
-                    except Exception:
-                        self.bail()
-        return self._version
+        if len(self.versions) == 1:
+            return 0
+        version = self.fields.getvalue("DocVersion")
+        if not version:
+            return None
+        try:
+            return int(version)
+        except Exception:
+            self.bail()
 
-    @property
+    @cached_property
     def versions(self):
         """Sequence of versions available for the selected summary."""
 
-        if not hasattr(self, "_versions"):
-            self._versions = []
-            query = self.Query("doc_version", "num", "dt", "comment")
-            query.where(query.Condition("id", self.id))
-            query.order("num DESC")
-            rows = query.execute(self.cursor).fetchall()
-            if rows:
-                self._versions = [(0, "Current Working Version")]
-                for row in rows:
-                    comment = row.comment or "[No comment]"
-                    date = str(row.dt)[:10]
-                    label = f"[V{row.num:d} {date}] {comment}"
-                    self._versions.append((row.num, label))
-        return self._versions
+        query = self.Query("doc_version", "num", "dt", "comment")
+        query.where(query.Condition("id", self.id))
+        query.order("num DESC")
+        rows = query.execute(self.cursor).fetchall()
+        versions = [(0, "Current Working Version")]
+        for row in rows:
+            comment = row.comment or "[No comment]"
+            date = str(row.dt)[:10]
+            label = f"[V{row.num:d} {date}] {comment}"
+            versions.append((row.num, label))
+        return versions
 
 
 class Summary:
@@ -198,11 +213,11 @@ class Summary:
             version - optional integer for the version of the summary to parse
         """
 
-        self.__control = control
-        self.__id = id
-        self.__version = version
+        self.control = control
+        self.id = id
+        self.version = version
 
-    @property
+    @cached_property
     def citations(self):
         """Dictionary of the citations used by the summary document.
 
@@ -211,62 +226,48 @@ class Summary:
         will be reflected in the report.
         """
 
-        if not hasattr(self, "_citations"):
-            self._citations = {}
-            for node in self.root.iter("ReferenceList"):
-                for child in node.findall("Citation"):
-                    citation = Citation(self.control, child)
-                    if citation.key and citation.key not in self._citations:
-                        self._citations[citation.key] = citation
+        citations = {}
+        for node in self.root.iter("ReferenceList"):
+            for child in node.findall("Citation"):
+                citation = Citation(self.control, child)
+                if citation.key and citation.key not in citations:
+                    citations[citation.key] = citation
 
-            # Recurse if appropriate, rolling citations from linked modules
-            # into this dictionary.
-            if self.control.modules:
-                for node in self.root.iter("SummaryModuleLink"):
-                    cdr_ref = node.get(f"{{{Doc.NS}}}ref")
-                    if cdr_ref:
-                        try:
-                            id = Doc.extract_id(cdr_ref)
-                        except Exception:
-                            self.control.bail("bad module link %s", cdr_ref)
-                        if id not in self.control.parsed:
-                            summary = Summary(self.control, id)
-                            for key in summary.citations:
-                                if key not in self._citations:
-                                    citation = summary.citations[key]
-                                    self._citations[key] = citation
-        return self._citations
+        # Recurse if appropriate, rolling citations from linked modules
+        # into this dictionary.
+        if self.control.modules:
+            for node in self.root.iter("SummaryModuleLink"):
+                cdr_ref = node.get(f"{{{Doc.NS}}}ref")
+                if cdr_ref:
+                    try:
+                        id = Doc.extract_id(cdr_ref)
+                    except Exception:
+                        self.control.bail(f"bad module link {cdr_ref}")
+                    if id not in self.control.parsed:
+                        summary = Summary(self.control, id)
+                        for key in summary.citations:
+                            if key not in citations:
+                                citation = summary.citations[key]
+                                citations[key] = citation
+        return citations
 
-    @property
-    def control(self):
-        """Access to the report's options and report-building tools."""
-        return self.__control
-
-    @property
+    @cached_property
     def doc(self):
         """`Doc` object for the CDR summary document."""
 
-        if not hasattr(self, "_doc"):
-            opts = dict(id=self.__id, version=self.__version)
-            self._doc = Doc(self.control.session, **opts)
-            self.control.parsed.add(self.__id)
-        return self._doc
+        opts = dict(id=self.id, version=self.version)
+        self.control.parsed.add(self.id)
+        return Doc(self.control.session, **opts)
 
-    @property
+    @cached_property
     def root(self):
         """Denormalized summary document's DOM root."""
+        return self.doc.filter(*self.FILTERS).result_tree.getroot()
 
-        if not hasattr(self, "_root"):
-            self._root = self.doc.filter(*self.FILTERS).result_tree.getroot()
-        return self._root
-
-    @property
+    @cached_property
     def title(self):
         """String for the official title of the summary document."""
-
-        if not hasattr(self, "_title"):
-            self._title = Doc.get_text(self.root.find("SummaryTitle"))
-        return self._title
+        return Doc.get_text(self.root.find("SummaryTitle"))
 
 
 class Citation:
@@ -283,22 +284,19 @@ class Citation:
             node - where the citation reference was found
         """
 
-        self.__control = control
-        self.__node = node
+        self.control = control
+        self.node = node
 
     def __lt__(self, other):
         """Fold characters with different diacritics together."""
         return strcoll(self.sort_key, other.sort_key) < 0
 
-    @property
+    @cached_property
     def key(self):
         """Unique tuple distinguishing this reference."""
+        return (self.pmid, self.text) if self.text else None
 
-        if not hasattr(self, "_key"):
-            self._key = (self.pmid, self.text) if self.text else None
-        return self._key
-
-    @property
+    @cached_property
     def list_item(self):
         """Return an HTML LI object for this citation.
 
@@ -306,7 +304,7 @@ class Citation:
         citation on the Pubmed web site.
         """
 
-        B = self.__control.HTMLPage.B
+        B = self.control.HTMLPage.B
         if self.pmid:
             a = B.A(self.pmid, href=f"{self.URL}/{self.pmid}", target="_blank")
             a.tail = "]"
@@ -314,31 +312,24 @@ class Citation:
         else:
             return B.LI(self.text)
 
-    @property
+    @cached_property
     def pmid(self):
         """String for NLM's Pubmed ID for this citation."""
+        return self.node.get("PMID", "").strip()
 
-        if not hasattr(self, "_pmid"):
-            self._pmid = self.__node.get("PMID", "").strip()
-        return self._pmid
-
-    @property
+    @cached_property
     def sort_key(self):
         """Ignore case for sorting."""
+        return self.text.lower()
 
-        if not hasattr(self, "_sort_key"):
-            self._sort_key = self.text.lower()
-        return self._sort_key
-
-    @property
+    @cached_property
     def text(self):
         """String for the citation's reference text."""
 
-        if not hasattr(self, "_text"):
-            self._text = Doc.get_text(self.__node, "").strip()
-            if self._text and not self._text.endswith("."):
-                self._text += "."
-        return self._text
+        text = Doc.get_text(self.node, "").strip()
+        if text and not text.endswith("."):
+            text += "."
+        return text
 
 
 if __name__ == "__main__":

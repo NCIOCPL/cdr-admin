@@ -3,6 +3,7 @@
 """Republish CDR documents to Cancer.gov.
 """
 
+from functools import cached_property
 from cdrcgi import Controller
 from RepublishDocs import CdrRepublisher
 from cdrapi.docs import Doc
@@ -50,6 +51,8 @@ class Control(Controller):
             page - HTMLPage object on which to draw the form
         """
 
+        if not self.session.can_do("USE PUBLISHING SYSTEM"):
+            self.bail("You are not authorized to use the publishing system")
         fieldset = page.fieldset("Instructions")
         for paragraph in self.INSTRUCTIONS:
             fieldset.append(page.B.P(paragraph))
@@ -74,38 +77,71 @@ class Control(Controller):
         page.form.append(fieldset)
 
     def show_report(self):
-        """Re-draw the form, with a description of the request outcome."""
+        """Submit the job and re-draw the form."""
+
+        # Make sure we have what we need.
+        if not self.session.can_do("USE PUBLISHING SYSTEM"):
+            self.bail("You are not authorized to use the publishing system")
+        if not (self.docs or self.jobs or self.doctype):
+            self.alerts.append(dict(
+                message="Document(s), job(s), or document type required.",
+                type="error",
+            ))
+        else:
+            try:
+
+                # Submit the job.
+                republisher = CdrRepublisher(self.session.name)
+                args = (
+                    self.include_linked_documents,
+                    self.docs,
+                    self.jobs,
+                    self.doctype,
+                    self.include_all_documents_for_type,
+                    self.include_only_failed_documents,
+                    self.email,
+                )
+                job_id = str(republisher.republish(*args))
+
+                # Tell the user that the job has been queued.
+                page = self.form_page
+                link = page.menu_link("PubStatus.py", job_id, id=job_id)
+                link.set("target", "_blank")
+                self.alerts.append(dict(
+                    message=("Export job ", link, " created successfully."),
+                    type="success",
+                ))
+            except Exception as e:
+                self.logger.exception("Republish failure: %s", e)
+                self.alerts.append(dict(
+                    message=f"Republish request failed: {e}",
+                    type="error",
+                ))
+
+        # Re-draw the form.
         self.show_form()
 
-    @property
-    def buttons(self):
-        """Customize button list to add the developer menu."""
-        return self.SUBMIT, self.DEVMENU, self.ADMINMENU, self.LOG_OUT
-
-    @property
+    @cached_property
     def docs(self):
         """Sequence of document ID for the docs to be republished."""
 
-        if not hasattr(self, "_docs"):
-            try:
-                docs = self.fields.getvalue("docs", "").split()
-                self._docs = [Doc.extract_id(doc) for doc in docs]
-            except Exception:
-                self.logger.exception("failure parsing IDs")
-                self.bail("invalid document IDs")
-        return self._docs
+        try:
+            docs = self.fields.getvalue("docs", "").split()
+            return [Doc.extract_id(doc) for doc in docs]
+        except Exception:
+            self.logger.exception("failure parsing IDs")
+            self.bail("invalid document IDs")
 
-    @property
+    @cached_property
     def doctype(self):
         """Document type name selected from the form, if any."""
 
-        if not hasattr(self, "_doctype"):
-            self._doctype = self.fields.getvalue("doctype") or None
-            if self._doctype and self._doctype not in self.doctypes:
-                self.bail()
-        return self._doctype
+        doctype = self.fields.getvalue("doctype") or None
+        if doctype and doctype not in self.doctypes:
+            self.bail()
+        return doctype
 
-    @property
+    @cached_property
     def doctypes(self):
         """Document type names for the form picklist.
 
@@ -113,89 +149,56 @@ class Control(Controller):
         set speeds up the query by orders of magnitude.
         """
 
-        if not hasattr(self, "_doctypes"):
-            query = self.Query("doc_type t", "t.name", "d.doc_type").unique()
-            query.order("t.name")
-            query.join("document d", "d.doc_type = t.id")
-            query.join("pub_proc_cg c", "c.id = d.id")
-            rows = query.execute(self.cursor).fetchall()
-            self._doctypes = [row.name for row in rows if row.name != "Person"]
-        return self._doctypes
+        query = self.Query("doc_type t", "t.name", "d.doc_type").unique()
+        query.order("t.name")
+        query.join("document d", "d.doc_type = t.id")
+        query.join("pub_proc_cg c", "c.id = d.id")
+        rows = query.execute(self.cursor).fetchall()
+        return [row.name for row in rows if row.name != "Person"]
 
-    @property
+    @cached_property
     def email(self):
         """Email address to which we send notification of request outcome."""
 
-        if not hasattr(self, "_email"):
-            self._email = self.fields.getvalue("email")
-            if not self._email:
-                user = self.session.User(self.session, id=self.session.user_id)
-                self._email = user.email
-        return self._email
+        email = self.fields.getvalue("email")
+        if email:
+            return email
+        return self.session.User(self.session, id=self.session.user_id).email
 
-    @property
+    @cached_property
     def include_all_documents_for_type(self):
         """Boolean indicating whether to do a full doctype republish."""
         return True if "all" in self.options else False
 
-    @property
+    @cached_property
     def include_linked_documents(self):
         """True: add documents which are linked from the original set."""
         return True if "linked" in self.options else False
 
-    @property
+    @cached_property
     def include_only_failed_documents(self):
         """True means ignore successful docs and just republish failures."""
         return True if "failed" in self.options else False
 
-    @property
+    @cached_property
     def jobs(self):
         """Sequence of job IDs for the jobs to be republished."""
 
-        if not hasattr(self, "_jobs"):
-            try:
-                jobs = self.fields.getvalue("jobs", "").split()
-                self._jobs = [int(job) for job in jobs]
-            except Exception:
-                self.bail("invalid job IDs")
-        return self._jobs
+        try:
+            jobs = self.fields.getvalue("jobs", "").split()
+            return [int(job) for job in jobs]
+        except Exception:
+            self.bail("invalid job IDs")
 
-    @property
+    @cached_property
     def options(self):
         """Sequence of checked checkbox options."""
+        return self.fields.getlist("options")
 
-        if not hasattr(self, "_options"):
-            self._options = self.fields.getlist("options")
-        return self._options
-
-    @property
-    def subtitle(self):
-        """String to be displayed under the main banner."""
-
-        if not hasattr(self, "_subtitle"):
-            if self.request != self.SUBMIT:
-                self._subtitle = self.SUBTITLE
-            elif not (self.docs or self.jobs or self.doctype):
-                self._subtitle = self.SUBTITLE
-            else:
-                try:
-                    republisher = CdrRepublisher(self.session.name)
-                    args = (
-                        self.include_linked_documents,
-                        self.docs,
-                        self.jobs,
-                        self.doctype,
-                        self.include_all_documents_for_type,
-                        self.include_only_failed_documents,
-                        self.email,
-                    )
-                    job_id = republisher.republish(*args)
-                    subtitle = f"Export job {job_id:d} created successfully"
-                except Exception as e:
-                    self.logger.exception("Republish failure: %s", e)
-                    subtitle = f"Republish request failed: {e}"
-                self._subtitle = subtitle
-        return self._subtitle
+    @cached_property
+    def same_window(self):
+        """Only open a new browser tab once."""
+        return [self.SUBMIT] if self.request else []
 
 
 if __name__ == "__main__":

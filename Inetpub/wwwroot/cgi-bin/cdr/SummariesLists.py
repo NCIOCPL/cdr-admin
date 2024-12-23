@@ -5,7 +5,7 @@
 
 from functools import cached_property
 from operator import itemgetter
-from cdrcgi import Controller
+from cdrcgi import Controller, BasicWebPage
 
 
 class Control(Controller):
@@ -68,7 +68,9 @@ function check_included(val) {
         page.form.append(fieldset)
         fieldset = page.fieldset("Extra Blank Columns", id="extra-block")
         opts = dict(label="Extra Cols", value="0")
-        fieldset.append(page.text_field("extra", **opts))
+        field = page.text_field("extra", **opts)
+        field.find("input").set("type", "number")
+        fieldset.append(field)
         page.form.append(fieldset)
         fieldset = page.fieldset("Included Documents")
         for value, label, checked in self.INCLUDED:
@@ -85,9 +87,17 @@ function check_included(val) {
         page.add_script(self.SCRIPT)
 
     def show_report(self):
-        """Override base class version so we can set the table widhts."""
+        """Override base class version so we can handle extra columns."""
 
-        self.report.page.add_css(".report table { width: 1024px; }")
+        if self.extra:
+            report = BasicWebPage()
+            report.wrapper.append(report.B.H1(self.SUBTITLE))
+            for table in self.build_tables():
+                report.wrapper.append(table.node)
+            report.wrapper.append(self.footer)
+            css = "table { margin-bottom: 3rem; width: 100%; }"
+            report.page.head.append(report.B.STYLE(css))
+            report.send()
         self.report.send()
 
     @cached_property
@@ -111,7 +121,7 @@ function check_included(val) {
         # Not SVPC-only: don't narrow by board if none are selected.
         ids = self.fields.getlist("board")
         if not ids or "all" in ids:
-            return [Board(self, id) for id in self.boards]# + [Board(self)]
+            return [Board(self, id) for id in self.boards]
 
         # We've been asked to restrict the report to specific boards.
         board = []
@@ -138,7 +148,7 @@ function check_included(val) {
             columns.append(self.Reporter.Column("CDR ID"))
         columns.append(self.Reporter.Column("Title"))
         for _ in range(self.extra):
-            columns.append(self.Reporter.Column("", width="50px"))
+            columns.append(self.Reporter.Column("", width="10rem;"))
         return columns
 
     @cached_property
@@ -288,7 +298,6 @@ class Board:
         if self.id:
             return f"{self.control.boards[self.id]} Editorial Board"
         return ""
-
 
     @cached_property
     def summaries(self):

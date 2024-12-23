@@ -5,8 +5,12 @@
 See JIRA ticket OCECDR-5105 for requirements.
 """
 
+from functools import cached_property
+from io import BytesIO
+from openpyxl import load_workbook
+from requests import get
 from cdrcgi import Controller
-from cdrapi import db
+
 
 class Control(Controller):
 
@@ -21,17 +25,65 @@ class Control(Controller):
     ]
     CONCEPT_PATH = "/GlossaryTermName/GlossaryTermConcept/@cdr:ref"
     COLUMNS = "Documents", "Count"
+    URL = "https://cdr.cancer.gov/cgi-bin/cdr/PDQContentCounts.py?format=excel"
+    INSTRUCTIONS = (
+        "This report pulls together counts of published PDQ content "
+        "of various types for inclusion in more widely disseminated "
+        "communications. Use the form below for specifying the format "
+        "in which the report should be generated."
+    )
 
-    def show_form(self):
-        """This report has no form."""
-        self.show_report()
+    def populate_form(self, page):
+        """Ask the user which flavor or report to generate."""
+
+        if not self.fields.getvalue("prompt"):
+            self.show_report()
+        fieldset = page.fieldset("Instructions")
+        fieldset.append(page.B.P(self.INSTRUCTIONS))
+        page.form.append(fieldset)
+        page.add_output_options()
 
     def build_tables(self):
-        """Create a single table."""
+        """Wrap the table in a sequence."""
+        return [self.table]
+
+    @cached_property
+    def table(self):
+        """Used for both HTML and Excel reports."""
+
+        rows = []
+        caption = None
+        for title, count in self.rows:
+            rows.append([title, self.Reporter.Cell(count, right=True)])
+        if self.format == "excel":
+            columns = (
+                self.Reporter.Column("Documents", width="250px"),
+                self.Reporter.Column("Count", width="50px"),
+            )
+            caption = "Counts"
+        else:
+            columns = (
+                self.Reporter.Column("Documents"),
+                self.Reporter.Column("Count", classes="text-right"),
+            )
+        return self.Reporter.Table(rows, caption=caption, columns=columns)
+
+    @cached_property
+    def rows(self):
+        """Get the data from the production server."""
+
+        # If this isn't the production server, hand off the work to it.
+        if self.session.tier.name != "PROD":
+            response = get(self.URL)
+            if not response.ok:
+                self.bail(f"Report failed: {response.reason}")
+            book = load_workbook(BytesIO(response.content))
+            rows = [row for row in book.active]
+            return [(row[0].value, row[1].value) for row in rows[3:]]
 
         # Start by counting the cancer information summaries.
         rows = []
-        cursor = db.connect(user="CdrGuest", tier="PROD").cursor()
+        cursor = self.cursor
 
         # Change in requirements: don't include "module-only" summaries.
         subquery = self.Query("query_term", "doc_id")
@@ -58,7 +110,7 @@ class Control(Controller):
                             "s.path = '/Summary/@SVPC'")
                 query.where("s.value IS NULL")
             count = query.execute(cursor).fetchone().n
-            rows.append([title, self.Reporter.Cell(count, right=True)])
+            rows.append([title, count])
 
         # Next we count the drug information summaries
         query = self.Query("query_term_pub t", "COUNT(*) AS n")
@@ -66,7 +118,7 @@ class Control(Controller):
         query.join("active_doc d", "d.id = t.doc_id")
         count = query.execute(cursor).fetchone().n
         title = "Drug information summaries"
-        rows.append([title, self.Reporter.Cell(count, right=True)])
+        rows.append([title, count])
 
         # Now get the counts for the dictionaries.
         for dictionary in ("Cancer", "Genetics"):
@@ -92,7 +144,7 @@ class Control(Controller):
                 query.where(f"d.path = '{d_path}'")
                 query.where(f"d.value = '{d_value}'")
                 count = query.execute(cursor).fetchone().n
-                rows.append([title, self.Reporter.Cell(count, right=True)])
+                rows.append([title, count])
         query = self.Query("query_term_pub d", "COUNT(DISTINCT d.doc_id) AS n")
         query.join("active_doc a", "a.id = d.doc_id")
         query.where("d.path = '/Term/Definition/DefinitionType'")
@@ -103,7 +155,7 @@ class Control(Controller):
         query.where("s.value = 'Drug/agent'")
         count = query.execute(cursor).fetchone().n
         title = "NCI Drug Dictionary Terms"
-        rows.append([title, self.Reporter.Cell(count, right=True)])
+        rows.append([title, count])
 
         # For media, exclude images which we are reusing from journals, etc.
         image_encoding_path = "/Media/PhysicalMedia/ImageData/ImageEncoding"
@@ -125,15 +177,11 @@ class Control(Controller):
         video = {row.doc_id for row in query.execute(cursor).fetchall()}
         title = "English Biomedical Images and Animations"
         count = len(((images - reused) | video) ^ spanish)
-        rows.append([title, self.Reporter.Cell(count, right=True)])
+        rows.append([title, count])
         title = "Spanish Biomedical Images and Animations"
         count = len(((images - reused) | video) & spanish)
-        rows.append([title, self.Reporter.Cell(count, right=True)])
-        columns = (
-            self.Reporter.Column("Documents", width="250px"),
-            self.Reporter.Column("Count", width="50px"),
-        )
-        return self.Reporter.Table(rows, caption="Counts", columns=columns)
+        rows.append([title, count])
+        return rows
 
 
 if __name__ == "__main__":

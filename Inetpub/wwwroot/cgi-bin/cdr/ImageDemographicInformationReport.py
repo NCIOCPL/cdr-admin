@@ -14,7 +14,7 @@ See https://tracker.nci.nih.gov/browse/OCECDR-5095.
 """
 
 from functools import cached_property
-from cdrcgi import Controller, HTMLPage, bail
+from cdrcgi import Controller
 from cdrapi import db
 from cdrapi.docs import Doc, Link
 from cdr import Board, getDoctype
@@ -103,8 +103,8 @@ class Control(Controller):
         if self.language != "any":
             caption.append(f"Language: {self.language.capitalize()}")
         if self.diagnosis != "all":
-            diagnoses = dict(self.diagnoses)
-            caption.append(f"Image Diagnosis: {diagnoses[int(self.diagnosis)]}")
+            diagnosis = dict(self.diagnoses)[int(self.diagnosis)]
+            caption.append(f"Image Diagnosis: {diagnosis}")
         for name in self.DEMOGRAPHIC_FIELDS:
             value = self.fields.getvalue(name, "all")
             if value != "all":
@@ -147,9 +147,9 @@ class Control(Controller):
             if self.language != "english":
                 columns.append(f"{name} (es)")
         if self.language != "spanish":
-            columns.append(f"Image Link (en)")
+            columns.append("Image Link (en)")
         if self.language != "english":
-            columns.append(f"Image Link (es)")
+            columns.append("Image Link (es)")
         return columns
 
     @cached_property
@@ -233,7 +233,7 @@ class Control(Controller):
                     self.bail("No image title specified.")
                 title = self.image_title
                 query.join("query_term_pub t", "t.doc_id = i.doc_id")
-                query.where ("t.path = '/Media/MediaTitle'")
+                query.where("t.path = '/Media/MediaTitle'")
                 query.where(query.Condition("t.value", title, "LIKE"))
             case "category":
                 path = '/Media/MediaContent/Categories/Category'
@@ -257,7 +257,8 @@ class Control(Controller):
         elif self.language == "spanish":
             join_condition = "translation_of.doc_id = i.doc_id"
             query.join("query_term_pub translation_of", join_condition)
-            query.where("translation_of.path = '/Media/TranslationOf/@cdr:ref'")
+            path = "/Media/TranslationOf/@cdr:ref"
+            query.where(f"translation_of.path = '{path}'")
 
         # Filter on audience as requested.
         audiences = dict(hp="Health_professionals", patient="Patients")
@@ -316,6 +317,11 @@ class Control(Controller):
     @cached_property
     def race(self):
         return self.fields.getvalue("race")
+
+    @property
+    def report_css(self):
+        """Keep the caption lines from hugging the left margin."""
+        return ".usa-table caption { margin-left: 1rem; }"
 
     @cached_property
     def report_type(self):
@@ -508,6 +514,11 @@ class Control(Controller):
         """Dictionary of Media valid-values lists."""
         return dict(getDoctype("guest", "Media").vvLists)
 
+    @cached_property
+    def wide_css(self):
+        """We need more horizontal space for the report table."""
+        return self.Reporter.Table.WIDE_CSS
+
     def build_tables(self):
         """Show the report if we have all the information we need."""
 
@@ -529,7 +540,7 @@ class Control(Controller):
             fieldset.append(page.radio_button("type", **opts))
         page.form.append(fieldset)
         fieldset = page.fieldset("Image Selection Method")
-        fieldset.set("class", "default-hidden")
+        fieldset.set("class", "default-hidden usa-fieldset")
         fieldset.set("id", "image-method-fieldset")
         checked = True
         for value, label in self.IMAGE_METHODS:
@@ -538,7 +549,7 @@ class Control(Controller):
             fieldset.append(page.radio_button("image_method", **opts))
         page.form.append(fieldset)
         fieldset = page.fieldset("Summary Selection Method")
-        fieldset.set("class", "default-hidden")
+        fieldset.set("class", "default-hidden usa-fieldset")
         fieldset.set("id", "summary-method-fieldset")
         checked = True
         for value, label in self.SUMMARY_METHODS:
@@ -547,34 +558,34 @@ class Control(Controller):
             fieldset.append(page.radio_button("summary_method", **opts))
         page.form.append(fieldset)
         fieldset = page.fieldset("Image Title")
-        fieldset.set("class", "default-hidden")
+        fieldset.set("class", "default-hidden usa-fieldset")
         fieldset.set("id", "image-title-fieldset")
         fieldset.append(page.text_field("image-title", label="Title"))
         page.form.append(fieldset)
         fieldset = page.fieldset("CDR Image ID")
-        fieldset.set("class", "default-hidden")
+        fieldset.set("class", "default-hidden usa-fieldset")
         fieldset.set("id", "image-id-fieldset")
         fieldset.append(page.text_field("image-id", label="CDR ID"))
         page.form.append(fieldset)
         fieldset = page.fieldset("Image Category")
-        fieldset.set("class", "default-hidden")
+        fieldset.set("class", "default-hidden usa-fieldset")
         fieldset.set("id", "image-category-fieldset")
         for category in self.image_categories:
             opts = dict(value=category, label=category)
             fieldset.append(page.checkbox("image-category", **opts))
         page.form.append(fieldset)
         fieldset = page.fieldset("Summary Title")
-        fieldset.set("class", "default-hidden")
+        fieldset.set("class", "default-hidden usa-fieldset")
         fieldset.set("id", "summary-title-fieldset")
         fieldset.append(page.text_field("summary-title", label="Title"))
         page.form.append(fieldset)
         fieldset = page.fieldset("CDR Summary ID")
-        fieldset.set("class", "default-hidden")
+        fieldset.set("class", "default-hidden usa-fieldset")
         fieldset.set("id", "summary-id-fieldset")
         fieldset.append(page.text_field("summary-id", label="CDR ID"))
         page.form.append(fieldset)
         fieldset = page.fieldset("Summary Boards")
-        fieldset.set("class", "default-hidden")
+        fieldset.set("class", "default-hidden usa-fieldset")
         fieldset.set("id", "summary-board-fieldset")
         opts = dict(value="all", label="All Boards", checked=True)
         fieldset.append(page.checkbox("board", **opts))
@@ -584,14 +595,14 @@ class Control(Controller):
             fieldset.append(page.checkbox("board", **opts))
         page.form.append(fieldset)
         fieldset = page.fieldset("Summary Types")
-        fieldset.set("class", "default-hidden")
+        fieldset.set("class", "default-hidden usa-fieldset")
         fieldset.set("id", "summary-type-fieldset")
         for summary_type in self.summary_types:
             opts = dict(value=summary_type, label=summary_type)
             fieldset.append(page.checkbox("summary-type", **opts))
         page.form.append(fieldset)
         fieldset = page.fieldset("Summary Options")
-        fieldset.set("class", "default-hidden")
+        fieldset.set("class", "default-hidden usa-fieldset")
         fieldset.set("id", "summary-options-fieldset")
         opts = dict(value="modules", label="Include summary modules")
         fieldset.append(page.checkbox("summary-options", **opts))
@@ -729,10 +740,10 @@ jQuery(function() {
         # Log tbe assembled query.
         query.log(label="Image Demographic Report Query")
 
-
     class Image:
         NAMES = "id", "title", "age", "sex", "race", "skin_tone", "ethnicity"
         SINGLE = "id", "title"
+
         def __init__(self, doc):
             self.control = doc.control
             self.english = self.spanish = None
@@ -740,6 +751,7 @@ jQuery(function() {
                 self.english = doc
             else:
                 self.spanish = doc
+
         @cached_property
         def rows(self):
             Cell = self.control.Reporter.Cell
@@ -775,7 +787,6 @@ jQuery(function() {
                     cell = Cell("QC Report", **opts)
                 row.append(cell)
             return [row]
-
 
     class MediaDoc:
         def __init__(self, control, id):
@@ -819,7 +830,7 @@ jQuery(function() {
                     if value:
                         try:
                             return Doc.extract_id(value)
-                        except:
+                        except Exception:
                             self.control.logger.exception(value)
             return None
 
@@ -973,7 +984,6 @@ jQuery(function() {
             self.control.logger.debug("returning %d summary rows", len(rows))
             return rows
 
-
     class SummaryDoc:
         """Summary and the images to which it links."""
 
@@ -996,7 +1006,7 @@ jQuery(function() {
                     if value:
                         try:
                             return Doc.extract_id(value)
-                        except:
+                        except Exception:
                             self.control.logger.exception(value)
             return None
 

@@ -4,6 +4,7 @@
 """
 
 from copy import deepcopy
+from functools import cached_property
 from cdrcgi import Controller
 from cdrapi.docs import Doc
 from cdrapi.users import Session
@@ -54,79 +55,84 @@ class Control(Controller):
         """Provide custom routing for the multiple forms."""
 
         if not self.concept:
+            if self.fragment and not self.names:
+                warning = f"No documents found matching {self.fragment!r}."
+                self.alerts.append(dict(message=warning, type="warning"))
             self.show_form()
         else:
             self.concept.show_report()
 
-    @property
+    @cached_property
     def concept(self):
         """Subject of the report."""
+        return Concept(self) if self.id else None
 
-        if not hasattr(self, "_concept"):
-            self._concept = Concept(self) if self.id else None
-        return self._concept
+    @cached_property
+    def fragment(self):
+        """Term name fragment, possibly with wildcards."""
+        return self.fields.getvalue("name")
 
-    @property
+    @cached_property
     def id(self):
         """CDR GlossaryTermConcept document ID."""
 
-        if not hasattr(self, "_id"):
-            self._id = self.fields.getvalue("id")
-            if self._id is None:
-                self._id = self.fields.getvalue("DocId")
-            if self._id is None:
-                if self.names and len(self.names) == 1:
-                    self._id = self.names[0][0]
-                elif self.name_id:
-                    query = self.Query("query_term", "int_val")
-                    query.where(query.Condition("path", self.CONCEPT_PATH))
-                    query.where(query.Condition("doc_id", self.name_id))
-                    rows = query.execute(self.cursor).fetchall()
-                    if not rows:
-                        self.bail("Not a GlossaryTermName document ID")
-                    self._id = rows[0][0]
-            else:
-                self._id = Doc.extract_id(self._id)
-        return self._id
+        id = self.fields.getvalue("id")
+        if not id:
+            id = self.fields.getvalue("DocId")
+        if id:
+            return Doc.extract_id(id)
+        if self.names and len(self.names) == 1:
+            return self.names[0][0]
+        if self.name_id:
+            query = self.Query("query_term", "int_val")
+            query.where(query.Condition("path", self.CONCEPT_PATH))
+            query.where(query.Condition("doc_id", self.name_id))
+            rows = query.execute(self.cursor).fetchall()
+            if not rows:
+                self.bail("Not a GlossaryTermName document ID")
+            return rows[0][0]
+        return None
 
-    @property
+    @cached_property
     def layout(self):
         """Should English and Spanish be stacked or side-by-side?"""
 
-        if not hasattr(self, "_layout"):
-            self._layout = self.fields.getvalue("layout", self.LAYOUTS[0])
-            if self._layout not in self.LAYOUTS:
-                self.bail()
-        return self._layout
+        layout = self.fields.getvalue("layout", self.LAYOUTS[0])
+        if layout not in self.LAYOUTS:
+            self.bail()
+        return layout
 
-    @property
+    @cached_property
     def name_id(self):
         """CDR ID for a GlossaryTermName document."""
 
-        if not hasattr(self, "_name_id"):
-            self._name_id = self.fields.getvalue("name_id")
-            if self._name_id:
-                self._name_id = Doc.extract_id(self._name_id)
-        return self._name_id
+        name_id = self.fields.getvalue("name_id")
+        try:
+            return Doc.extract_id(name_id) if name_id else None
+        except Exception:
+            self.bail(f"Invalid Name ID {name_id!r}")
 
-    @property
+    @cached_property
     def names(self):
         """Concept-id/name-string tuples matching name fragment."""
 
-        if not hasattr(self, "_names"):
-            fragment = self.fields.getvalue("name")
-            if fragment:
-                fields = "c.int_val", "n.value"
-                query = self.Query("query_term n", *fields).order("n.value")
-                query.join("query_term c", "c.doc_id = n.doc_id")
-                query.where(query.Condition("n.path", self.NAME_PATH))
-                query.where(query.Condition("c.path", self.CONCEPT_PATH))
-                query.where(query.Condition("n.value", fragment, "LIKE"))
-                rows = query.execute(self.cursor).fetchall()
-                self._names = [tuple(row) for row in rows]
-            else:
-                self._names = []
-        return self._names
+        if not self.fragment:
+            return []
+        fields = "c.int_val", "n.value"
+        query = self.Query("query_term n", *fields).order("n.value")
+        query.join("query_term c", "c.doc_id = n.doc_id")
+        query.where(query.Condition("n.path", self.NAME_PATH))
+        query.where(query.Condition("c.path", self.CONCEPT_PATH))
+        query.where(query.Condition("n.value", self.fragment, "LIKE"))
+        rows = query.execute(self.cursor).fetchall()
+        return [tuple(row) for row in rows]
+
+    @cached_property
+    def same_window(self):
+        """Only open a new browser tab from the initial menu page."""
+
+        initial_menu_page = self.fields.getvalue("initial-menu-page")
+        return [] if initial_menu_page else [self.SUBMIT]
 
 
 class Concept:
@@ -163,156 +169,133 @@ class Concept:
         sys.stdout.buffer.write(html.tostring(self.report, **opts))
         sys.exit(0)
 
-    @property
+    @cached_property
     def control(self):
         """Access to all the information we need for the report."""
         return self.__control
 
-    @property
+    @cached_property
     def definitions(self):
         """`Definition` objects for the concept, indexed by langcode."""
 
-        if not hasattr(self, "_definitions"):
-            self._definitions = {}
-            for langcode in self.LANGUAGES:
-                self._definitions[langcode] = {}
-            for name in self.DEFINITION_ELEMENTS:
-                for node in self.doc.root.findall(name):
-                    definition = self.Definition(self, node)
-                    entry = {definition.audience: definition}
-                    self._definitions[definition.langcode].update(entry)
-        return self._definitions
+        definitions = {}
+        for langcode in self.LANGUAGES:
+            definitions[langcode] = {}
+        for name in self.DEFINITION_ELEMENTS:
+            for node in self.doc.root.findall(name):
+                definition = self.Definition(self, node)
+                entry = {definition.audience: definition}
+                definitions[definition.langcode].update(entry)
+        return definitions
 
-    @property
+    @cached_property
     def doc(self):
         """CDR `Doc` object for the GlossaryTermConcept document."""
 
-        if not hasattr(self, "_doc"):
-            self._doc = Doc(self.control.session, id=self.control.id)
-            if self._doc.doctype.name != "GlossaryTermConcept":
-                self.control.bail("Not a GlossaryTermConcept document")
-        return self._doc
+        doc = Doc(self.control.session, id=self.control.id)
+        if doc.doctype.name != "GlossaryTermConcept":
+            self.control.bail("Not a GlossaryTermConcept document")
+        return doc
 
-    @property
+    @cached_property
     def drug_links(self):
         """Drug summary links for the concept."""
+        return self.Link.get_links(self, "drug")
 
-        if not hasattr(self, "_drug_links"):
-            self._drug_links = self.Link.get_links(self, "drug")
-        return self._drug_links
-
-    @property
+    @cached_property
     def external_refs(self):
         """Links from this concept to pages outside the CDR."""
+        return self.Link.get_links(self, "xref")
 
-        if not hasattr(self, "_external_refs"):
-            self._external_refs = self.Link.get_links(self, "xref")
-        return self._external_refs
-
-    @property
+    @cached_property
     def media_links(self):
         """Links to images not associated with a specific definition."""
 
-        if not hasattr(self, "_media_links"):
-            nodes = self.doc.root.findall("MediaLink")
-            self._media_links = [self.MediaLink(node) for node in nodes]
-        return self._media_links
+        nodes = self.doc.root.findall("MediaLink")
+        return [self.MediaLink(node) for node in nodes]
 
-    @property
+    @cached_property
     def media_table(self):
         """Table showing all the non-definition-specific images."""
 
-        if not hasattr(self, "_media_table"):
-            self._media_table = builder.TABLE()
-            for link in self.media_links:
-                self._media_table.append(link.row)
-        return self._media_table
+        table = builder.TABLE()
+        for link in self.media_links:
+            table.append(link.row)
+        return table
 
-    @property
+    @cached_property
     def name_links(self):
         """Links to other glossary term names."""
+        return self.Link.get_links(self, "term")
 
-        if not hasattr(self, "_name_links"):
-            self._name_links = self.Link.get_links(self, "term")
-        return self._name_links
-
-    @property
+    @cached_property
     def names(self):
         """Objects for the concept's GlossaryTermName documents."""
 
-        if not hasattr(self, "_names"):
-            query = self.control.Query("query_term", "doc_id")
-            query.where(query.Condition("path", self.control.CONCEPT_PATH))
-            query.where(query.Condition("int_val", self.doc.id))
-            rows = query.execute(self.control.cursor).fetchall()
-            self._names = [self.Name(self, row.doc_id) for row in rows]
-        return self._names
+        query = self.control.Query("query_term", "doc_id")
+        query.where(query.Condition("path", self.control.CONCEPT_PATH))
+        query.where(query.Condition("int_val", self.doc.id))
+        rows = query.execute(self.control.cursor).fetchall()
+        return [self.Name(self, row.doc_id) for row in rows]
 
-    @property
+    @cached_property
     def pdq_terms(self):
         """Links to PDQ term documents."""
+        return self.Link.get_links(self, "pdqt")
 
-        if not hasattr(self, "_pdq_terms"):
-            self._pdq_terms = self.Link.get_links(self, "pdqt")
-        return self._pdq_terms
-
-    @property
+    @cached_property
     def related_info_table(self):
         """Table at the bottom of the report to links to other information."""
 
-        if not hasattr(self, "_related_info_table"):
-            self._related_info_table = None
-            rows = [drug_link.row for drug_link in self.drug_links]
-            rows += [summary_ref.row for summary_ref in self.summary_refs]
-            rows += [external_ref.row for external_ref in self.external_refs]
-            rows += [name_link.row for name_link in self.name_links]
-            rows += [pdq_term.row for pdq_term in self.pdq_terms]
-            if self.thesaurus_ids:
-                label = "NCI Thesaurus ID"
-                args = [self.thesaurus_ids[0]]
-                for id in self.thesaurus_ids[1:]:
-                    args += [builder.BR(), id]
-                rows.append(builder.TR(builder.TD(label), builder.TD(*args)))
-            if rows:
-                self._related_info_table = builder.TABLE(*rows)
-                self._related_info_table.set("class", "related-info-table")
-        return self._related_info_table
+        rows = [drug_link.row for drug_link in self.drug_links]
+        rows += [summary_ref.row for summary_ref in self.summary_refs]
+        rows += [external_ref.row for external_ref in self.external_refs]
+        rows += [name_link.row for name_link in self.name_links]
+        rows += [pdq_term.row for pdq_term in self.pdq_terms]
+        if self.thesaurus_ids:
+            label = "NCI Thesaurus ID"
+            args = [self.thesaurus_ids[0]]
+            for id in self.thesaurus_ids[1:]:
+                args += [builder.BR(), id]
+            rows.append(builder.TR(builder.TD(label), builder.TD(*args)))
+        if not rows:
+            return None
+        return builder.TABLE(*rows, builder.CLASS("related-info-table"))
 
-    @property
+    @cached_property
     def report(self):
         """`HTMLPage` object for the report."""
 
-        if not hasattr(self, "_report"):
-            B = builder
-            meta = B.META(charset="utf-8")
-            link = B.LINK(href=self.CSS, rel="stylesheet")
-            icon = B.LINK(href="/favicon.ico", rel="icon")
-            jqry = B.SCRIPT(src=self.control.HTMLPage.JQUERY)
-            head = B.HEAD(meta, B.TITLE(self.TITLE), icon, link, jqry)
-            time = B.SPAN(self.control.started.ctime())
-            args = self.SUBTITLE, B.BR(), "QC Report", B.BR(), time
-            concept_id = B.P(f"CDR{self.doc.id}", id="concept-id")
-            wrapper = body = B.BODY(B.E("header", B.H1(*args)), concept_id)
-            self._report = B.HTML(head, body)
-            sortopts = dict(reverse=True)
-            for langcode in sorted(self.definitions):
-                language = self.LANGUAGES[langcode]
-                if self.parallel:
-                    wrapper = B.DIV(B.CLASS("lang-wrapper"))
-                    body.append(wrapper)
-                for audience in sorted(self.definitions[langcode], **sortopts):
-                    definition = self.definitions[langcode][audience]
-                    section = f"{language} - {definition.audience.title()}"
-                    wrapper.append(B.H2(section))
-                    wrapper.append(definition.term_table)
-                    wrapper.append(definition.info_table)
-            if self.media_table is not None:
-                body.append(self.media_table)
-            body.append(self.term_type_table)
-            if self.related_info_table is not None:
-                body.append(B.H2("Related Information"))
-                body.append(self.related_info_table)
-            body.append(B.SCRIPT("""\
+        B = builder
+        meta = B.META(charset="utf-8")
+        link = B.LINK(href=self.CSS, rel="stylesheet")
+        icon = B.LINK(href="/favicon.ico", rel="icon")
+        jqry = B.SCRIPT(src=self.control.HTMLPage.JQUERY)
+        head = B.HEAD(meta, B.TITLE(self.TITLE), icon, link, jqry)
+        time = B.SPAN(self.control.started.ctime())
+        args = self.SUBTITLE, B.BR(), "QC Report", B.BR(), time
+        concept_id = B.P(f"CDR{self.doc.id}", id="concept-id")
+        wrapper = body = B.BODY(B.E("header", B.H1(*args)), concept_id)
+        report = B.HTML(head, body)
+        sortopts = dict(reverse=True)
+        for langcode in sorted(self.definitions):
+            language = self.LANGUAGES[langcode]
+            if self.parallel:
+                wrapper = B.DIV(B.CLASS("lang-wrapper"))
+                body.append(wrapper)
+            for audience in sorted(self.definitions[langcode], **sortopts):
+                definition = self.definitions[langcode][audience]
+                section = f"{language} - {definition.audience.title()}"
+                wrapper.append(B.H2(section))
+                wrapper.append(definition.term_table)
+                wrapper.append(definition.info_table)
+        if self.media_table is not None:
+            body.append(self.media_table)
+        body.append(self.term_type_table)
+        if self.related_info_table is not None:
+            body.append(B.H2("Related Information"))
+            body.append(self.related_info_table)
+        body.append(B.SCRIPT("""\
 jQuery(function() {
     jQuery("a.sound").click(function() {
         var url = jQuery(this).attr("href");
@@ -325,25 +308,19 @@ jQuery(function() {
         return false;
     });
 });"""))
-        return self._report
+        return report
 
-    @property
+    @cached_property
     def parallel(self):
         """True if the English and Spanish should be side-by-side."""
+        return self.control.layout == Control.SIDE_BY_SIDE
 
-        if not hasattr(self, "_parallel"):
-            self._parallel = self.control.layout == Control.SIDE_BY_SIDE
-        return self._parallel
-
-    @property
+    @cached_property
     def summary_refs(self):
         """Links to Cancer Information Summary documents."""
+        return self.Link.get_links(self, "sref")
 
-        if not hasattr(self, "_summary_refs"):
-            self._summary_refs = self.Link.get_links(self, "sref")
-        return self._summary_refs
-
-    @property
+    @cached_property
     def term_type_table(self):
         """Table showing all of the term type string for the concept."""
 
@@ -355,27 +332,25 @@ jQuery(function() {
         table.set("class", "term-type-table")
         return table
 
-    @property
+    @cached_property
     def term_types(self):
         """Sequence of term type strings for the concept, in document order."""
 
-        if not hasattr(self, "_term_types"):
-            self._term_types = []
-            for node in self.doc.root.findall("TermType"):
-                self._term_types.append(Doc.get_text(node, "").strip())
-        return self._term_types
+        term_types = []
+        for node in self.doc.root.findall("TermType"):
+            term_types.append(Doc.get_text(node, "").strip())
+        return term_types
 
-    @property
+    @cached_property
     def thesaurus_ids(self):
         """Links to concepts in the NCI thesaurus."""
 
-        if not hasattr(self, "_thesaurus_ids"):
-            self._thesaurus_ids = []
-            for node in self.doc.root.findall("NCIThesaurusID"):
-                self._thesaurus_ids.append(Doc.get_text(node, "").strip())
-        return self._thesaurus_ids
+        thesaurus_ids = []
+        for node in self.doc.root.findall("NCIThesaurusID"):
+            thesaurus_ids.append(Doc.get_text(node, "").strip())
+        return thesaurus_ids
 
-    @property
+    @cached_property
     def videos(self):
         """Embedded videos not associated with a specific definition.
 
@@ -383,10 +358,8 @@ jQuery(function() {
         That is surely a mistake.
         """
 
-        if not hasattr(self, "_videos"):
-            nodes = self.doc.root.findall("EmbeddedVideo")
-            self._videos = [Concept.Video(node) for node in nodes]
-        return self._videos
+        nodes = self.doc.root.findall("EmbeddedVideo")
+        return [Concept.Video(node) for node in nodes]
 
     class Definition:
         """One concept definition for a specifc language/audience combo."""
@@ -409,40 +382,35 @@ jQuery(function() {
             self.__concept = concept
             self.__node = node
 
-        @property
+        @cached_property
         def audience(self):
             """Audience for this definition."""
+            return Doc.get_text(self.node.find("Audience"))
 
-            if not hasattr(self, "_audience"):
-                self._audience = Doc.get_text(self.node.find("Audience"))
-            return self._audience
-
-        @property
+        @cached_property
         def comments(self):
             """`Comment` objects belonging to the definition."""
 
-            if not hasattr(self, "_comments"):
-                self._comments = []
-                for node in self.node.findall("Comment"):
-                    self._comments.append(self.Comment(node))
-            return self._comments
+            comments = []
+            for node in self.node.findall("Comment"):
+                comments.append(self.Comment(node))
+            return comments
 
-        @property
+        @cached_property
         def concept(self):
             """Access to the terms connected with the concept."""
             return self.__concept
 
-        @property
+        @cached_property
         def dictionaries(self):
             """Dictionaries in which this definition should appear."""
 
-            if not hasattr(self, "_dictionaries"):
-                self._dictionaries = []
-                for node in self.node.findall("Dictionary"):
-                    self._dictionaries.append(Doc.get_text(node, "").strip())
-            return self._dictionaries
+            dictionaries = []
+            for node in self.node.findall("Dictionary"):
+                dictionaries.append(Doc.get_text(node, "").strip())
+            return dictionaries
 
-        @property
+        @cached_property
         def info_table(self):
             """Table with meta information about this definition."""
 
@@ -451,118 +419,98 @@ jQuery(function() {
                 table.append(row)
             return table
 
-        @property
+        @cached_property
         def langcode(self):
             """Language code for this definition ("en" or "es")."""
             return "en" if self.node.tag == "TermDefinition" else "es"
 
-        @property
+        @cached_property
         def last_modified(self):
             """Date the definition was last modified."""
 
-            if not hasattr(self, "_last_modified"):
-                self._last_modified = None
-                node = self.node.find("DateLastModified")
-                if node is not None:
-                    self._last_modified = Doc.get_text(node, "").strip()
-            return self._last_modified
+            child = self.node.find("DateLastModified")
+            return Doc.get_text(child, "").strip() or None
 
-        @property
+        @cached_property
         def last_reviewed(self):
             """Date the definition was last reviewed."""
 
-            if not hasattr(self, "_last_reviewed"):
-                self._last_reviewed = None
-                node = self.node.find("DateLastReviewed")
-                if node is not None:
-                    self._last_reviewed = Doc.get_text(node, "").strip()
-            return self._last_reviewed
+            child = self.node.find("DateLastReviewed")
+            return Doc.get_text(child, "").strip() or None
 
-        @property
+        @cached_property
         def media_links(self):
             """Links to images for the definition."""
 
-            if not hasattr(self, "_media_links"):
-                nodes = self.node.findall("MediaLink")
-                self._media_links = [Concept.MediaLink(node) for node in nodes]
-            return self._media_links
+            children = self.node.findall("MediaLink")
+            return [Concept.MediaLink(child) for child in children]
 
-        @property
+        @cached_property
         def node(self):
             """Parsed XML node for the definition."""
             return self.__node
 
-        @property
+        @cached_property
         def replacements(self):
             """Replacement strings not specific to any term name."""
 
-            if not hasattr(self, "_replacements"):
-                self._replacements = {}
-                for node in self.node.findall("ReplacementText"):
-                    self._replacements[node.get("name")] = node
-            return self._replacements
+            replacements = {}
+            for node in self.node.findall("ReplacementText"):
+                replacements[node.get("name")] = node
+            return replacements
 
-        @property
+        @cached_property
         def resources(self):
             """Resources used for this definition."""
 
-            if not hasattr(self, "_resources"):
-                self._resources = []
-                for tag in ("DefinitionResource", "TranslationResource"):
-                    for node in self.node.findall(tag):
-                        self._resources.append(Doc.get_text(node, "").strip())
-            return self._resources
+            resources = []
+            for tag in ("DefinitionResource", "TranslationResource"):
+                for node in self.node.findall(tag):
+                    resources.append(Doc.get_text(node, "").strip())
+            return resources
 
-        @property
+        @cached_property
         def rows(self):
             """Table rows for this definition's meta data."""
 
-            if not hasattr(self, "_rows"):
-                rows = []
-                resources = self.RESOURCES[self.langcode]
-                self.__add_row(rows, "resources", resources)
-                for media_link in self.media_links:
-                    rows.append(media_link.row)
-                for video in self.videos:
-                    rows.append(video.row)
-                self.__add_row(rows, "dictionaries", "Dictionary")
-                self.__add_row(rows, "status", self.STATUSES[self.langcode])
-                self.__add_row(rows, "status_date", "Status Date")
-                # Only include the topmost comment
-                for comment in self.comments[:1]:
-                    rows.append(comment.row)
-                self.__add_row(rows, "last_modified", "Date Last Modified")
-                self.__add_row(rows, "last_reviewed", "Date Last Reviewed")
-                self._rows = rows
-            return self._rows
+            rows = []
+            resources = self.RESOURCES[self.langcode]
+            self.__add_row(rows, "resources", resources)
+            for media_link in self.media_links:
+                rows.append(media_link.row)
+            for video in self.videos:
+                rows.append(video.row)
+            self.__add_row(rows, "dictionaries", "Dictionary")
+            self.__add_row(rows, "status", self.STATUSES[self.langcode])
+            self.__add_row(rows, "status_date", "Status Date")
+            # Only include the topmost comment
+            for comment in self.comments[:1]:
+                rows.append(comment.row)
+            self.__add_row(rows, "last_modified", "Date Last Modified")
+            self.__add_row(rows, "last_reviewed", "Date Last Reviewed")
+            return rows
 
-        @property
+        @cached_property
         def status(self):
             """String for the definition's status."""
 
-            if not hasattr(self, "_status"):
-                self._status = None
-                for tag in ("DefinitionStatus", "TranslatedStatus"):
-                    self._status = self.node.find(tag)
-                    if self._status is not None:
-                        self._status = Doc.get_text(self._status, "").strip()
-                        break
-            return self._status
+            for tag in ("DefinitionStatus", "TranslatedStatus"):
+                status = self.node.find(tag)
+                if status is not None:
+                    return Doc.get_text(status, "").strip()
+            return None
 
-        @property
+        @cached_property
         def status_date(self):
             """Date of the definition's current status."""
 
-            if not hasattr(self, "_status_date"):
-                self._status_date = None
-                for tag in ("StatusDate", "TranslatedStatusDate"):
-                    node = self.node.find(tag)
-                    if node is not None:
-                        self._status_date = Doc.get_text(node, "").strip()
-                        break
-            return self._status_date
+            for tag in ("StatusDate", "TranslatedStatusDate"):
+                node = self.node.find(tag)
+                if node is not None:
+                    return Doc.get_text(node, "").strip()
+            return None
 
-        @property
+        @cached_property
         def term_table(self):
             """Table showing term names and customized definitions.
 
@@ -612,22 +560,17 @@ jQuery(function() {
                     table.append(name.resolve_placeholders(self))
             return table
 
-        @property
+        @cached_property
         def text(self):
             """Definition text with placeholders to be resolved."""
+            return self.node.find("DefinitionText")
 
-            if not hasattr(self, "_text"):
-                self._text = self.node.find("DefinitionText")
-            return self._text
-
-        @property
+        @cached_property
         def videos(self):
             """Sequence of embedded videos for this definition."""
 
-            if not hasattr(self, "_videos"):
-                nodes = self.node.findall("EmbeddedVideo")
-                self._videos = [Concept.Video(node) for node in nodes]
-            return self._videos
+            nodes = self.node.findall("EmbeddedVideo")
+            return [Concept.Video(node) for node in nodes]
 
         def __add_row(self, rows, name, label):
             """Helper method to create a row for the definition meta table."""
@@ -656,17 +599,15 @@ jQuery(function() {
 
                 self.__node = node
 
-            @property
+            @cached_property
             def row(self):
                 """HTML markup for this comment."""
 
-                if not hasattr(self, "_row"):
-                    wrapper = etree.Element("GlossaryTermDef")
-                    wrapper.append(self.__node)
-                    doc = Doc(Concept.GUEST, xml=etree.tostring(wrapper))
-                    result = doc.filter(Concept.FILTER)
-                    self._row = html.fromstring(str(result.result_tree))
-                return self._row
+                wrapper = etree.Element("GlossaryTermDef")
+                wrapper.append(self.__node)
+                doc = Doc(Concept.GUEST, xml=etree.tostring(wrapper))
+                result = doc.filter(Concept.FILTER)
+                return html.fromstring(str(result.result_tree))
 
     class Link:
         """Link to be displayed in the concept's table for related info."""
@@ -702,24 +643,22 @@ jQuery(function() {
             self.__external = external
             self.__indent = indent
 
-        @property
+        @cached_property
         def row(self):
             """HTML markup for the link."""
 
-            if not hasattr(self, "_row"):
-                label = builder.TD(self.__label)
-                if self.__indent:
-                    label.set("class", "indent")
-                if self.__external:
-                    display = url = self.__value
-                else:
-                    doc_id = Doc.extract_id(self.__value)
-                    display = f"CDR{doc_id:d}"
-                    url = f"QcReport.py?Session=guest&DocId={doc_id:d}"
-                link = builder.A(display, href=url)
-                args = f"{self.__text} (", link, ")"
-                self._row = builder.TR(label, builder.TD(*args))
-            return self._row
+            label = builder.TD(self.__label)
+            if self.__indent:
+                label.set("class", "indent")
+            if self.__external:
+                display = url = self.__value
+            else:
+                doc_id = Doc.extract_id(self.__value)
+                display = f"CDR{doc_id:d}"
+                url = f"QcReport.py?Session=guest&DocId={doc_id:d}"
+            link = builder.A(display, href=url)
+            args = f"{self.__text} (", link, ")"
+            return builder.TR(label, builder.TD(*args))
 
         @classmethod
         def get_links(cls, concept, key):
@@ -759,7 +698,7 @@ jQuery(function() {
 
         @property
         def id(self):
-            """CDR ID for the image document."""
+            """CDR ID for the image document (cached by hand)."""
 
             if not hasattr(self, "_id"):
                 node = self.node.find("MediaID")
@@ -771,25 +710,23 @@ jQuery(function() {
                     self._text = Doc.get_text(node, "").strip()
             return self._id
 
-        @property
+        @cached_property
         def node(self):
             """Wrapper node for the media link."""
             return self.__node
 
-        @property
+        @cached_property
         def row(self):
             """HTML markup for the the image's table row."""
 
-            if not hasattr(self, "_row"):
-                B = builder
-                img = B.IMG(src=self.URL.format(self.id))
-                args = f"{self.text} (CDR{self.id})", B.BR(), img
-                self._row = B.TR(B.TD("Media Link"), B.TD(*args))
-            return self._row
+            B = builder
+            img = B.IMG(src=self.URL.format(self.id))
+            args = f"{self.text} (CDR{self.id})", B.BR(), img
+            return B.TR(B.TD("Media Link"), B.TD(*args))
 
         @property
         def text(self):
-            """Text to be displayed above the image."""
+            """Text to be displayed above the image (manually cached)."""
 
             if not hasattr(self, "_text"):
                 node = self.node.find("MediaID")
@@ -854,7 +791,7 @@ jQuery(function() {
 
         @property
         def alternate_spanish_names(self):
-            """Extra spanish names."""
+            """Extra spanish names (manually cached)."""
 
             if not hasattr(self, "_alternate_spanish_names"):
                 self._alternate_spanish_names = []
@@ -866,71 +803,63 @@ jQuery(function() {
                         self._spanish_name = node
             return self._alternate_spanish_names
 
-        @property
+        @cached_property
         def blocked(self):
             """True if the name document can't be published."""
             return self.doc.active_status != Doc.ACTIVE
 
-        @property
+        @cached_property
         def doc(self):
             """CDR `Doc` object for the GlossaryTermName document."""
+            return Doc(Concept.GUEST, id=self.id)
 
-            if not hasattr(self, "_doc"):
-                self._doc = Doc(Concept.GUEST, id=self.id)
-            return self._doc
-
-        @property
+        @cached_property
         def id(self):
             """CDR ID for the GlossaryTermName document."""
             return self.__id
 
-        @property
+        @cached_property
         def english_name(self):
             """English name for the glossary term."""
+            return self.doc.root.find("TermName/TermNameString")
 
-            if not hasattr(self, "_english_name"):
-                node = self.doc.root.find("TermName/TermNameString")
-                self._english_name = node
-            return self._english_name
-
-        @property
+        @cached_property
         def english_pronunciation(self):
             """Link to the audio file for pronunciation of the English name."""
 
-            if self.english_pronunciation_url:
-                B = builder
-                url = self.english_pronunciation_url
-                img = B.IMG(B.CLASS("sound"), src="/images/audio.png")
-                return B.A(img, B.CLASS("sound"), href=url)
-            return None
+            if not self.english_pronunciation_url:
+                return None
+            B = builder
+            url = self.english_pronunciation_url
+            img = B.IMG(B.CLASS("sound"), src="/images/audio.png")
+            return B.A(img, B.CLASS("sound"), href=url)
 
-        @property
+        @cached_property
         def english_pronunciation_url(self):
             """URL for the audio file for pronunciation of the English name."""
 
-            if not hasattr(self, "_english_pronunciation_url"):
-                self._english_pronunciation_url = None
-                node = self.doc.root.find("TermName/MediaLink/MediaID")
-                if node is not None:
-                    id = node.get(f"{{{Doc.NS}}}ref")
-                    if id:
-                        url = f"GetCdrBlob.py?disp=inline&id={id}"
-                        self._english_pronunciation_url = url
-            return self._english_pronunciation_url
+            node = self.doc.root.find("TermName/MediaLink/MediaID")
+            if node is not None:
+                id = node.get(f"{{{Doc.NS}}}ref")
+                if id:
+                    return f"GetCdrBlob.py?disp=inline&id={id}"
+            return None
 
-        @property
+        @cached_property
         def replacements(self):
             """The name's replacement strings for definition placeholders."""
 
-            if not hasattr(self, "_replacements"):
-                self._replacements = {}
-                for node in self.doc.root.findall("ReplacementText"):
-                    self._replacements[node.get("name")] = node
-            return self._replacements
+            replacements = {}
+            for node in self.doc.root.findall("ReplacementText"):
+                replacements[node.get("name")] = node
+            return replacements
 
         @property
         def spanish_name(self):
-            """Primary (non-"alternate") Spanish name for the term."""
+            """Primary (non-"alternate") Spanish name for the term.
+
+            Manual caching is intentional.
+            """
 
             if not hasattr(self, "_spanish_name"):
                 self._spanish_name = None
@@ -946,7 +875,7 @@ jQuery(function() {
                     self._alternate_spanish_names = alternates
             return self._spanish_name
 
-        @property
+        @cached_property
         def spanish_pronunciation(self):
             """Link to the audio file for pronunciation of the Spanish name."""
 
@@ -957,19 +886,16 @@ jQuery(function() {
                 return B.A(img, B.CLASS("sound"), href=url)
             return None
 
-        @property
+        @cached_property
         def spanish_pronunciation_url(self):
             """URL for the audio file for pronunciation of the Spanish name."""
 
-            if not hasattr(self, "_spanish_pronunciation_url"):
-                self._spanish_pronunciation_url = None
-                node = self.doc.root.find("TranslatedName/MediaLink/MediaID")
-                if node is not None:
-                    id = node.get(f"{{{Doc.NS}}}ref")
-                    if id:
-                        url = f"GetCdrBlob.py?disp=inline&id={id}"
-                        self._spanish_pronunciation_url = url
-            return self._spanish_pronunciation_url
+            node = self.doc.root.find("TranslatedName/MediaLink/MediaID")
+            if node is not None:
+                id = node.get(f"{{{Doc.NS}}}ref")
+                if id:
+                    return f"GetCdrBlob.py?disp=inline&id={id}"
+            return None
 
         @staticmethod
         def markup_for_name(name):
@@ -1037,77 +963,60 @@ jQuery(function() {
 
             self.__node = node
 
-        @property
+        @cached_property
         def id(self):
             """CDR ID for the video's Media document."""
 
-            if not hasattr(self, "_id"):
-                node = self.node.find("VideoID")
-                self._id = None
-                if node is not None:
-                    try:
-                        self._id = Doc.extract_id(node.get(f"{{{Doc.NS}}}ref"))
-                    except Exception:
-                        pass
-            return self._id
+            node = self.node.find("VideoID")
+            if node is not None:
+                try:
+                    return Doc.extract_id(node.get(f"{{{Doc.NS}}}ref"))
+                except Exception:
+                    return None
+            return None
 
-        @property
+        @cached_property
         def img(self):
             """Still image displayed for the video."""
+            return builder.IMG(src=self.IMAGE_URL.format(self.youtube_id))
 
-            if not hasattr(self, "_img"):
-                url = self.IMAGE_URL.format(self.youtube_id)
-                self._img = builder.IMG(src=url)
-            return self._img
-
-        @property
+        @cached_property
         def link(self):
             """Link for playing the YouTube video."""
 
-            if not hasattr(self, "_link"):
-                url = self.VIDEO_URL.format(self.youtube_id)
-                self._link = builder.A("Watch video on YouTube", href=url)
-            return self._link
+            url = self.VIDEO_URL.format(self.youtube_id)
+            return builder.A("Watch video on YouTube", href=url)
 
-        @property
+        @cached_property
         def node(self):
             """Wrapper element for the video information."""
             return self.__node
 
-        @property
+        @cached_property
         def row(self):
             """HTML markup for displaying the video info and link."""
 
-            if not hasattr(self, "_row"):
-                B = builder
-                args = self.text, B.BR(), self.img, B.BR(), self.link
-                self._row = B.TR(B.TD("Video Link"), B.TD(*args))
-            return self._row
+            B = builder
+            args = self.text, B.BR(), self.img, B.BR(), self.link
+            return B.TR(B.TD("Video Link"), B.TD(*args))
 
-        @property
+        @cached_property
         def text(self):
             """String describing the video, displayed at the top."""
 
-            if not hasattr(self, "_text"):
-                self._text = None
-                node = self.node.find("SpecificMediaTitle")
-                if node is not None:
-                    self._text = Doc.get_text(node, "").strip()
-                if not self._text:
-                    node = self.node.find("VideoID")
-                    if node is not None:
-                        self._text = Doc.get_text(node, "").strip()
-            return self._text
+            for name in ("SpecificMediaTitle", "VideoID"):
+                text = Doc.get_text(self.node.find(name), "").strip()
+                if text:
+                    return text
+            return ""
 
-        @property
+        @cached_property
         def youtube_id(self):
             """Token for the URL to play the video."""
 
-            if not hasattr(self, "_youtube_id"):
-                doc = Doc(self.SESSION, id=self.id)
-                node = doc.root.find("PhysicalMedia/VideoData/HostingID")
-                self._youtube_id = Doc.get_text(node, "").strip() or None
-            return self._youtube_id
+            doc = Doc(self.SESSION, id=self.id)
+            node = doc.root.find("PhysicalMedia/VideoData/HostingID")
+            return Doc.get_text(node, "").strip() or None
 
 
 if __name__ == "__main__":

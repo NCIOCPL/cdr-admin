@@ -4,7 +4,7 @@
 """
 
 from functools import cached_property
-from cdrcgi import AdvancedSearch
+from cdrcgi import AdvancedSearch, Controller
 
 
 class TermSearch(AdvancedSearch):
@@ -13,7 +13,7 @@ class TermSearch(AdvancedSearch):
     DOCTYPE = "Term"
     SUBTITLE = DOCTYPE
     FILTER = "set:QC Term Set"
-    NCIT = "https://nciterms.nci.nih.gov"
+    NCIT = "https://evsexplore.semantics.cancer.gov/evsexplore/welcome"
     PATHS = dict(
         name="/Term/PreferredName",
         other_name="/Term/OtherName/OtherTermName",
@@ -34,29 +34,32 @@ class TermSearch(AdvancedSearch):
         if self.sem_type:
             if self.sem_type not in [st[0] for st in self.semantic_types]:
                 raise Exception("Tampering with form values")
+        opts = dict(label="Semantic Type", options=[""]+self.semantic_types)
         # pylint: enable=no-member
         self.search_fields = (
             self.text_field("name"),
             self.text_field("other_name"),
             self.select("term_type", options=[""]+self.term_types),
-            self.select("sem_type", options=[""]+self.semantic_types),
+            self.select("sem_type", **opts),
         )
         self.query_fields = []
         for name, path in self.PATHS.items():
             field = self.QueryField(getattr(self, name), [path])
             self.query_fields.append(field)
 
-    def customize_form(self, page):
-        """Add a button for browsing the NCI Thesaurus.
+    def show_form(self, subtitle="Term", error=None):
+        """Add a button for browsing the NCI Thesaurus."""
 
-        If the user has sufficient permissions, also add fields for
-        importing a new thesaurus concept or updating one we have imported
-        in the past.
-        """
-
-        ncit = f"window.open('{self.NCIT}', 'ncit');"
-        buttons = page.body.xpath("//*[@id='header-buttons']")
-        buttons[0].append(self.button("Search NCI Thesaurus", onclick=ncit))
+        args = self.session.name, subtitle, self.search_fields
+        page = self.Form(*args, error=error, control=self)
+        classes = page.B.CLASS("button usa-button")
+        opts = dict(name="Request", value="Search", type="submit")
+        page.form.append(page.B.INPUT(classes, **opts))
+        opts["value"] = "Search NCI Thesaurus"
+        opts["onclick"] = f"window.open('{self.NCIT}', 'ncit');"
+        page.form.append(page.B.INPUT(classes, **opts))
+        page.body.append(page.B.SCRIPT(src=f"{page.USWDS}/js/uswds.min.js"))
+        Controller.send_page(page.tostring())
 
     @cached_property
     def semantic_types(self):

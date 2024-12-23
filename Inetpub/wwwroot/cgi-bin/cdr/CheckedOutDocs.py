@@ -22,7 +22,9 @@ class Control(Controller):
         if self.lockers:
             fieldset = page.fieldset("Select User")
             page.form.append(fieldset)
-            fieldset.append(page.select("User", options=self.lockers))
+            field = page.select("User", options=self.lockers)
+            field.find("select").set("autofocus")
+            fieldset.append(field)
             page.add_output_options("html")
         else:
             page.form.append(page.B.P("No CDR documents are locked."))

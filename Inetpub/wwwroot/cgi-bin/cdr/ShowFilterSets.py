@@ -4,7 +4,8 @@
 """
 
 from copy import deepcopy
-from cdrcgi import Controller, navigateTo
+from functools import cached_property
+from cdrcgi import Controller
 from cdrapi.docs import Filter as APIFilter, FilterSet as APIFilterSet
 
 
@@ -20,11 +21,11 @@ class Control(Controller):
         """Provide routing to our custom commands."""
 
         if self.request == self.DEEP:
-            navigateTo(self.script, self.session.name)
+            self.navigate_to(self.script, self.session.name)
         elif self.request == self.SHALLOW:
-            navigateTo(self.script, self.session.name, depth="shallow")
+            self.navigate_to(self.script, self.session.name, depth="shallow")
         elif self.request == self.FILTER_SETS:
-            navigateTo(self.EDIT_FILTER_SETS, self.session.name)
+            self.navigate_to(self.EDIT_FILTER_SETS, self.session.name)
         else:
             Controller.run(self)
 
@@ -93,44 +94,39 @@ function show(id) {
         page.form.append(fieldset)
         page.add_css("dt { font-weight: bold; }\nfieldset { width: 600px; }")
 
-    @property
+    @cached_property
     def buttons(self):
         """Customize supported actions, including toggle between versions."""
 
         other = self.DEEP if self.depth == "shallow" else self.SHALLOW
-        return (
-            other,
-            self.FILTER_SETS,
-            self.REPORTS_MENU,
-            self.DEVMENU,
-            self.ADMINMENU,
-            self.LOG_OUT,
-        )
+        return (other, self.FILTER_SETS)
 
-    @property
+    @cached_property
     def depth(self):
         """If shallow, we don't recurse."""
         return self.fields.getvalue("depth")
 
-    @property
+    @cached_property
     def filter_sets(self):
         """Sequence of FilterSet` objects used by the deep report."""
 
-        if not hasattr(self, "_filter_sets"):
+        # Load and index the filters first.
+        for doc in APIFilterSet.get_filters(self.session):
+            Filter(doc)
 
-            # Load and index the filters first.
-            for doc in APIFilterSet.get_filters(self.session):
-                Filter(doc)
+        # Now it's safe to load up the filter sets.
+        sets = []
+        for id, name in APIFilterSet.get_filter_sets(self.session):
+            api_filter_set = APIFilterSet(self.session, id=id, name=name)
+            sets.append(FilterSet(api_filter_set))
+        return sets
 
-            # Now it's safe to load up the filter sets.
-            sets = []
-            for id, name in APIFilterSet.get_filter_sets(self.session):
-                api_filter_set = APIFilterSet(self.session, id=id, name=name)
-                sets.append(FilterSet(api_filter_set))
-            self._filter_sets = sets
-        return self._filter_sets
+    @cached_property
+    def same_window(self):
+        """Don't open new browser tabs."""
+        return self.buttons
 
-    @property
+    @cached_property
     def subtitle(self):
         """Identify which report this is."""
 
@@ -160,18 +156,17 @@ class FilterSet:
         """The string for the filter set's name."""
         return self.__api_filter_set.name
 
-    @property
+    @cached_property
     def members(self):
         """Sequence of members using our own object types."""
 
-        if not hasattr(self, "_members"):
-            self._members = []
-            for member in self.__api_filter_set.members:
-                if isinstance(member, APIFilterSet):
-                    self._members.append(FilterSet(member))
-                else:
-                    self._members.append(Filter(member))
-        return self._members
+        members = []
+        for member in self.__api_filter_set.members:
+            if isinstance(member, APIFilterSet):
+                members.append(FilterSet(member))
+            else:
+                members.append(Filter(member))
+        return members
 
     @property
     def node(self):
@@ -263,24 +258,18 @@ class Filter:
             self.elem = elem
             self.href = href
 
-        @property
+        @cached_property
         def name(self):
             """Used for display and for constructing lookup key."""
 
-            if not hasattr(self, "_name"):
-                if self.href.startswith("cdr:"):
-                    self._name = self.href[4:]
-                else:
-                    self._name = self.href
-            return self._name
+            if self.href.startswith("cdr:"):
+                return self.href[4:]
+            return self.href
 
-        @property
+        @cached_property
         def key(self):
             """Index into Filter.TITLES dictionary."""
-
-            if not hasattr(self, "_key"):
-                self._key = self.name[5:].lower().strip()
-            return self._key
+            return self.name[5:].lower().strip()
 
         @property
         def node(self):

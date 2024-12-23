@@ -3,7 +3,8 @@
 """Show blocking database requests.
 """
 
-from cdrcgi import Controller
+from functools import cached_property
+from cdrcgi import Controller, BasicWebPage
 
 
 class Control(Controller):
@@ -43,11 +44,17 @@ class Control(Controller):
         """Bypass the form, go straight to the report."""
         self.show_report()
 
-    def build_tables(self):
-        """Assemble the table for this report."""
-        return self.Reporter.Table(self.rows, columns=self.COLUMNS)
+    def show_report(self):
+        """Overridden because the table is too wide for the standard layout."""
 
-    @property
+        report = BasicWebPage()
+        report.wrapper.append(report.B.H1(self.SUBTITLE))
+        report.wrapper.append(self.table.node)
+        report.wrapper.append(self.footer)
+        report.page.head.append(report.B.STYLE("table { width: 100%; }"))
+        report.send()
+
+    @cached_property
     def rows(self):
         """Values for the report table."""
 
@@ -57,6 +64,11 @@ class Control(Controller):
         query.join("master..sysdatabases d", "d.dbid = p.dbid")
         query.where(query.Or("blocked <> 0", spid_in_blocked))
         return [tuple(row) for row in query.execute(self.cursor).fetchall()]
+
+    @cached_property
+    def table(self):
+        """Assemble the table for the report."""
+        return self.Reporter.Table(self.rows, columns=self.COLUMNS)
 
 
 if __name__ == "__main__":

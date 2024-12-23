@@ -6,6 +6,7 @@ https://tracker.nci.nih.gov/browse/OCECDR-4487
 """
 
 from datetime import date, timedelta
+from functools import cached_property
 from cdrcgi import Controller
 
 
@@ -29,8 +30,6 @@ class Control(Controller):
     )
     SUMMARY = "Summary"
     MEDIA = "Media"
-    REPORTS_MENU = SUBMENU = "Reports"
-    ADMINMENU = "Admin"
     TYPES = (
         ("current", "Current Jobs", True),
         ("history", "Job History", False),
@@ -98,186 +97,161 @@ class Control(Controller):
         else:
             Controller.run(self)
 
-    def show_report(self):
-        """Override the base class version so we can add extra buttons."""
-
-        page = self.report.page
-        buttons = page.body.find("form/header/h1/span")
-        buttons.insert(0, page.button(self.MEDIA))
-        buttons.insert(0, page.button(self.SUMMARY))
-        self.report.send(self.format)
-
-    @property
+    @cached_property
     def buttons(self):
         """Customize the form's buttons."""
+        return self.SUBMIT, self.SUMMARY, self.MEDIA
 
-        return (
-            self.SUBMIT,
-            self.SUMMARY,
-            self.MEDIA,
-            self.REPORTS_MENU,
-            self.ADMINMENU,
-            self.LOG_OUT,
-        )
-
-    @property
+    @cached_property
     def columns(self):
         """Headers for the top of the table."""
 
-        if not hasattr(self, "_columns"):
-            self._columns = (
-                self.Reporter.Column("CDR ID"),
-                self.Reporter.Column("TITLE", width="500px"),
-                self.Reporter.Column("STATUS", width="175px"),
-                self.Reporter.Column("STATUS DATE", width="100px"),
-                self.Reporter.Column("ASSIGNED TO", width="175px"),
-                self.Reporter.Column("COMMENT", width="250px")
-            )
-        return self._columns
+        column_values = (
+            ("CDR ID", None),
+            ("Title", 500),
+            ("Status", 175),
+            ("Status Date", 100),
+            ("Assigned To", 175),
+            ("Comment", 250),
+        )
+        if self.format == "html":
+            return [values[0] for values in column_values]
+        columns = []
+        for header, width in column_values:
+            opts = dict(width=f"{width}px") if width else {}
+            columns.append(self.Reporter.Column(header, **opts))
+        return columns
 
-    @property
+    @cached_property
     def comments(self):
         """Show comments in full or truncated?"""
 
-        if not hasattr(self, "_comments"):
-            default = self.COMMENTS[0][0]
-            self._comments = self.fields.getvalue("comments", default)
-            if self._comments not in {c[0] for c in self.COMMENTS}:
-                self.bail()
-        return self._comments
+        default = self.COMMENTS[0][0]
+        comments = self.fields.getvalue("comments", default)
+        if comments not in {c[0] for c in self.COMMENTS}:
+            self.bail()
+        return comments
 
-    @property
+    @cached_property
     def end(self):
         """End of the date range for the report."""
 
-        if not hasattr(self, "_end"):
-            self._end = self.parse_date(self.fields.getvalue("end"))
-            if not self._end:
-                args = (
-                    self.started.year,
-                    self.started.month,
-                    self.started.day,
-                )
-                self._end = date(*args)
-        return self._end
+        end = self.parse_date(self.fields.getvalue("end"))
+        if end:
+            return end
+        return date(self.started.year, self.started.month, self.started.day)
 
-    @property
+    @cached_property
     def jobs(self):
         """Sequence of `Job` objects used for the report."""
 
-        if not hasattr(self, "_jobs"):
-            query = self.Query(self.TABLES[self.type], *self.FIELDS)
-            query.join("usr u", "u.id = j.assigned_to")
-            query.join("document d", "d.id = j.doc_id")
-            query.join("glossary_translation_state s",
-                       "s.value_id = j.state_id")
-            query.where(f"j.state_date >= '{self.start}'")
-            query.where(f"j.state_date <= '{self.end} 23:59:59'")
-            if self.translator:
-                query.where(query.Condition("u.id", self.translator, "IN"))
-            if self.state:
-                query.where(query.Condition("s.value_id", self.state, "IN"))
-            self._jobs = []
-            for row in query.execute(self.cursor).fetchall():
-                job = Job(self, row)
-                if not self._jobs or job != self._jobs[-1]:
-                    self._jobs.append(job)
-        return self._jobs
+        query = self.Query(self.TABLES[self.type], *self.FIELDS)
+        query.join("usr u", "u.id = j.assigned_to")
+        query.join("document d", "d.id = j.doc_id")
+        query.join("glossary_translation_state s",
+                   "s.value_id = j.state_id")
+        query.where(f"j.state_date >= '{self.start}'")
+        query.where(f"j.state_date <= '{self.end} 23:59:59'")
+        if self.translator:
+            query.where(query.Condition("u.id", self.translator, "IN"))
+        if self.state:
+            query.where(query.Condition("s.value_id", self.state, "IN"))
+        jobs = []
+        for row in query.execute(self.cursor).fetchall():
+            job = Job(self, row)
+            if not jobs or job != jobs[-1]:
+                jobs.append(job)
+        return jobs
 
-    @property
+    @cached_property
     def rows(self):
         """Collect the rows for the report's table."""
+        return [job.row for job in sorted(self.jobs)]
 
-        if not hasattr(self, "_rows"):
-            self._rows = [job.row for job in sorted(self.jobs)]
-        return self._rows
+    @cached_property
+    def same_window(self):
+        """Don't open a new browser tab for these buttons."""
+        return self.SUMMARY, self.MEDIA
 
-    @property
+    @cached_property
     def sort(self):
         """In which order does the user want the report rows?"""
 
-        if not hasattr(self, "_sort"):
-            self._sort = self.fields.getvalue("sort", self.SORT[0])
-            if self._sort not in self.SORT:
-                self.bail()
-        return self._sort
+        sort = self.fields.getvalue("sort", self.SORT[0])
+        if sort not in self.SORT:
+            self.bail()
+        return sort
 
-    @property
+    @cached_property
     def start(self):
         """Beginning of the date range for the report."""
 
-        if not hasattr(self, "_start"):
-            self._start = self.parse_date(self.fields.getvalue("start"))
-            if not self._start:
-                self._start = self.end - timedelta(7)
-        return self._start
+        start = self.parse_date(self.fields.getvalue("start"))
+        return start if start else self.end - timedelta(7)
 
-    @property
+    @cached_property
     def state(self):
         """State(s) selected for the report."""
 
-        if not hasattr(self, "_state"):
-            self._state = []
-            for value in self.fields.getlist("state"):
-                try:
-                    state = int(value)
-                except Exception:
-                    self.bail()
-                if state not in self.states.map:
-                    self.bail()
-                self._state.append(state)
-        return self._state
+        states = []
+        for value in self.fields.getlist("state"):
+            try:
+                state = int(value)
+            except Exception:
+                self.bail()
+            if state not in self.states.map:
+                self.bail()
+            states.append(state)
+        return states
 
-    @property
+    @cached_property
     def state_sequence(self):
-        if not hasattr(self, "_state_sequence"):
-            self._state_sequence = {}
-            for i, state in enumerate(self.states.values):
-                state_id, state_name = state
-                self._state_sequence[state_name] = i
-        return self._state_sequence
+        """Map used for ordering the job states."""
 
-    @property
+        state_sequence = {}
+        for i, state in enumerate(self.states.values):
+            state_id, state_name = state
+            state_sequence[state_name] = i
+        return state_sequence
+
+    @cached_property
     def states(self):
         """Valid values for glossary translation states."""
+        return self.load_valid_values("glossary_translation_state")
 
-        if not hasattr(self, "_states"):
-            self._states = self.load_valid_values("glossary_translation_state")
-        return self._states
-
-    @property
+    @cached_property
     def translator(self):
         """Translator(s) selected for the report."""
 
-        if not hasattr(self, "_translator"):
-            self._translator = []
-            for value in self.fields.getlist("translator"):
-                try:
-                    translator = int(value)
-                except Exception:
-                    self.bail()
-                if translator not in self.translators.map:
-                    self.bail()
-                self._translator.append(translator)
-        return self._translator
+        translators = []
+        for value in self.fields.getlist("translator"):
+            try:
+                translator = int(value)
+            except Exception:
+                self.bail()
+            if translator not in self.translators.map:
+                self.bail()
+            translators.append(translator)
+        return translators
 
-    @property
+    @cached_property
     def translators(self):
         """Members of the Spanish Glossary Translators group."""
+        return self.load_group("Spanish Glossary Translators")
 
-        if not hasattr(self, "_translators"):
-            self._translators = self.load_group("Spanish Glossary Translators")
-        return self._translators
-
-    @property
+    @cached_property
     def type(self):
         """History or just the current jobs."""
 
-        if not hasattr(self, "_type"):
-            self._type = self.fields.getvalue("type", self.TYPES[0][0])
-            if self._type not in {t[0] for t in self.TYPES}:
-                self.bail()
-        return self._type
+        type = self.fields.getvalue("type", self.TYPES[0][0])
+        if type not in {t[0] for t in self.TYPES}:
+            self.bail()
+        return type
+
+    @cached_property
+    def wide_css(self):
+        """Override so we can widen the report table."""
+        return self.Reporter.Table.WIDE_CSS
 
 
 class Job:
@@ -311,108 +285,96 @@ class Job:
                 return True
         return False
 
-    @property
+    @cached_property
     def comments(self):
         """String for notes on this job."""
         return self.__row.comments
 
-    @property
+    @cached_property
     def date(self):
         """String for the date portion of the date/time value."""
+        return str(self.__row.state_date)[:10]
 
-        if not hasattr(self, "_date"):
-            self._date = str(self.__row.state_date)[:10]
-        return self._date
-
-    @property
+    @cached_property
     def doc_id(self):
         """Integer for the CDR ID of the glossary document."""
         return self.__row.doc_id
 
-    @property
+    @cached_property
     def doc_type(self):
         """GlossaryTermName or GlossaryTermConcept."""
 
-        if not hasattr(self, "_doc_type"):
-            query = self.__control.Query("doc_type t", "t.name")
-            query.join("document d", "d.doc_type = t.id")
-            query.where(query.Condition("d.id", self.doc_id))
-            row = query.execute(self.__control.cursor).fetchone()
-            if not row:
-                self.__control.bail(f"Unable to find CDR{self.doc_id}")
-            self._doc_type = row.name
-        return self._doc_type
+        query = self.__control.Query("doc_type t", "t.name")
+        query.join("document d", "d.doc_type = t.id")
+        query.where(query.Condition("d.id", self.doc_id))
+        row = query.execute(self.__control.cursor).fetchone()
+        if not row:
+            self.__control.bail(f"Unable to find CDR{self.doc_id}")
+        return row.name
 
-    @property
+    @cached_property
     def key(self):
         """Sort key depends on the selected order for the report."""
 
-        if not hasattr(self, "_key"):
-            if self.__control.sort == "Glossary CDR ID":
-                self._key = self.doc_id
-            elif self.__control.sort == "Processing Status":
-                state_sequence = self.__control.state_sequence[self.state]
-                self._key = state_sequence, self.title.lower()
-            elif self.__control.sort == "Status Date":
-                self._key = self.date, self.title.lower()
-            elif self.__control.sort == "User":
-                self._key = self.user, self.title.lower()
-            else:
-                self._key = self.title.lower()
+        if self.__control.sort == "Glossary CDR ID":
+            return self.doc_id
+        elif self.__control.sort == "Processing Status":
+            state_sequence = self.__control.state_sequence[self.state]
+            return state_sequence, self.title.lower()
+        elif self.__control.sort == "Status Date":
+            return self.date, self.title.lower()
+        elif self.__control.sort == "User":
+            return self.user, self.title.lower()
+        else:
+            return self.title.lower()
         return self._key
 
-    @property
+    @cached_property
     def row(self):
         """Assemble the row for the report's table."""
 
-        if not hasattr(self, "_row"):
-            Cell = self.__control.Reporter.Cell
-            comments = (self.comments or "").strip().replace("\r", "")
-            if self.__control.comments == "short":
-                comments = comments.replace("\n", "")
-                if len(comments) > 40:
-                    comments = Cell(f"{comments[:40]}...", title=comments)
-            else:
-                comments = comments.split("\n")
-            self._row = (
-                self.doc_id,
-                self.title,
-                self.state,
-                Cell(self.date, classes="nowrap"),
-                self.user,
-                comments,
-            )
-        return self._row
+        Cell = self.__control.Reporter.Cell
+        comments = (self.comments or "").strip().replace("\r", "")
+        if self.__control.comments == "short":
+            comments = comments.replace("\n", "")
+            if len(comments) > 40:
+                comments = Cell(f"{comments[:40]}...", title=comments)
+        else:
+            comments = comments.split("\n")
+        return (
+            self.doc_id,
+            self.title,
+            self.state,
+            Cell(self.date, classes="nowrap"),
+            self.user,
+            comments,
+        )
 
     @property
     def state(self):
         """Which phase of the translation job have we reached?"""
         return self.__row.value_name
 
-    @property
+    @cached_property
     def title(self):
         """String for the document title (artificial for concept docs)."""
 
-        if not hasattr(self, "_title"):
-            if self.doc_type.lower() == "glossarytermname":
-                query = self.__control.Query("document", "title")
-                query.where(query.Condition("id", self.doc_id))
-                row = query.execute(self.__control.cursor).fetchone()
-                self._title = row.title.split(";")[0] if row else None
-            else:
-                path = "/GlossaryTermName/GlossaryTermConcept/@cdr:ref"
-                query = self.__control.Query("document d", "d.title").limit(1)
-                query.join("query_term q", "q.doc_id = d.id")
-                query.where(query.Condition("q.path", path))
-                query.where(query.Condition("q.int_val", self.doc_id))
-                query.order("d.title")
-                row = query.execute(self.__control.cursor).fetchone()
-                if row:
-                    title = row.title.split(";")[0]
-                    self._title = f"GTC for {title}"
-                else:
-                    self._title = f"GTC CDR{self.doc_id:d}"
-        return self._title
+        if self.doc_type.lower() == "glossarytermname":
+            query = self.__control.Query("document", "title")
+            query.where(query.Condition("id", self.doc_id))
+            row = query.execute(self.__control.cursor).fetchone()
+            return row.title.split(";")[0] if row else None
+        path = "/GlossaryTermName/GlossaryTermConcept/@cdr:ref"
+        query = self.__control.Query("document d", "d.title").limit(1)
+        query.join("query_term q", "q.doc_id = d.id")
+        query.where(query.Condition("q.path", path))
+        query.where(query.Condition("q.int_val", self.doc_id))
+        query.order("d.title")
+        row = query.execute(self.__control.cursor).fetchone()
+        if row:
+            title = row.title.split(";")[0]
+            return f"GTC for {title}"
+        return f"GTC CDR{self.doc_id:d}"
 
     @property
     def user(self):

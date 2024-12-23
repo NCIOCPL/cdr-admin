@@ -4,8 +4,9 @@
 """
 
 from datetime import timedelta
+from functools import cached_property
 from lxml import etree
-from cdrcgi import Controller, Reporter
+from cdrcgi import Controller, Reporter, BasicWebPage
 from cdrapi.docs import Doc
 
 
@@ -41,12 +42,18 @@ class Control(Controller):
         ScientificName="font-style: italic;",
     )
     ERROR = "font-weight: bold; color: red;"
-
-    def build_tables(self):
-        """Assemble the table for the report."""
-
-        opts = dict(caption=self.caption, columns=self.columns)
-        return Reporter.Table(self.rows, **opts)
+    CSS = (
+        'body { font-family: "Source Sans Pro Web", Arial, sans-serif; }',
+        "body > div { width: 95%; margin: 2rem auto; }",
+        "table { border-collapse: collapse; }",
+        "table caption { font-weight: bold; padding: .25rem; }",
+        "th, td { font-size: .95em; border: 1px solid black; }",
+        "th { vertical-align: middle; }",
+        "td { padding: .25rem; vertical-align: top; }",
+        ".report-footer { font-style: italic; font-size: .9em; ",
+        "                 text-align: center; }",
+        "#elapsed { color: green; }",
+    )
 
     def populate_form(self, page):
         """Add the fields to the request form.
@@ -76,18 +83,28 @@ class Control(Controller):
             fieldset.append(page.checkbox("opts", **opts))
         page.form.append(fieldset)
 
-    @property
+    def show_report(self):
+        """Overridden because the table is too wide for the standard layout."""
+
+        opts = dict(caption=self.caption, columns=self.columns)
+        table = self.Reporter.Table(self.rows, **opts)
+        report = BasicWebPage()
+        report.wrapper.append(report.B.H1(self.subtitle))
+        report.wrapper.append(table.node)
+        report.wrapper.append(self.footer)
+        report.send()
+
+    @cached_property
     def audience(self):
         """String for the audience selected by the user for the report."""
 
-        if not hasattr(self, "_audience"):
-            default = self.AUDIENCES[0]
-            self._audience = self.fields.getvalue("audience", default)
-            if self._audience not in self.AUDIENCES:
-                self.bail()
-        return self._audience
+        default = self.AUDIENCES[0]
+        audience = self.fields.getvalue("audience", default)
+        if audience not in self.AUDIENCES:
+            self.bail()
+        return audience
 
-    @property
+    @cached_property
     def caption(self):
         """String to be displayed at the top of the table."""
 
@@ -96,7 +113,7 @@ class Control(Controller):
             return caption, self.date_range
         return caption
 
-    @property
+    @cached_property
     def columns(self):
         """Strings for headers at the top of the report's table columns."""
 
@@ -120,180 +137,147 @@ class Control(Controller):
             if self.show_resources:
                 columns.append("Translation Resource")
         if self.include_notes_column:
-            columns.append("QC Notes")
+            columns.append(self.Reporter.Column("QC Notes", width="10rem"))
         return columns
 
-    @property
+    @cached_property
     def concepts(self):
         """Glossary term concepts selected for the report."""
 
-        if not hasattr(self, "_concepts"):
-            query = self.Query("query_term", "doc_id").unique()
-            query.where(query.Condition("path", self.status_date_path))
-            if self.start:
-                query.where(query.Condition("value", self.start, ">="))
-            if self.end:
-                end = f"{self.end} 23:59:59"
-                query.where(query.Condition("value", end, "<="))
-            self._concepts = []
-            for row in query.order("doc_id").execute(self.cursor).fetchall():
-                concept = Concept(self, row.doc_id)
-                if concept.in_scope:
-                    self._concepts.append(concept)
-        return self._concepts
+        query = self.Query("query_term", "doc_id").unique()
+        query.where(query.Condition("path", self.status_date_path))
+        if self.start:
+            query.where(query.Condition("value", self.start, ">="))
+        if self.end:
+            end = f"{self.end} 23:59:59"
+            query.where(query.Condition("value", end, "<="))
+        concepts = []
+        for row in query.order("doc_id").execute(self.cursor).fetchall():
+            concept = Concept(self, row.doc_id)
+            if concept.in_scope:
+                concepts.append(concept)
+        return concepts
 
-    @property
+    @cached_property
     def date_range(self):
         """Second caption line above the table."""
 
-        if not hasattr(self, "_date_range"):
-            if self.start:
-                if self.end:
-                    self._date_range = f"{self.start} to {self.end}"
-                else:
-                    self._date_range = f"Since {self.start}"
-            elif self.end:
-                self._date_range = f"Through {self.end}"
+        if self.start:
+            if self.end:
+                return f"{self.start} to {self.end}"
             else:
-                self._date_range = None
-        return self._date_range
+                return f"Since {self.start}"
+        elif self.end:
+            return f"Through {self.end}"
+        else:
+            return None
 
-    @property
+    @cached_property
     def default_end(self):
         """Default value for the end of the request form's date range."""
         return self.started.strftime("%Y-%m-%d")
 
-    @property
+    @cached_property
     def default_start(self):
         """Default value for the start of the request form's date range."""
         return (self.started - timedelta(7)).strftime("%Y-%m-%d")
 
-    @property
+    @cached_property
     def end(self):
         """End of the date range requested for the report."""
 
-        if not hasattr(self, "_end"):
-            self._end = self.fields.getvalue("end")
-            if self._end:
-                try:
-                    self._end = str(self.parse_date(self._end))
-                except Exception:
-                    self.logger.exception(self._end)
-                    self.bail("Invalid end date string")
-        return self._end
+        end = self.fields.getvalue("end")
+        if not end:
+            return None
+        try:
+            return str(self.parse_date(end))
+        except Exception:
+            self.logger.exception(end)
+            self.bail("Invalid end date string")
 
-    @property
+    @cached_property
     def include_blocked_documents(self):
         """True if we should include blocked term name documents."""
+        return "blocked" in self.options
 
-        if not hasattr(self, "_include_blocked_documents"):
-            self._include_blocked_documents = "blocked" in self.options
-        return self._include_blocked_documents
-
-    @property
+    @cached_property
     def include_english(self):
         """True if we should include information about the original document.
 
         Applicable only when we are running the Spanish version of the report.
         """
 
-        if not hasattr(self, "_include_english"):
-            self._include_english = "english" in self.options
-        return self._include_english
+        return "english" in self.options
 
-    @property
+    @cached_property
     def include_notes_column(self):
         """True if we should display a QC Notes column."""
+        return "notes" in self.options
 
-        if not hasattr(self, "_include_notes_column"):
-            self._include_notes_column = "notes" in self.options
-        return self._include_notes_column
-
-    @property
+    @cached_property
     def language(self):
         """String for the language selected by the user for the report."""
 
-        if not hasattr(self, "_language"):
-            self._language = self.fields.getvalue("language")
-            if not self._language:
-                self._language = self.fields.getvalue("report")
-            if not self._language:
-                self._language = self.LANGUAGES[0]
-            if self._language not in self.LANGUAGES:
-                self.bail()
-        return self._language
+        language = self.fields.getvalue("language")
+        if not language:
+            language = self.fields.getvalue("report")
+        if not language:
+            language = self.LANGUAGES[0]
+        if language not in self.LANGUAGES:
+            self.bail()
+        return language
 
-    @property
+    @cached_property
     def options(self):
         """Miscellanous options for the report."""
+        return set(self.fields.getlist("opts"))
 
-        if not hasattr(self, "_options"):
-            self._options = set(self.fields.getlist("opts"))
-        return self._options
-
-    @property
+    @cached_property
     def report_type(self):
         """Lowercase string for the report's selected language."""
+        return self.language.lower()
 
-        if not hasattr(self, "_report_type"):
-            self._report_type = self.language.lower()
-        return self._report_type
-
-    @property
+    @cached_property
     def rows(self):
         """Assemble the table rows for the report."""
+        return sum([concept.rows for concept in self.concepts], start=[])
 
-        if not hasattr(self, "_rows"):
-            self._rows = []
-            for concept in self.concepts:
-                self._rows += concept.rows
-        return self._rows
-
-    @property
+    @cached_property
     def show_resources(self):
         """True if we should display pronunciation or translation resources."""
+        return "resources" in self.options
 
-        if not hasattr(self, "_show_resources"):
-            self._show_resources = "resources" in self.options
-        return self._show_resources
-
-    @property
+    @cached_property
     def start(self):
         """Beginning of the date range requested for the report."""
 
-        if not hasattr(self, "_start"):
-            self._start = self.fields.getvalue("start")
-            if self._start:
-                try:
-                    self._start = str(self.parse_date(self._start))
-                except Exception:
-                    self.logger.exception(self._start)
-                    self.bail("Invalid start date string")
-        return self._start
+        start = self.fields.getvalue("start")
+        if not start:
+            return None
+        try:
+            return str(self.parse_date(start))
+        except Exception:
+            self.logger.exception(start)
+            self.bail("Invalid start date string")
 
-    @property
+    @cached_property
     def status(self):
         """String for the status value selected by the user for the report."""
 
-        if not hasattr(self, "_status"):
-            self._status = self.fields.getvalue("status", self.STATUSES[0])
-            if self._status not in self.STATUSES:
-                self.bail()
-        return self._status
+        status = self.fields.getvalue("status", self.STATUSES[0])
+        if status not in self.STATUSES:
+            self.bail()
+        return status
 
-    @property
+    @cached_property
     def status_date_path(self):
         """Query term path used to find the concepts for the report."""
         return f"/GlossaryTermConcept/{self.STATUS_DATE_PATHS[self.language]}"
 
-    @property
+    @cached_property
     def subtitle(self):
         """What we display underneath the main banner."""
-
-        if not hasattr(self, "_subtitle"):
-            template = "Glossary Term Concept by {} Definition Status"
-            self._subtitle = template.format(self.language)
-        return self._subtitle
+        return f"GTC by {self.language} Definition Status"
 
 
 class Concept:
@@ -316,78 +300,73 @@ class Concept:
         self.__control = control
         self.__doc_id = doc_id
 
-    @property
+    @cached_property
     def blocked(self):
         """True if the document is blocked from publication."""
         return self.doc.active_status != Doc.ACTIVE
 
-    @property
+    @cached_property
     def control(self):
         """Access to the database and the report's options."""
         return self.__control
 
-    @property
+    @cached_property
     def doc(self):
         """`Doc` object for the CDR GlossaryTermConcept document."""
+        return Doc(self.control.session, id=self.__doc_id)
 
-        if not hasattr(self, "_doc"):
-            self._doc = Doc(self.control.session, id=self.__doc_id)
-        return self._doc
-
-    @property
+    @cached_property
     def english_definition(self):
         """English definition which is in scope for the report."""
 
-        if not hasattr(self, "_english_definition"):
-            self._english_definition = None
-            for node in self.doc.root.findall("TermDefinition"):
-                if not self._english_definition:
-                    definition = Definition(self, node)
-                    if definition.in_scope:
-                        self._english_definition = definition
-            if not self._english_definition:
-                self._english_definition = Definition(self)
-        return self._english_definition
+        english_definition = None
+        for node in self.doc.root.findall("TermDefinition"):
+            if not english_definition:
+                definition = Definition(self, node)
+                if definition.in_scope:
+                    english_definition = definition
+        return english_definition or Definition(self)
 
-    @property
+    @cached_property
     def english_name(self):
         """`Name` object for the English name selected for the report."""
         return self.name_doc.english
 
-    @property
+    @cached_property
     def english_rows(self):
         """Assemble the rows for the English version of the report."""
 
-        if not hasattr(self, "_english_rows"):
-            Cell = Reporter.Cell
-            row = [
-                Cell(self.doc.id, rowspan=self.rowspan),
-                self.name_docs[0].english.span,
-            ]
+        row = [
+            Reporter.Cell(self.doc.id, rowspan=self.rowspan, classes="nowrap"),
+            self.name_docs[0].english.span,
+        ]
+        if self.control.show_resources:
+            resources = self.name_docs[0].english.resources
+            row.append(Reporter.Cell(resources, classes="break-all"))
+        if self.control.status == "Revision pending":
+            definition = self.name_doc.published_definition
+            row.append(Reporter.Cell(definition.span, rowspan=self.rowspan))
+        definition = self.english_definition
+        row.append(Reporter.Cell(definition.span, rowspan=self.rowspan))
+        opts = dict(rowspan=self.rowspan, classes="break-all")
+        row.append(Reporter.Cell(definition.resources, **opts))
+        if self.control.include_notes_column:
+            row.append(Reporter.Cell("", rowspan=self.rowspan))
+        rows = [row]
+        for doc in self.name_docs[1:]:
+            row = [doc.english.span]
             if self.control.show_resources:
-                row.append(self.name_docs[0].english.resources)
-            if self.control.status == "Revision pending":
-                definition = self.name_doc.published_definition
-                row.append(Cell(definition.span, rowspan=self.rowspan))
-            definition = self.english_definition
-            row.append(Cell(definition.span, rowspan=self.rowspan))
-            row.append(Cell(definition.resources, rowspan=self.rowspan))
-            if self.control.include_notes_column:
-                row.append(Cell("", rowspan=self.rowspan, width="100px"))
-            self._english_rows = [row]
-            for doc in self.name_docs[1:]:
-                row = [doc.english.span]
-                if self.control.show_resources:
-                    row.append(doc.english.resources)
-                self._english_rows.append(row)
-        return self._english_rows
+                opts = dict(classes="break-all")
+                row.append(Reporter.Cell(doc.english.resources, **opts))
+            rows.append(row)
+        return rows
 
-    @property
+    @cached_property
     def in_scope(self):
         """Should we include this concept document in the report?"""
         return getattr(self, f"{self.control.report_type}_definition").in_scope
 
-    @property
+    @cached_property
     def name_doc(self):
         """NameDoc object selected for filling in definition text placeholders.
 
@@ -395,125 +374,112 @@ class Concept:
         Otherwise, use the first one in the sort order for the docs.
         """
 
-        if not hasattr(self, "_name_doc"):
-            self._name_doc = None
-            for doc in self.name_docs:
-                if doc.last_published:
-                    if self._name_doc:
-                        if self._name_doc.last_published < doc.last_published:
-                            self._name_doc = doc
-                    else:
-                        self._name_doc = doc
-            if not self._name_doc:
-                self._name_doc = self.name_docs[0]
-        return self._name_doc
+        name_doc = None
+        for doc in self.name_docs:
+            if doc.last_published:
+                if name_doc:
+                    if name_doc.last_published < doc.last_published:
+                        name_doc = doc
+                else:
+                    name_doc = doc
+        if not name_doc:
+            name_doc = self.name_docs[0]
+        return name_doc
 
-    @property
+    @cached_property
     def name_docs(self):
         """Sequence of `NameDoc` objects linked to this concept."""
 
-        if not hasattr(self, "_name_docs"):
-            docs = []
-            query = self.control.Query("query_term", "doc_id").unique()
-            query.where(query.Condition("path", self.NAME_PATH))
-            query.where(query.Condition("int_val", self.doc.id))
-            for row in query.execute(self.control.cursor).fetchall():
-                doc = NameDoc(self, row.doc_id)
-                if self.control.include_blocked_documents or not doc.blocked:
-                    docs.append(doc)
-            if docs:
-                self._name_docs = sorted(docs)
-            else:
-                self._name_docs = [NameDoc(self)]
-        return self._name_docs
+        docs = []
+        query = self.control.Query("query_term", "doc_id").unique()
+        query.where(query.Condition("path", self.NAME_PATH))
+        query.where(query.Condition("int_val", self.doc.id))
+        for row in query.execute(self.control.cursor).fetchall():
+            doc = NameDoc(self, row.doc_id)
+            if self.control.include_blocked_documents or not doc.blocked:
+                docs.append(doc)
+        return sorted(docs) if docs else [NameDoc(self)]
 
-    @property
+    @cached_property
     def replacements(self):
         """Dictionary of nodes for filling in placeholders in definitions."""
 
-        if not hasattr(self, "_replacements"):
-            self._replacements = {}
-            for node in self.doc.root.iter("ReplacementText"):
-                self._replacements[node.get("name")] = node
-            self._replacements.update(self.name_doc.replacements)
-        return self._replacements
+        replacements = {}
+        for node in self.doc.root.iter("ReplacementText"):
+            replacements[node.get("name")] = node
+        replacements.update(self.name_doc.replacements)
+        return replacements
 
-    @property
+    @cached_property
     def rows(self):
         """Assemble the rows for the report."""
         return getattr(self, f"{self.control.report_type}_rows")
 
-    @property
+    @cached_property
     def rowspan(self):
         """Number of table rows in total used for this concept document."""
 
-        if not hasattr(self, "_rowspan"):
-            self._rowspan = None
-            if self.control.report_type == "english":
-                if len(self.name_docs) > 1:
-                    self._rowspan = len(self.name_docs)
-            else:
-                count = sum([len(doc.spanish) for doc in self.name_docs])
-                if count > 1:
-                    self._rowspan = count
-        return self._rowspan
+        if self.control.report_type == "english":
+            count = len(self.name_docs)
+        else:
+            count = sum([len(doc.spanish) for doc in self.name_docs])
+        return count if count > 1 else None
 
-    @property
+    @cached_property
     def spanish_definition(self):
         """Spanish definition which is in scope for the report."""
 
-        if not hasattr(self, "_spanish_definition"):
-            self._spanish_definition = None
-            for node in self.doc.root.findall("TranslatedTermDefinition"):
-                if not self._spanish_definition:
-                    definition = Definition(self, node)
-                    if definition.in_scope:
-                        self._spanish_definition = definition
-            if not self._spanish_definition:
-                self._spanish_definition = Definition(self)
-        return self._spanish_definition
+        spanish_definition = None
+        for node in self.doc.root.findall("TranslatedTermDefinition"):
+            if not spanish_definition:
+                definition = Definition(self, node)
+                if definition.in_scope:
+                    spanish_definition = definition
+        if not spanish_definition:
+            spanish_definition = Definition(self)
+        return spanish_definition
 
-    @property
+    @cached_property
     def spanish_name(self):
         """`NameString` object for the Spanish name selected for the report."""
         return self.name_doc.spanish[0]
 
-    @property
+    @cached_property
     def spanish_rows(self):
         """Assemble the rows for the Spanish version of the report."""
 
-        if not hasattr(self, "_spanish_rows"):
-            Cell = Reporter.Cell
-            row = [Cell(self.doc.id, rowspan=self.rowspan)]
-            doc = self.name_docs[0]
-            if self.control.include_english:
-                row.append(Cell(doc.english.span, rowspan=len(doc.spanish)))
-            row.append(Cell(doc.spanish[0].span))
-            if self.control.include_english:
-                definition = self.english_definition
-                row.append(Cell(definition.span, rowspan=self.rowspan))
-            definition = self.spanish_definition
+        Cell = Reporter.Cell
+        row = [Cell(self.doc.id, rowspan=self.rowspan)]
+        doc = self.name_docs[0]
+        if self.control.include_english:
+            row.append(Cell(doc.english.span, rowspan=len(doc.spanish)))
+        row.append(Cell(doc.spanish[0].span))
+        if self.control.include_english:
+            definition = self.english_definition
             row.append(Cell(definition.span, rowspan=self.rowspan))
-            row.append(Cell(definition.comment, rowspan=self.rowspan))
-            if self.control.show_resources:
-                row.append(Cell(definition.resources, rowspan=self.rowspan))
-            if self.control.include_notes_column:
-                row.append(Cell("", rowspan=self.rowspan, width="100px"))
-            self._spanish_rows = [row]
-            for name in doc.spanish[1:]:
-                self._spanish_rows.append([Cell(name.span)])
-            for doc in self.name_docs[1:]:
-                if self.control.include_english:
-                    self._spanish_rows.append([
-                        Cell(doc.english.span, rowspan=len(doc.spanish)),
-                        Cell(doc.spanish[0].span),
-                    ])
-                    for name in doc.spanish[1:]:
-                        self._spanish_rows.append([Cell(name.span)])
-                else:
-                    for name in doc.spanish:
-                        self._spanish_rows.append([Cell(name.span)])
-        return self._spanish_rows
+        definition = self.spanish_definition
+        row.append(Cell(definition.span, rowspan=self.rowspan))
+        row.append(Cell(definition.comment, rowspan=self.rowspan))
+        if self.control.show_resources:
+            opts = dict(rowspan=self.rowspan, classes="break-all")
+            row.append(Cell(definition.resources, **opts))
+        if self.control.include_notes_column:
+            row.append(Cell("", rowspan=self.rowspan))
+        spanish_rows = [row]
+        for name in doc.spanish[1:]:
+            spanish_rows.append([Cell(name.span)])
+        for doc in self.name_docs[1:]:
+            if self.control.include_english:
+                spanish_rows.append([
+                    Cell(doc.english.span, rowspan=len(doc.spanish)),
+                    Cell(doc.spanish[0].span),
+                ])
+                for name in doc.spanish[1:]:
+                    spanish_rows.append([Cell(name.span)])
+            else:
+                for name in doc.spanish:
+                    spanish_rows.append([Cell(name.span)])
+        return spanish_rows
 
 
 class NameDoc:
@@ -544,63 +510,55 @@ class NameDoc:
         """Support sorting based on the calculated name-based sort key."""
         return self.sort_key < other.sort_key
 
-    @property
+    @cached_property
     def blocked(self):
         """True if the name document may not be published."""
         return self.doc and self.doc.active_status != Doc.ACTIVE
 
-    @property
+    @cached_property
     def concept(self):
         """Object for the document in which the name link was found."""
         return self.__concept
 
-    @property
+    @cached_property
     def control(self):
         """Access to the report's options and report-creation tools."""
         return self.concept.control
 
-    @property
+    @cached_property
     def doc(self):
         """`Doc` object for the GlossaryTermName document."""
 
-        if not hasattr(self, "_doc"):
-            self._doc = None
-            try:
-                if self.__doc_id:
-                    self._doc = Doc(self.control.session, id=self.__doc_id)
-            except Exception:
-                self.control.bail(f"Name document CDR{self.__doc_id} missing")
-        return self._doc
+        doc = Doc(self.control.session, id=self.__doc_id)
+        if not doc.id:
+            return None
+        if doc.title is None:
+            self.control.bail(f"Name document CDR{doc.id} not found.")
+        return doc
 
-    @property
+    @cached_property
     def english(self):
         """`Name` object for the document's English name."""
 
-        if not hasattr(self, "_english"):
-            self._english = None
-            if self.doc:
-                node = self.doc.root.find("TermName")
-                if node is not None:
-                    self._english = EnglishName(self, node)
-            if self._english is None:
-                self._english = EnglishName(self)
-        return self._english
+        if self.doc:
+            node = self.doc.root.find("TermName")
+            if node is not None:
+                return EnglishName(self, node)
+        return EnglishName(self)
 
-    @property
+    @cached_property
     def last_published(self):
         """When the name document was most recently published."""
 
-        if not hasattr(self, "_last_published"):
-            self._last_published = None
-            if self.doc:
-                query = self.control.Query("pub_proc_cg c", "p.completed")
-                query.join("pub_proc p", "p.id = c.pub_proc")
-                query.where(query.Condition("c.id", self.doc.id))
-                rows = query.execute(self.control.cursor).fetchall()
-                self._last_published = rows[0].completed if rows else None
-        return self._last_published
+        if not self.doc:
+            return None
+        query = self.control.Query("pub_proc_cg c", "p.completed")
+        query.join("pub_proc p", "p.id = c.pub_proc")
+        query.where(query.Condition("c.id", self.doc.id))
+        rows = query.execute(self.control.cursor).fetchall()
+        return rows[0].completed if rows else None
 
-    @property
+    @cached_property
     def published_definition(self):
         """The latest published English definition for the report's audience.
 
@@ -610,38 +568,31 @@ class NameDoc:
         partners.
         """
 
-        if not hasattr(self, "_published_definition"):
-            self._published_definition = None
-            if self.doc:
-                query = self.control.Query("pub_proc_cg", "xml")
-                query.where(query.Condition("id", self.doc.id))
-                rows = query.execute(self.control.cursor).fetchall()
-                if rows:
-                    root = etree.fromstring(rows[0].xml.encode("utf-8"))
-                    for node in root.iter("TermDefinition"):
-                        if not self._published_definition:
-                            audience = Doc.get_text(node.find("Audience"))
-                            if audience == self.control.audience:
-                                definition = node.find("DefinitionText")
-                                if definition is not None:
-                                    pubdef = PublishedDefinition(self, node)
-                                    self._published_definition = pubdef
-            if not self._published_definition:
-                self._published_definition = PublishedDefinition(self)
-        return self._published_definition
+        if self.doc:
+            query = self.control.Query("pub_proc_cg", "xml")
+            query.where(query.Condition("id", self.doc.id))
+            rows = query.execute(self.control.cursor).fetchall()
+            if rows:
+                root = etree.fromstring(rows[0].xml.encode("utf-8"))
+                for node in root.iter("TermDefinition"):
+                    audience = Doc.get_text(node.find("Audience"))
+                    if audience == self.control.audience:
+                        definition = node.find("DefinitionText")
+                        if definition is not None:
+                            return PublishedDefinition(self, node)
+        return PublishedDefinition(self)
 
-    @property
+    @cached_property
     def replacements(self):
         """Dictionary of substitutions for placeholders in the definition."""
 
-        if not hasattr(self, "_replacements"):
-            self._replacements = {}
-            if self.doc:
-                for node in self.doc.root.iter("ReplacementText"):
-                    self._replacements[node.get("name")] = node
-        return self._replacements
+        replacements = {}
+        if self.doc:
+            for node in self.doc.root.iter("ReplacementText"):
+                replacements[node.get("name")] = node
+        return replacements
 
-    @property
+    @cached_property
     def sort_key(self):
         """Select and normalize the name used for sorting.
 
@@ -650,26 +601,21 @@ class NameDoc:
         name string, depending on which report we're creating.
         """
 
-        if not hasattr(self, "_sort_key"):
-            if self.control.report_type == "english":
-                name_key = self.english.sort_key
-            else:
-                name_key = self.spanish[0].sort_key
-            self._sort_key = name_key, self.doc.id if self.doc else 0
-        return self._sort_key
+        if self.control.report_type == "english":
+            name_key = self.english.sort_key
+        else:
+            name_key = self.spanish[0].sort_key
+        return name_key, self.doc.id if self.doc else 0
 
-    @property
+    @cached_property
     def spanish(self):
         """Sequence of `TermNameString` objects for the Spanish names."""
 
-        if not hasattr(self, "_spanish"):
-            self._spanish = None
-            if self.doc:
-                nodes = self.doc.root.findall("TranslatedName")
-                self._spanish = [SpanishName(self, node) for node in nodes]
-            if not self._spanish:
-                self._spanish = [SpanishName(self)]
-        return self._spanish
+        if self.doc:
+            nodes = self.doc.root.findall("TranslatedName")
+            if nodes:
+                return [SpanishName(self, node) for node in nodes]
+        return [SpanishName(self)]
 
 
 class Name:
@@ -696,7 +642,7 @@ class Name:
         self.__name_doc = name_doc
         self.__node = node
 
-    @property
+    @cached_property
     def control(self):
         """Access to the report options and report-building tools."""
         return self.__name_doc.control
@@ -706,49 +652,42 @@ class Name:
         """Override in derived classes."""
         raise Exception("Must override this method")
 
-    @property
+    @cached_property
     def name_string_node(self):
         """Node from which the name's string is pulled."""
+        return None if self.node is None else self.node.find("TermNameString")
 
-        if not hasattr(self, "_name_string_node"):
-            self._name_string_node = None
-            if self.__node is not None:
-                self._name_string_node = self.__node.find("TermNameString")
-        return self._name_string_node
+    @cached_property
+    def node(self):
+        """TermName or TranslatedName node from the document."""
+        return self.__node
 
-    @property
+    @cached_property
     def pronunciation(self):
         """String for the pronunciation of the English name."""
 
-        if not hasattr(self, "_pronunciation"):
-            self._pronunciation = None
-            if self.__node is not None:
-                node = self.__node.find("TermPronunciation")
-                self._pronunciation = Doc.get_text(node, "").strip()
-        return self._pronunciation
+        if self.node is None:
+            return None
+        return Doc.get_text(self.node.find("TermPronunciation"), "").strip()
 
-    @property
+    @cached_property
     def resources(self):
         """Sequence of strings for pronunciation resources."""
 
-        if not hasattr(self, "_resources"):
-            self._resources = []
-            if self.__node is not None:
-                for node in self.__node.findall("PronunciationResource"):
-                    resource = Doc.get_text(node, "").strip()
-                    if resource:
-                        self._resources.append(resource)
-        return self._resources
+        resources = []
+        if self.node is not None:
+            for node in self.node.findall("PronunciationResource"):
+                resource = Doc.get_text(node, "").strip()
+                if resource:
+                    resources.append(resource)
+        return resources
 
-    @property
+    @cached_property
     def sort_key(self):
         """Order the names on the report within the concept."""
 
-        if not hasattr(self, "_sort_key"):
-            self._sort_key = ""
-            if self.__node is not None:
-                self._sort_key = "".join(self.__node.itertext()).lower()
-        return self._sort_key
+        key = "" if self.node is None else "".join(self.node.itertext())
+        return key.lower()
 
     @property
     def span(self):
@@ -851,15 +790,13 @@ class Definition:
         self.__concept = concept
         self.__node = node
 
-    @property
+    @cached_property
     def audience(self):
         """Patient or Health professional."""
 
-        if not hasattr(self, "_audience"):
-            self._audience = None
-            if self.__node is not None:
-                self._audience = Doc.get_text(self.__node.find("Audience"))
-        return self._audience
+        if self.__node is None:
+            return None
+        return Doc.get_text(self.__node.find("Audience"))
 
     @property
     def concept(self):
@@ -871,21 +808,18 @@ class Definition:
         """Access to the report's options and report-creation tools."""
         return self.concept.control
 
-    @property
+    @cached_property
     def comment(self):
         """First comment found (last entered) for the definition, if any."""
 
-        if not hasattr(self, "_comment"):
-            comments = []
-            if self.__node is not None:
-                for node in self.__node.findall("Comment"):
-                    comment = Doc.get_text(node, "").strip()
-                    if comment:
-                        comments.append(comment)
-            self._comment = comments[0] if comments else ""
-        return self._comment
+        if self.__node is not None:
+            for node in self.__node.findall("Comment"):
+                comment = Doc.get_text(node, "").strip()
+                if comment:
+                    return comment
+        return ""
 
-    @property
+    @cached_property
     def in_scope(self):
         """True if this definition matches the options for the report."""
 
@@ -906,69 +840,57 @@ class Definition:
             return False
         return True
 
-    @property
+    @cached_property
     def language(self):
         """English or Spanish."""
 
-        if not hasattr(self, "_language"):
-            self._language = None
-            if self.__node is not None:
-                if self.__node.tag == "TermDefinition":
-                    self._language = "English"
-                else:
-                    self._language = "Spanish"
-        return self._language
+        if self.__node is None:
+            return None
+        return "English" if self.__node.tag == "TermDefinition" else "Spanish"
 
-    @property
+    @cached_property
     def not_found(self):
         """String displayed for a dummy definition object."""
         return f"NO {self.control.audience} DEFINITION FOUND"
 
-    @property
+    @cached_property
     def resources(self):
         """Sequence of strings for definition resources."""
 
-        if not hasattr(self, "_resources"):
-            self._resources = []
-            if self.__node is not None:
-                tag = self.TAGS[self.language]["resource"]
-                for node in self.__node.findall(tag):
-                    self._resources.append(Doc.get_text(node, "").strip())
-        return self._resources
+        resources = []
+        if self.__node is not None:
+            tag = self.TAGS[self.language]["resource"]
+            for node in self.__node.findall(tag):
+                resources.append(Doc.get_text(node, "").strip())
+        return resources
 
-    @property
+    @cached_property
     def span(self):
         """HTML wrapper for the marked-up definition display."""
 
-        if not hasattr(self, "_span"):
-            self._span = None
-            if self.__node is not None:
-                self._span = self.__parse(self.__node.find("DefinitionText"))
-            if self._span is None:
-                self._span = self.B.SPAN(self.not_found, style=Control.ERROR)
-        return self._span
+        if self.__node is not None:
+            span = self.__parse(self.__node.find("DefinitionText"))
+            if span is not None:
+                return span
+        return self.B.SPAN(self.not_found, style=Control.ERROR)
 
-    @property
+    @cached_property
     def status(self):
         """String for the definition's status."""
 
-        if not hasattr(self, "_status"):
-            self._status = None
-            if self.__node is not None:
-                tag = self.TAGS[self.language]["status"]
-                self._status = Doc.get_text(self.__node.find(tag), "").strip()
-        return self._status
+        if self.__node is None:
+            return None
+        tag = self.TAGS[self.language]["status"]
+        return Doc.get_text(self.__node.find(tag), "").strip()
 
-    @property
+    @cached_property
     def status_date(self):
         """String for the definition's status date."""
 
-        if not hasattr(self, "_status_date"):
-            self._status_date = None
-            if self.__node is not None:
-                node = self.__node.find(self.TAGS[self.language]["date"])
-                self._status_date = Doc.get_text(node, "").strip()
-        return self._status_date
+        if self.__node is None:
+            return None
+        node = self.__node.find(self.TAGS[self.language]["date"])
+        return Doc.get_text(node, "").strip()
 
     def __parse(self, node, with_tail=False):
         """Recursively assemble the segments of this definition.
@@ -1052,7 +974,7 @@ class Definition:
 class PublishedDefinition(Definition):
     """Provides custom display for missing definition."""
 
-    @property
+    @cached_property
     def not_found(self):
         """String displayed for a dummy definition object."""
         return "NO PUBLISHED DEFINITION FOUND"

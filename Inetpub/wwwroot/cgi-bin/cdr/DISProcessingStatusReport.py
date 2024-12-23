@@ -3,6 +3,7 @@
 """Create a new report based on the new ProcessingStatus block.
 """
 
+from functools import cached_property
 from cdrcgi import Controller
 from cdrapi.docs import Doc
 
@@ -35,26 +36,35 @@ class Control(Controller):
 
     def build_tables(self):
         """Assemble the report's table."""
-        return [self.Reporter.Table(self.rows, columns=self.columns)]
 
-    @property
+        opts = dict(columns=self.columns, fixed=True)
+        return [self.Reporter.Table(self.rows, **opts)]
+
+    def show_report(self):
+        """Override so we can widen the report table."""
+
+        table = self.report.page.form.find("table")
+        report_footer = self.report.page.main.find("p")
+        report_footer.addprevious(table)
+        css = ".report .usa-table { width: 90%; margin: 3rem auto 1.25rem; }"
+        self.report.page.add_css(css)
+        self.report.send(self.format)
+
+    @cached_property
     def columns(self):
         """Column headers for the report's table."""
 
-        if not hasattr(self, "_columns"):
-            self._columns = (
-                self.Reporter.Column("CDR ID", width="100px"),
-                self.Reporter.Column("DIS Title", width="300px"),
-                self.Reporter.Column("Processing Status Value", width="200px"),
-                self.Reporter.Column("Processing Status Date", width="80px"),
-                self.Reporter.Column("Entered By", width="100px"),
-                self.Reporter.Column("Comments", width="300px"),
-                self.Reporter.Column("Last Version Publishable?",
-                                     width="100px"),
-                self.Reporter.Column("Date First Published", width="80px"),
-                self.Reporter.Column("Published Date", width="80px"),
-            )
-        return self._columns
+        return (
+            "CDR ID",
+            "DIS Title",
+            "Processing Status Value",
+            "Processing Status Date",
+            "Entered By",
+            self.Reporter.Column("Comments", width="20%"),
+            "Last Version Publishable?",
+            "Date First Published",
+            "Published Date",
+        )
 
     @property
     def drugs(self):

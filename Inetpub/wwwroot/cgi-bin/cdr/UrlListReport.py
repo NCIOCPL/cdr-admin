@@ -6,7 +6,8 @@ into a regular report.  The report, however, will be run by document
 type. (Eliminating Filter type from possible doc types)
 """
 
-from cdrcgi import Controller
+from functools import cached_property
+from cdrcgi import Controller, BasicWebPage
 
 
 class Control(Controller):
@@ -41,12 +42,24 @@ class Control(Controller):
         opts = dict(columns=self.COLUMNS, caption=self.caption)
         return self.Reporter.Table(self.rows, **opts)
 
-    @property
+    def show_report(self):
+        """Report tables are too wide for the standard HTML layout."""
+
+        if self.format == "excel":
+            return self.report.send("excel")
+        report = BasicWebPage()
+        report.wrapper.append(report.B.H1(self.SUBTITLE))
+        report.wrapper.append(self.build_tables().node)
+        report.wrapper.append(self.footer)
+        report.head.append(report.B.STYLE("table { width: 100%; }"))
+        report.send()
+
+    @cached_property
     def caption(self):
         """String to be displayed directly above the table."""
         return f"Document Type: {self.doctype}"
 
-    @property
+    @cached_property
     def cis_query(self):
         """Query for Cancer Information Summaries."""
 
@@ -63,7 +76,7 @@ class Control(Controller):
         query.where("x.path LIKE '/Summary%/ExternalRef/@cdr:xref'")
         return query
 
-    @property
+    @cached_property
     def default_query(self):
         """Query for all non-summary document types."""
 
@@ -83,7 +96,7 @@ class Control(Controller):
         query.where("x.path LIKE '%/ExternalRef/@cdr:xref'")
         return query
 
-    @property
+    @cached_property
     def dis_query(self):
         """Query for Drug Information Summaries."""
 
@@ -95,7 +108,7 @@ class Control(Controller):
         query.where("x.value IS NOT NULL")
         return query
 
-    @property
+    @cached_property
     def gtc_query(self):
         """Query for GlossaryTermConcept.
            Users need to find URLs for ExternalRef and RelatedExternalRef."""
@@ -114,12 +127,12 @@ class Control(Controller):
         query.where("x.path LIKE '%/%ExternalRef/@cdr:xref'")
         return query
 
-    @property
+    @cached_property
     def doctype(self):
         """Document type selected by the user from the form."""
         return self.fields.getvalue("doctype")
 
-    @property
+    @cached_property
     def doctypes(self):
         """ID/name tuples for the radio buttons on the form.
 
@@ -128,20 +141,18 @@ class Control(Controller):
         more than two orders of magnitude slower without it!
         """
 
-        if not hasattr(self, "_doctypes"):
-            query = self.Query("doc_type t", "d.doc_type", "t.name").unique()
-            query.order("t.name")
-            query.join("document d", "d.doc_type = t.id")
-            query.join("query_term l", "l.doc_id = d.id")
-            query.where("path LIKE '%ExternalRef%'")
-            query.where("t.name <> 'Filter'")
-            query.log()
-            rows = query.execute(self.cursor).fetchall()
-            doctypes = [row.name for row in rows] + ["DrugInformationSummary"]
-            self._doctypes = sorted(set(doctypes))
-        return self._doctypes
+        query = self.Query("doc_type t", "d.doc_type", "t.name").unique()
+        query.order("t.name")
+        query.join("document d", "d.doc_type = t.id")
+        query.join("query_term l", "l.doc_id = d.id")
+        query.where("path LIKE '%ExternalRef%'")
+        query.where("t.name <> 'Filter'")
+        query.log()
+        rows = query.execute(self.cursor).fetchall()
+        doctypes = [row.name for row in rows] + ["DrugInformationSummary"]
+        return sorted(set(doctypes))
 
-    @property
+    @cached_property
     def rows(self):
         """Values for the report table.
 
@@ -152,12 +163,10 @@ class Control(Controller):
         columns for all three types.
         """
 
-        if not hasattr(self, "_rows"):
-            name = self.QUERIES.get(self.doctype, self.DEFAULT_QUERY)
-            query = getattr(self, name)
-            self.logger.debug(query)
-            self._rows = query.execute(self.cursor).fetchall()
-        return self._rows
+        name = self.QUERIES.get(self.doctype, self.DEFAULT_QUERY)
+        query = getattr(self, name)
+        self.logger.debug(query)
+        return query.execute(self.cursor).fetchall()
 
 
 if __name__ == "__main__":

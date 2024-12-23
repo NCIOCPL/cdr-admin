@@ -4,8 +4,9 @@
 """
 
 from datetime import date
+from functools import cached_property
 from cdrapi.docs import Doc
-from cdrcgi import Controller
+from cdrcgi import Controller, BasicWebPage
 from cdr import URDATE, getSchemaEnumVals
 
 
@@ -32,54 +33,42 @@ class Control(Controller):
     )
 
     def build_tables(self):
-        """Assemble the table(s) for the report.
+        """Callback which the Excel version of the report will need."""
+        return self.tables
 
-        If we're ready to display the report, we have three options:
-          1. a single table showing the latest changes in each
-             category of change for each selected summary
-          2. an historical report with a single table showing
-             all changes falling within the specified date range
-             for all selected summaries
-          3. multiple tables, one for each type of change,
-             showing all changes occurring withing the specified
-             date range for all selected summaries
-        """
+    def show_report(self):
+        """Report tables are too wide for the standard HTML layout."""
 
-        tables = None
-        if self.type == self.CURRENT:
-            caption = "Type of Change Report (Most Recent Change)"
-        elif self.organization == self.BY_SUMMARY:
-            caption = "Type of Change Report (All Changes by Summary)"
-            caption = caption, self.date_range
-        else:
-            tables = self.change_type_tables
-        if tables is None:
-            opts = dict(caption=caption, columns=self.columns)
-            rows = []
-            for summary in sorted(self.summaries):
-                rows.extend(summary.get_rows())
-            tables = [self.Reporter.Table(rows, **opts)]
-        self.subtitle = f"Report produced {self.today}"
+        if not self.ready:
+            return self.show_form()
+        if self.format == "excel":
+            return self.report.send("excel")
+        title = "Summary Changes"
         if self.type == self.HISTORICAL:
-            self.subtitle += f" -- {self.date_range}"
-        return tables
+            title = f"Summary Changes -- {self.date_range}"
+        else:
+            title = "Current Summary Changes"
+        report = BasicWebPage()
+        report.wrapper.append(report.B.H1(title))
+        for table in self.tables:
+            report.wrapper.append(table.node)
+        report.wrapper.append(self.footer)
+        report.head.append(report.B.STYLE("table { margin-bottom: 3rem; }"))
+        report.send()
 
-    def populate_form(self, page, titles=None):
+    def populate_form(self, page):
         """Put the fields on the form.
 
         Pass:
             page - `cdrcgi.HTMLPage` object
-            titles - if not None, show the followup page for selecting
-                     from multiple matches with the user's title fragment;
-                     otherwise, show the report's main request form
         """
 
         page.form.append(page.hidden_field("debug", self.debug or ""))
-        opts = {"titles": titles, "id-label": "CDR ID(s)"}
+        opts = {"titles": self.summary_titles, "id-label": "CDR ID(s)"}
         opts["id-tip"] = "separate multiple IDs with spaces"
         self.add_summary_selection_fields(page, **opts)
         fieldset = page.fieldset("Include")
-        fieldset.set("class", "by-board-block")
+        fieldset.set("class", "by-board-block usa-fieldset")
         for value, label in self.MODULES:
             checked = value == self.modules
             opts = dict(value=value, label=label, checked=checked)
@@ -108,13 +97,14 @@ class Control(Controller):
             fieldset.append(page.radio_button("type", **opts))
         page.form.append(fieldset)
         fieldset = page.fieldset("Date Range for Changes History")
-        fieldset.set("class", "history")
+        fieldset.set("class", "history usa-fieldset")
         opts = dict(value=self.start, label="Start Date")
         fieldset.append(page.date_field("start", **opts))
         opts = dict(value=self.end, label="End Date")
         fieldset.append(page.date_field("end", **opts))
         page.form.append(fieldset)
-        fieldset = page.fieldset("Report Organization")
+        fieldset = page.fieldset("Report Organization", id="rep-org")
+        fieldset.set("class", "history usa-fieldset")
         for organization in self.REPORT_ORGANIZATIONS:
             checked = organization == self.organization
             opts = dict(value=organization, checked=checked)
@@ -128,257 +118,289 @@ $(function() {
     check_type($("input[name='type']:checked").val());
 });""")
 
-    @property
+    @cached_property
     def all_types(self):
         """Valid type of change values parsed from the summary schema."""
 
-        if not hasattr(self, "_all_types"):
-            args = "SummarySchema.xml", "SummaryChangeType"
-            self._all_types = sorted(getSchemaEnumVals(*args))
-        return self._all_types
+        args = "SummarySchema.xml", "SummaryChangeType"
+        return sorted(getSchemaEnumVals(*args))
 
-    @property
+    @cached_property
     def audience(self):
         """Selecting summaries for this audience."""
 
-        if not hasattr(self, "_audience"):
-            self._audience = self.fields.getvalue("audience")
-            if self._audience:
-                if self._audience not in self.AUDIENCES:
-                    self.bail()
-            else:
-                self._audience = self.AUDIENCES[0]
-        return self._audience
+        audience = self.fields.getvalue("audience")
+        if not audience:
+            return self.AUDIENCES[0]
+        if audience not in self.AUDIENCES:
+            self.bail()
+        return audience
 
-    @property
+    @cached_property
     def board(self):
         """PDQ board ID(s) selected by the user for the report."""
 
-        if not hasattr(self, "_board"):
-            boards = self.fields.getlist("board")
-            if "all" in boards:
-                self._board = ["all"]
-            else:
-                self._board = set()
-                for id in boards:
-                    try:
-                        self._board.add(int(id))
-                    except Exception:
-                        self.bail()
-                self._board = list(self._board)
-                if not self._board:
-                    self._board = ["all"]
-        return self._board
+        values = self.fields.getlist("board")
+        if not values or "all" in values:
+            return ["all"]
+        boards = set()
+        for value in values:
+            try:
+                boards.add(int(value))
+            except Exception:
+                self.bail()
+        return list(boards)
 
-    @property
+    @cached_property
     def boards(self):
         """Dictionary of board names indexed by CDR Organization ID."""
+        return self.get_boards()
 
-        if not hasattr(self, "_boards"):
-            self._boards = self.get_boards()
-        return self._boards
+    @cached_property
+    def board_summaries(self):
+        """`Summary` objects for the selected board(s), etc."""
 
-    @property
+        a_path = "/Summary/SummaryMetaData/SummaryAudience"
+        b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
+        l_path = "/Summary/SummaryMetaData/SummaryLanguage"
+        t_path = "/Summary/TranslationOf/@cdr:ref"
+        m_path = "/Summary/@AvailableAsModule"
+        query = self.Query("active_doc d", "d.id")
+        query.join("query_term_pub a", "a.doc_id = d.id")
+        query.where(query.Condition("a.path", a_path))
+        query.where(query.Condition("a.value", self.audience + "s"))
+        query.join("query_term_pub l", "l.doc_id = d.id")
+        query.where(query.Condition("l.path", l_path))
+        query.where(query.Condition("l.value", self.language))
+        if "all" not in self.board:
+            if self.language == "English":
+                query.join("query_term_pub b", "b.doc_id = d.id")
+            else:
+                query.join("query_term_pub t", "t.doc_id = d.id")
+                query.where(query.Condition("t.path", t_path))
+                query.join("query_term b", "b.doc_id = t.int_val")
+            query.where(query.Condition("b.path", b_path))
+            query.where(query.Condition("b.int_val", self.board, "IN"))
+        if self.modules == "modules":
+            query.join("query_term_pub m", "m.doc_id = d.id")
+            query.where(query.Condition("m.path", m_path))
+        elif self.modules == "summaries":
+            query.outer("query_term_pub m", "m.doc_id = d.id",
+                        f"m.path = '{m_path}'")
+            query.where("m.doc_id IS NULL")
+        rows = query.unique().execute(self.cursor).fetchall()
+        return [Summary(self, row.id) for row in rows]
+
+    @cached_property
+    def cdr_id(self):
+        """String entered by the user for selection by CDR ID."""
+        return self.fields.getvalue("cdr-id")
+
+    @cached_property
     def cdr_ids(self):
-        """Set of unique CDR ID integers."""
+        """Integers for the selected documents, populated by `ready()`."""
+        return set()
 
-        if not hasattr(self, "_cdr_ids"):
-            self._cdr_ids = set()
-            for word in self.fields.getvalue("cdr-id", "").strip().split():
-                try:
-                    self._cdr_ids.add(Doc.extract_id(word))
-                except Exception:
-                    self.bail("Invalid format for CDR ID")
-        return self._cdr_ids
-
-    @property
+    @cached_property
     def change_type_tables(self):
         """Report each type of change in its own table."""
 
-        if not hasattr(self, "_change_type_tables"):
-            opts = {"html_callback_pre": Control.table_spacer}
-            tables = []
-            title = "Type of Change Report"
-            range = self.date_range
-            for change_type in self.change_types:
-                rows = []
-                for summary in self.summaries:
-                    rows.extend(summary.get_rows(change_type))
-                if not rows:
-                    continue
-                count = f"{len(rows):d} change"
-                if len(rows) > 1:
-                    count += "s"
-                opts = dict(
-                    caption=(title, change_type, f"{range} ({count})"),
-                    sheet_name=change_type.split()[0],
-                    columns=self.columns,
-                    classes="change_type_table",
-                )
-                tables.append(self.Reporter.Table(rows, **opts))
-            self._change_type_tables = tables
-        return self._change_type_tables
+        tables = []
+        title = "Type of Change Report"
+        range = self.date_range
+        for change_type in self.change_types:
+            rows = []
+            for summary in self.summaries:
+                rows.extend(summary.get_rows(change_type))
+            if not rows:
+                continue
+            count = f"{len(rows):d} change"
+            if len(rows) > 1:
+                count += "s"
+            opts = dict(
+                caption=(title, change_type, f"{range} ({count})"),
+                sheet_name=change_type.split()[0],
+                columns=self.columns,
+                classes="change_type_table",
+            )
+            tables.append(self.Reporter.Table(rows, **opts))
+        return tables
 
-    @property
+    @cached_property
     def change_types(self):
         """Types of change selected by the user."""
 
-        if not hasattr(self, "_change_types"):
-            types = self.fields.getlist("change-type") or self.all_types
-            if set(types) - set(self.all_types):
-                self.bail()
-            self._change_types = sorted(types)
-        return self._change_types
+        types = self.fields.getlist("change-type") or self.all_types
+        if set(types) - set(self.all_types):
+            self.bail()
+        return sorted(types)
 
-    @property
+    @cached_property
     def columns(self):
         """Sequence of column definitions for the output report.
 
         Number and types of columns depend on config parms.
         """
 
-        if not hasattr(self, "_columns"):
+        # We'll use this a lot.
+        Column = self.Reporter.Column
 
-            # We'll use this a lot.
-            Column = self.Reporter.Column
+        # Leftmost column is always a doc title and ID.
+        columns = [Column("Summary", width="220px")]
 
-            # Leftmost column is always a doc title and ID.
-            self._columns = [Column("Summary", width="220px")]
-
-            # Basic reports need cols for types of change and comments.
-            if self.type == self.CURRENT:
+        # Basic reports need cols for types of change and comments.
+        if self.type == self.CURRENT:
+            if self.comments:
+                comment_column = Column("Comment", width="150px")
+            for change_type in sorted(self.change_types):
+                columns.append(Column(change_type, width="105px"))
                 if self.comments:
-                    comment_column = Column("Comment", width="150px")
-                for change_type in sorted(self.change_types):
-                    self._columns.append(Column(change_type, width="105px"))
-                    if self.comments:
-                        self._columns.append(comment_column)
+                    columns.append(comment_column)
 
-            # Historical reports.
-            else:
-                self._columns.append(Column("Date", width="80px"))
-                if self.organization == self.BY_SUMMARY:
-                    col = Column("Type of Change", width="150px")
-                    self._columns.append(col)
-                if self.comments:
-                    self._columns.append(Column("Comment", width="180px"))
+        # Historical reports.
+        else:
+            columns.append(Column("Date", width="80px"))
+            if self.organization == self.BY_SUMMARY:
+                col = Column("Type of Change", width="150px")
+                columns.append(col)
+            if self.comments:
+                columns.append(Column("Comment", width="180px"))
 
-        return self._columns
+        # Don't specify widths for the HTML version of the report.
+        if self.format == "html":
+            return [column.name for column in columns]
 
-    @property
+        return columns
+
+    @cached_property
     def comments(self):
         """True if the report should include comments."""
+        return self.fields.getvalue("comments") != self.EXCLUDE
 
-        if not hasattr(self, "_comments"):
-            comments = self.fields.getvalue("comments")
-            self._comments = comments != self.EXCLUDE
-        return self._comments
-
-    @property
+    @cached_property
     def date_range(self):
         """String describing the date coverage for the report."""
 
-        if not hasattr(self, "_date_range"):
-            start_is_urdate = str(self.start) <= URDATE
-            end_is_today = self.end >= self.today
-            if start_is_urdate:
-                if end_is_today:
-                    self._date_range = "Complete History"
-                else:
-                    self._date_range = f"Through {self.end}"
-            elif end_is_today:
-                self._date_range = f"From {self.start}"
+        start_is_urdate = str(self.start) <= URDATE
+        end_is_today = self.end >= self.today
+        if start_is_urdate:
+            if end_is_today:
+                return "Complete History"
             else:
-                self._date_range = f"{self.start} - {self.end}"
-        return self._date_range
+                return f"Through {self.end}"
+        elif end_is_today:
+            return f"From {self.start}"
+        else:
+            return f"{self.start} - {self.end}"
 
-    @property
+    @cached_property
     def debug(self):
         """True if we're running with increased logging."""
+        return True if self.fields.getvalue("debug") else False
 
-        if not hasattr(self, "_debug"):
-            self._debug = True if self.fields.getvalue("debug") else False
-        return self._debug
-
-    @property
+    @cached_property
     def end(self):
         """End of date range for the historical version of the report."""
+        return self.parse_date(self.fields.getvalue("end")) or self.today
 
-        if not hasattr(self, "_end"):
-            end = self.fields.getvalue("end")
-            self._end = self.parse_date(end) or self.today
-        return self._end
-
-    @property
+    @cached_property
     def fragment(self):
         """Title fragment for selecting a summary by title."""
+        return self.fields.getvalue("title")
 
-        if not hasattr(self, "_fragment"):
-            self._fragment = self.fields.getvalue("title")
-        return self._fragment
-
-    @property
+    @cached_property
     def language(self):
         """Selecting summaries for this language."""
 
-        if not hasattr(self, "_language"):
-            self._language = self.fields.getvalue("language")
-            if self._language:
-                if self._language not in self.LANGUAGES:
-                    self.bail()
-            else:
-                self._language = self.LANGUAGES[0]
-        return self._language
+        language = self.fields.getvalue("language") or self.LANGUAGES[0]
+        if language not in self.LANGUAGES:
+            self.bail()
+        return language
 
-    @property
+    @cached_property
     def loglevel(self):
         """Override to support debug logging."""
         return "DEBUG" if self.debug else self.LOGLEVEL
 
-    @property
+    @cached_property
     def modules(self):
         """How to handle modules in summary selection."""
 
-        if not hasattr(self, "_modules"):
-            self._modules = self.fields.getvalue("modules", "both")
-            if self._modules not in [m[0] for m in self.MODULES]:
-                self.bail()
-        return self._modules
+        modules = self.fields.getvalue("modules", "both")
+        if modules not in [m[0] for m in self.MODULES]:
+            self.bail()
+        return modules
 
-    @property
+    @cached_property
     def organization(self):
         """Report organization (by summary or by change types)."""
 
-        if not hasattr(self, "_organization"):
-            organization = self.fields.getvalue("organization")
-            self._organization = organization or self.BY_SUMMARY
-            if self._organization not in self.REPORT_ORGANIZATIONS:
-                self.bail()
-        return self._organization
+        organization = self.fields.getvalue("organization") or self.BY_SUMMARY
+        if organization not in self.REPORT_ORGANIZATIONS:
+            self.bail()
+        return organization
 
-    @property
+    @cached_property
+    def ready(self):
+        """True if we have what is needed for the report."""
+
+        # If we're just getting started, we can't be ready.
+        if not self.request:
+            return False
+
+        # Check conditions specific to the selection method chosen.
+        match self.selection_method:
+            case "id":
+                ids = (self.cdr_id or "").strip().split()
+                if not ids:
+                    message = "At least one document ID is required."
+                    self.alerts.append(dict(message=message, type="error"))
+                for id in ids:
+                    try:
+                        doc = Doc(self.session, id=id)
+                        doctype = doc.doctype.name
+                        if doctype != "Summary":
+                            message = f"CDR{doc.id} is a {doctype} document."
+                            alert = dict(message=message, type="warning")
+                            self.alerts.append(alert)
+                        else:
+                            self.cdr_ids.add(doc.id)
+                    except Exception:
+                        message = f"Unable to find document {id}."
+                        self.logger.exception(message)
+                        self.alerts.append(dict(message=message, type="error"))
+            case "title":
+                if not self.fragment:
+                    message = "Title fragment is required."
+                    self.alerts.append(dict(message=message, type="error"))
+                if not self.summary_titles:
+                    message = f"No summaries match {self.fragment!r}."
+                    self.alerts.append(dict(message=message, type="warning"))
+                if len(self.summary_titles) > 1:
+                    message = f"Multiple matches found for {self.fragment}."
+                    self.alerts.append(dict(message=message, type="info"))
+            case "board":
+                if not self.board:
+                    message = "At least one board is required."
+                    self.alerts.append(dict(message=message, type="error"))
+                if not self.board_summaries:
+                    target = f"{self.language} {self.audience} summaries"
+                    action = "to report on"
+                    message = f"No {target} {action} for selected board(s)."
+                    self.alerts.append(dict(message=message, type="warning"))
+            case _:
+                # Shouldn't happen, unless a hacker is at work.
+                self.bail()
+
+        # We're ready if no alerts have been queued.
+        return False if self.alerts else True
+
+    @cached_property
     def start(self):
         """Start of date range for the historical version of the report."""
+        return self.parse_date(self.fields.getvalue("start", URDATE))
 
-        if not hasattr(self, "_start"):
-            start = self.fields.getvalue("start", URDATE)
-            self._start = self.parse_date(start)
-        return self._start
-
-    @property
-    def subtitle(self):
-        """What we display under the main banner."""
-
-        if not hasattr(self, "_subtitle"):
-            self._subtitle = self.SUBTITLE
-        return self._subtitle
-
-    @subtitle.setter
-    def subtitle(self, value):
-        """Allow the report page to override the subtitle."""
-        self._subtitle = value
-
-    @property
+    @cached_property
     def summaries(self):
         """PDQ summaries selected for the report.
 
@@ -389,82 +411,60 @@ $(function() {
         summary.
         """
 
-        if not hasattr(self, "_summaries"):
-            if self.selection_method == "title":
-                if not self.fragment:
-                    self.bail("Title fragment is required.")
-                titles = self.summary_titles
-                if not titles:
-                    self.bail("No summaries match that title fragment")
-                if len(titles) == 1:
-                    self._summaries = [Summary(self, titles[0].id)]
-                else:
-                    self.populate_form(self.form_page, titles)
-                    self.form_page.send()
-            elif self.selection_method == "id":
-                if not self.cdr_ids:
-                    self.bail("At least one CDR ID is required.")
-                self._summaries = [Summary(self, id) for id in self.cdr_ids]
-            else:
-                if not self.board:
-                    self.bail("At least one board is required.")
-                a_path = "/Summary/SummaryMetaData/SummaryAudience"
-                b_path = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
-                l_path = "/Summary/SummaryMetaData/SummaryLanguage"
-                t_path = "/Summary/TranslationOf/@cdr:ref"
-                m_path = "/Summary/@AvailableAsModule"
-                query = self.Query("active_doc d", "d.id")
-                query.join("query_term_pub a", "a.doc_id = d.id")
-                query.where(query.Condition("a.path", a_path))
-                query.where(query.Condition("a.value", self.audience + "s"))
-                query.join("query_term_pub l", "l.doc_id = d.id")
-                query.where(query.Condition("l.path", l_path))
-                query.where(query.Condition("l.value", self.language))
-                if "all" not in self.board:
-                    if self.language == "English":
-                        query.join("query_term_pub b", "b.doc_id = d.id")
-                    else:
-                        query.join("query_term_pub t", "t.doc_id = d.id")
-                        query.where(query.Condition("t.path", t_path))
-                        query.join("query_term b", "b.doc_id = t.int_val")
-                    query.where(query.Condition("b.path", b_path))
-                    query.where(query.Condition("b.int_val", self.board, "IN"))
-                if self.modules == "modules":
-                    query.join("query_term_pub m", "m.doc_id = d.id")
-                    query.where(query.Condition("m.path", m_path))
-                elif self.modules == "summaries":
-                    query.outer("query_term_pub m", "m.doc_id = d.id",
-                                f"m.path = '{m_path}'")
-                    query.where("m.doc_id IS NULL")
-                rows = query.unique().execute(self.cursor).fetchall()
-                self._summaries = [Summary(self, row.id) for row in rows]
-        return self._summaries
+        match self.selection_method:
+            case "board":
+                return sorted(self.board_summaries)
+            case "id":
+                return [Summary(self, id) for id in self.cdr_ids]
+            case "title":
+                return [Summary(self, self.titles[0].id)]
+            case _:
+                self.bail()
 
-    @property
+    @cached_property
+    def tables(self):
+        """Assemble the table(s) for the report.
+
+        If we're ready to display the report, we have three options:
+          1. a single table showing the latest changes in each
+             category of change for each selected summary
+          2. an historical report with a single table showing
+             all changes falling within the specified date range
+             for all selected summaries
+          3. multiple tables, one for each type of change,
+             showing all changes occurring withing the specified
+             date range for all selected summaries
+        """
+
+        tables = None
+        if self.type == self.CURRENT:
+            caption = "Type of Change Report (Most Recent Change)"
+        elif self.organization == self.BY_SUMMARY:
+            caption = "Type of Change Report (All Changes by Summary)"
+            caption = caption, self.date_range
+        else:
+            tables = self.change_type_tables
+        if tables is None:
+            opts = dict(caption=caption, columns=self.columns)
+            rows = []
+            for summary in self.summaries:
+                rows.extend(summary.get_rows())
+            tables = [self.Reporter.Table(rows, **opts)]
+        return tables
+
+    @cached_property
     def today(self):
         """Today's date object, used in several places."""
+        return date.today()
 
-        if not hasattr(self, "_today"):
-            self._today = date.today()
-        return self._today
-
-    @property
+    @cached_property
     def type(self):
         """Type of report (current or historical)."""
 
-        if not hasattr(self, "_type"):
-            self._type = self.fields.getvalue("type") or self.CURRENT
-            if self._type not in self.REPORT_TYPES:
-                self.bail()
-        return self._type
-
-    @staticmethod
-    def table_spacer(table, page):
-        """
-        Put some space before the table.
-        """
-
-        page.add_css("table { margin-top: 25px; }")
+        type = self.fields.getvalue("type") or self.CURRENT
+        if type not in self.REPORT_TYPES:
+            self.bail()
+        return type
 
 
 class Summary:
@@ -486,8 +486,8 @@ class Summary:
             doc_id - integer for the PDQ summary's unique CDR document ID
         """
 
-        self.__control = control
-        self.__doc_id = doc_id
+        self.control = control
+        self.id = doc_id
 
     def __lt__(self, other):
         """Support sorting the summaries by title."""
@@ -519,7 +519,7 @@ class Summary:
             row.append(" / ".join(changes[0].comments))
         rows = [tuple(row)]
         for change in changes[1:]:
-            row = [change.date]
+            row = [self.control.Reporter.Cell(change.date, classes="nowrap")]
             if not change_type:
                 row.append(change.type)
             if self.control.comments:
@@ -527,62 +527,41 @@ class Summary:
             rows.append(tuple(row))
         return rows
 
-    @property
-    def control(self):
-        """Access to the database and the report options."""
-        return self.__control
-
-    @property
+    @cached_property
     def doc(self):
         """`Doc` object for the summary's CDR document."""
+        return Doc(self.control.session, id=self.id)
 
-        if not hasattr(self, "_doc"):
-            self._doc = Doc(self.control.session, id=self.id)
-        return self._doc
-
-    @property
+    @cached_property
     def changes(self):
         """Record of modifications made throughout the life of the summary."""
 
-        if not hasattr(self, "_changes"):
-            changes = []
-            for node in self.doc.root.findall("TypeOfSummaryChange"):
-                change = self.Change(self.control, node)
-                self.control.logger.debug("CDR%d %s", self.id, change)
-                changes.append(change)
-            self._changes = sorted(changes)
-        return self._changes
+        changes = []
+        for node in self.doc.root.findall("TypeOfSummaryChange"):
+            change = self.Change(self.control, node)
+            self.control.logger.debug("CDR%d %s", self.id, change)
+            changes.append(change)
+        return sorted(changes)
 
-    @property
+    @cached_property
     def display_title(self):
-        if not hasattr(self, "_display_title"):
-            self._display_title = f"{self.title} ({self.id:d})"
-            if self.doc.root.get("AvailableAsModule") == "Yes":
-                self._display_title += " [Module]"
-        return self._display_title
 
-    @property
-    def id(self):
-        """Integer for the PDQ summary's unique CDR document ID."""
-        return self.__doc_id
+        display_title = f"{self.title} ({self.id:d})"
+        if self.doc.root.get("AvailableAsModule") == "Yes":
+            display_title += " [Module]"
+        return display_title
 
-    @property
+    @cached_property
     def key(self):
         """Control how the summaries are sorted."""
+        return self.title.lower(), self.id
 
-        if not hasattr(self, "_key"):
-            self._key = self.title.lower(), self.id
-        return self._key
-
-    @property
+    @cached_property
     def title(self):
         """Official title of the PDQ summary."""
 
-        if not hasattr(self, "_title"):
-            self._title = Doc.get_text(self.doc.root.find("SummaryTitle"))
-            if not self._title:
-                self._title = self.doc.title.split(";")[0]
-        return self._title
+        title = Doc.get_text(self.doc.root.find("SummaryTitle"))
+        return title or self.doc.title.split(";")[0]
 
     def __get_changes(self, change_type):
         """
@@ -596,6 +575,8 @@ class Summary:
         return [c for c in self.changes if c.in_scope(change_type)]
 
     def __get_single_row(self):
+        """For the "current" report, put the latest changes in one row."""
+
         change_types = dict([(ct, None) for ct in self.control.change_types])
         for change in self.changes:
             args = self.id, change
@@ -609,11 +590,12 @@ class Summary:
                         latest_change.comments.extend(change.comments)
         row = [self.display_title]
         nchanges = 0
+        Cell = self.control.Reporter.Cell
         for change_type in self.control.change_types:
             change = change_types.get(change_type)
             if change:
                 nchanges += 1
-            row.append(change and change.date or "")
+            row.append(Cell(change and change.date or "", classes="nowrap"))
             if self.control.comments:
                 row.append(change and " / ".join(change.comments) or "")
         if nchanges > 0:

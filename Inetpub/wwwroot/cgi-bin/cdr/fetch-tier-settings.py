@@ -1,88 +1,116 @@
 #!/usr/bin/env python
 
-# ----------------------------------------------------------------------
-# Collect settings from this tier as JSON.
-# OCECDR-4101
-# ----------------------------------------------------------------------
-import hashlib
-import json
-import os
-import sys
-import lxml.etree as etree
-import cdr
-import cdrcgi
-from cdrapi import db
-from cdrapi.settings import Tier
+"""Collect settings from this tier as JSON (OCECDR-4101).
+"""
+
+from functools import cached_property
+from hashlib import md5
 from importlib.metadata import packages_distributions, version
+from json import dumps
+from os import environ, walk
+from pathlib import Path
+from sys import getwindowsversion, version as sys_version
+from lxml import etree
+from cdr import run_command
+from cdrcgi import Controller
+
+
+class Control(Controller):
+    """Web page creator."""
+
+    TITLE = SUBTITLE = "Tier Settings"
+    LOGNAME = "tier-settings"
+
+    def populate_form(self, page):
+        """Explain the report.
+
+        Required positional argument:
+          page - instance of the cdrcgi.HTMLPage class
+        """
+
+        fieldset = page.fieldset("Instructions")
+        fieldset.append(page.B.P(
+            "Click Submit to generate a JSON representation of the "
+            f"settings for this tier ({self.session.tier}). "
+            "This information includes:"
+        ))
+        fieldset.append(
+            page.B.UL(
+                page.B.LI("Operating system version identification"),
+                page.B.LI("Environment variable values"),
+                page.B.LI("Executable search path locations"),
+                page.B.LI("Database settings"),
+                page.B.LI("Python interpreter and module versions"),
+                page.B.LI("Web server configuration settings"),
+                page.B.LI("Checksums for relevant file system content"),
+                page.B.LI("CDR document types and valid value enumerations")
+            )
+        )
+        page.form.append(fieldset)
+
+    def run(self):
+        """Customized routing."""
+
+        if not self.session.can_do("GET SYS CONFIG"):
+            message = "User not authorized for viewing system settings."
+            print(f"Status: 403\n\n{message}")
+        elif self.fields.getvalue("prompt"):
+            self.show_form()
+        else:
+            settings = Settings(self)
+            self.send_page(settings.json, mime_type="application/json")
 
 
 class Settings:
-    TIER = Tier()
-    HOSTNAMES = TIER.hosts
-    LOGFILE = f"{cdr.DEFAULT_LOGDIR}/fetch-tier-settings.log"
-    WD = cdr.WORK_DRIVE
-    WEBCONFIG_ROOT = f"{WD}:/Inetpub/wwwroot/web.config"
-    WEBCONFIG_SECURE = f"{WD}:/Inetpub/wwwroot/cgi-bin/secure/web.config"
-    WEBCONFIG_API = f"{WD}:/cdr/api/web.config"
+    """Collection of CDR server environment settings."""
 
-    def __init__(self, session):
-        self.session = session
-        try:
-            with open(f"{self.TIER.etc}/cdrenv.rc") as fp:
-                self.org = fp.read().strip()
-        except Exception:
-            self.org = "CBIIT"
-        self.tier = self.TIER.name
-        self.windows = self.get_windows_settings()
+    WEBCONFIG_ROOT = "Inetpub/wwwroot/web.config"
+    WEBCONFIG_SECURE = "Inetpub/wwwroot/cgi-bin/secure/web.config"
+    WEBCONFIG_API = "cdr/api/web.config"
+    WEBCONFIG = dict(
+        root=WEBCONFIG_ROOT,
+        secure=WEBCONFIG_SECURE,
+        api=WEBCONFIG_API,
+    )
+    DIRECTORIES = (
+        "cdr/lib",
+        "cdr/Bin",
+        "cdr/Build",
+        "cdr/ClientFiles",
+        "cdr/Glossifier",
+        "cdr/Licensee",
+        "cdr/Mailers",
+        "cdr/Publishing",
+        "cdr/Licensee",
+        "Inetpub/wwwroot",
+    )
 
-    def get_iis_settings(self):
-        return {
-            "account": cdr.run_command("whoami").stdout.strip(),
-            "version": os.environ.get("SERVER_SOFTWARE"),
-            "web.config": {
-                "root": self.xmltojson(self.WEBCONFIG_ROOT),
-                "secure": self.xmltojson(self.WEBCONFIG_SECURE),
-                "api": self.xmltojson(self.WEBCONFIG_API),
-            }
-        }
+    def __init__(self, control):
+        """Remember the caller's control object.
 
-    def xmltojson(self, path):
-        root = etree.parse(path).getroot()
-        return {root.tag: self.extract_node(root)}
+        Required positional argument:
+          session - access to the database and the environment
+        """
 
-    def extract_node(self, node):
-        children = {}
-        for key in node.keys():
-            children[key] = [node.get(key)]
-        for child in node:
-            if child.tag not in children:
-                children[child.tag] = []
-            children[child.tag].append(self.extract_node(child))
-        for name in children:
-            if len(children[name]) == 1:
-                children[name] = children[name][0]
-        return children
+        self.control = control
 
-    def get_windows_settings(self):
-        # pylint: disable-next=no-member
-        winver = sys.getwindowsversion()
-        settings = dict(version={})
-        for name in ("major", "minor", "build", "platform", "service_pack"):
-            settings["version"][name] = getattr(winver, name, "")
-        settings["environ"] = dict(os.environ)
-        path = [p for p in os.environ.get("PATH").split(";") if p]
-        settings["search_path"] = path
-        settings["mssql"] = self.get_mssql_settings()
-        settings["python"] = self.get_python_settings()
-        settings["iis"] = self.get_iis_settings()
-        settings["files"] = self.get_files()
-        settings["doctypes"] = self.get_doctypes()
-        return settings
+    @cached_property
+    def basedir(self):
+        """Top-level directory for CDR files."""
+        return Path(self.tier.basedir)
 
-    def get_doctypes(self):
+    @cached_property
+    def cursor(self):
+        """Access to the database."""
+        return self.control.cursor
+
+    @cached_property
+    def doctypes(self):
+        """Information about CDR document types."""
+
         doctypes = {}
-        path = f"{self.WD}:/cdr/ClientFiles/CdrDocTypes.xml"
-        root = etree.parse(path).getroot()
+        path = self.basedir / "ClientFiles" / "CdrDocTypes.xml"
+        root = etree.parse(str(path)).getroot()
         for node in root.findall("CdrGetDocTypeResp"):
             key = node.get("Type")
             doctypes[key] = {}
@@ -95,75 +123,150 @@ class Settings:
                     doctypes[key]["linking-elements"] = sorted(elems)
         return doctypes
 
-    def get_files(self):
+    @cached_property
+    def files(self):
+        """Information about the CDR files."""
+
         files = {}
-        self.walk(files, f"{self.WD}:/cdr/lib")
-        self.walk(files, f"{self.WD}:/cdr/Bin")
-        self.walk(files, f"{self.WD}:/cdr/Build")
-        self.walk(files, f"{self.WD}:/cdr/ClientFiles")
-        self.walk(files, f"{self.WD}:/cdr/Glossifier")
-        self.walk(files, f"{self.WD}:/cdr/Licensee")
-        self.walk(files, f"{self.WD}:/cdr/Mailers")
-        self.walk(files, f"{self.WD}:/cdr/Publishing")
-        self.walk(files, f"{self.WD}:/cdr/Licensee")
-        self.walk(files, f"{self.WD}:/Inetpub/wwwroot")
+        for location in self.DIRECTORIES:
+            top = f"{self.tier.drive}:/{location}"
+            for dirpath, _, filenames in walk(top):
+                if "__pycache__" not in dirpath:
+                    directory = Path(dirpath)
+                    node = files
+                    for name in directory.parts[1:]:
+                        if name not in node:
+                            node[name] = {}
+                        node = node[name]
+                    for name in filenames:
+                        path = directory / name
+                        try:
+                            filehash = md5(path.read_bytes())
+                            node[name] = filehash.hexdigest().lower()
+                        except Exception:
+                            self.control.logger.exception(path)
+                            node[name] = "unreadable"
         return files
 
-    def walk(self, files, path):
-        for path, dirs, filenames in os.walk(path):
-            if "__pycache__" in path:
-                continue
-            path = path.replace("\\", "/")
-            directory = files
-            for name in path.split("/")[1:]:
-                if name not in directory:
-                    directory[name] = {}
-                directory = directory[name]
-            for name in filenames:
-                self.add_file(path, name, directory)
+    @cached_property
+    def iis_settings(self):
+        """Web server settings."""
 
-    def add_file(self, path, name, files):
+        class Config:
+            """Extract web server values to a dictionary."""
+
+            def __init__(self, path):
+                """Remember the location of the configuration file.
+
+                Required positional argument:
+                  path - instance of the pathlib.Path class
+                """
+                self.path = path
+
+            @cached_property
+            def values(self):
+                """Parse the configuration document."""
+                root = etree.parse(str(self.path)).getroot()
+                return {root.tag: self.parse(root)}
+
+            def parse(self, node):
+                """Recursively walk the nodes of the document.
+
+                Required positional argument:
+                  node - DOM node of the XML configuration document
+                """
+                children = {}
+                for key in node.keys():
+                    children[key] = [node.get(key)]
+                for child in node:
+                    if not isinstance(child.tag, str):
+                        continue
+                    if child.tag not in children:
+                        children[child.tag] = []
+                    children[child.tag].append(self.parse(child))
+                for name in children:
+                    if len(children[name]) == 1:
+                        children[name] = children[name][0]
+                return children
+
+        web_config = {}
+        for name in self.WEBCONFIG:
+            path = Path(f"{self.tier.drive}:/{self.WEBCONFIG[name]}")
+            web_config[name] = Config(path).values
+        return {
+            "account": run_command("whoami").stdout.strip(),
+            "version": environ.get("SERVER_SOFTWARE"),
+            "web.config": web_config,
+        }
+
+    @cached_property
+    def json(self):
+        """Serialize the collected settings."""
+
+        opts = dict(indent=2, default=str)
+        return dumps(dict(windows=self.windows_settings), **opts)
+
+    @cached_property
+    def mssql_settings(self):
+        """Information about the SQL Server database."""
+
+        self.cursor.execute("EXEC sp_server_info")
+        settings = {}
+        for _, attr_name, attr_value in self.cursor.fetchall():
+            settings[attr_name] = attr_value
+        return settings
+
+    @cached_property
+    def org(self):
+        """CBIIT or (obsolete) OCE."""
+
+        path = Path(self.tier.etc) / "cdrenv.rc"
         try:
-            path = "%s/%s" % (path, name)
-            fp = open(path, "rb")
-            bytes = fp.read()
-            fp.close()
-            md5 = hashlib.md5()
-            md5.update(bytes)
-            md5 = md5.hexdigest().lower()
+            return path.read_text(encoding="ascii").strip()
         except Exception:
-            md5 = "unreadable"
-        files[name] = md5
+            self.logger.exception("Failure loading organization")
+            return "CBIIT"
 
-    def get_python_settings(self):
+    @cached_property
+    def python_settings(self):
+        """Information about the server's Python environment."""
+
         distributions = packages_distributions()
-        settings = dict(python=sys.version)
+        settings = dict(python=sys_version)
         for name in distributions:
             for package in distributions[name]:
                 settings[package] = version(package)
         return settings
 
-    def get_mssql_settings(self):
-        cursor = db.connect().cursor()
-        cursor.execute("EXEC sp_server_info")
-        settings = {}
-        for attr_id, attr_name, attr_value in cursor.fetchall():
-            settings[attr_name] = attr_value
+    @cached_property
+    def session(self):
+        """Provides access to the environment."""
+        return self.control.session
+
+    @cached_property
+    def tier(self):
+        """Information about the tier on which we're running."""
+        return self.session.tier
+
+    @cached_property
+    def windows_settings(self):
+        """Our only environment, for now."""
+
+        # pylint: disable-next=no-member
+        winver = getwindowsversion()
+        settings = dict(version={})
+        for name in ("major", "minor", "build", "platform", "service_pack"):
+            settings["version"][name] = getattr(winver, name, "")
+        settings["environ"] = dict(environ)
+        path = [p for p in environ.get("PATH").split(";") if p]
+        settings["search_path"] = path
+        settings["mssql"] = self.mssql_settings
+        settings["python"] = self.python_settings
+        settings["iis"] = self.iis_settings
+        settings["files"] = self.files
+        settings["doctypes"] = self.doctypes
         return settings
-
-    def serialize(self):
-        return json.dumps({
-            "windows": self.windows,
-        }, indent=2)
-
-    def run(self):
-        print(f"Content-type: application/json\n\n{self.serialize()}")
 
 
 if __name__ == "__main__":
-    fields = cdrcgi.FieldStorage()
-    session = cdrcgi.getSession(fields)
-    if not session or not cdr.canDo(session, "GET SYS CONFIG"):
-        print("Status: 403\n\nUser not authorized for viewing system settings")
-        sys.exit(0)
-    Settings(session).run()
+    Control().run()

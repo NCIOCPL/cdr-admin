@@ -3,6 +3,7 @@
 """Create a new CDR user account or modify an existing one.
 """
 
+from functools import cached_property
 from cdrcgi import Controller
 
 
@@ -10,7 +11,7 @@ class Control(Controller):
     """Top-level logic for editing interface."""
 
     EDIT_USERS = "EditUsers.py"
-    SUBMENU = "User Menu"
+    USER_MENU = "User Menu"
     SAVE_CHANGES = "Save Changes"
     SAVE_NEW = "Save New User Account"
     INACTIVATE = "Inactivate Account"
@@ -49,7 +50,7 @@ class Control(Controller):
             legend = "Password (required for local accounts)"
         fieldset = page.fieldset(legend)
         fieldset.set("id", "password-fields")
-        fieldset.set("class", "text-fields-box")
+        fieldset.set("class", "text-fields-box usa-fieldset")
         fieldset.append(page.password_field("password"))
         fieldset.append(page.password_field("confirm"))
         page.form.append(fieldset)
@@ -57,7 +58,7 @@ class Control(Controller):
         # Add the fields for the account's text values.
         page.form.append(page.hidden_field("usr", self.user.name))
         fieldset = page.fieldset("User Account Settings")
-        fieldset.set("class", "text-fields-box")
+        fieldset.set("class", "text-fields-box usa-fieldset")
         fieldset.append(page.text_field("name", value=self.user.name))
         fieldset.append(page.text_field("full_name", value=self.user.fullname))
         fieldset.append(page.text_field("office", value=self.user.office))
@@ -73,12 +74,14 @@ class Control(Controller):
         # Add the checkbox fields for the account's group memberships.
         self.logger.debug("groups is %s", self.user.groups)
         fieldset = page.fieldset("Group Membership")
-        fieldset.set("id", "group-membership-fields")
+        fieldset.set("id", "group-membership")
+        ul = page.B.UL()
+        fieldset.append(ul)
         for group in self.groups:
-            opts = dict(value=group)
+            opts = dict(value=group, label=group)
             if self.user.groups and group in self.user.groups:
                 opts["checked"] = True
-            fieldset.append(page.checkbox("group", **opts))
+            ul.append(page.B.LI(page.checkbox("group", **opts)))
         page.form.append(fieldset)
 
         # Add the client-side script to control the password block.
@@ -100,18 +103,14 @@ jQuery(function() {
 
         # Make it easier to see all the groups.
         page.add_css("""\
-fieldset { width: 1200px; }
-fieldset.text-fields-box input,
-fieldset.text-fields-box select,
-fieldset.text-fields-box textarea {
-    width: 1050px;
-}
-#group-membership-fields div { width: 300px; float: left; }""")
+#group-membership ul { column-width: 14rem; list-style-type: none; }
+#group-membership ul li:first-child div { margin-top: -.75rem; }
+""")
 
     def return_to_users_menu(self, deleted=None):
         """Go back to the menu listing all the CDR user accounts."""
 
-        opts = dict(deleted=deleted) if deleted else {}
+        opts = dict(deleted=deleted) if deleted else dict(returned="true")
         self.navigate_to(self.EDIT_USERS, self.session.name, **opts)
 
     def run(self):
@@ -122,7 +121,7 @@ fieldset.text-fields-box textarea {
                 return self.inactivate()
             elif self.request in (self.SAVE_CHANGES, self.SAVE_NEW):
                 return self.save()
-            elif self.request == self.SUBMENU:
+            elif self.request == self.USER_MENU:
                 return self.return_to_users_menu()
         except Exception as e:
             self.bail(f"Failure: {e}")
@@ -134,9 +133,9 @@ fieldset.text-fields-box textarea {
         if not self.name:
             self.bail("Required name is missing")
         if self.user.name:
-            self.subtitle = f"Changes to {self.name} saved successfully"
+            alert = f"Changes to account {self.user.name} saved successfully."
         else:
-            self.subtitle = f"New user {self.name} saved successfully"
+            alert = f"New user {self.name} saved successfully."
         opts = dict(
             authmode=self.authmode,
             comment=self.comment,
@@ -159,115 +158,99 @@ fieldset.text-fields-box textarea {
             password = None
         self.user = self.session.User(self.session, **opts)
         self.user.save(password)
+        self.alerts.append(dict(message=alert, type="success"))
+        del self.subtitle
         self.show_form()
 
-    @property
+    @cached_property
     def authmode(self):
         """Get the authmode value from the form field."""
         return self.fields.getvalue("authmode")
 
-    @property
+    @cached_property
     def buttons(self):
         """Add our custom navigation buttons."""
 
-        if not hasattr(self, "_buttons"):
-            self._buttons = [self.SUBMENU, self.ADMINMENU, self.LOG_OUT]
-            if self.user.id:
-                self._buttons.insert(0, self.INACTIVATE)
-                self._buttons.insert(0, self.SAVE_CHANGES)
-            else:
-                self._buttons.insert(0, self.SAVE_NEW)
-        return self._buttons
+        if self.user.id:
+            return self.SAVE_CHANGES, self.INACTIVATE, self.USER_MENU
+        return self.SAVE_NEW, self.USER_MENU
 
-    @property
+    @cached_property
     def comment(self):
         """Get the comment value from the form field."""
         return self.fields.getvalue("comment")
 
-    @property
+    @cached_property
     def confirm(self):
         """Get the confirm value from the form field."""
         return self.fields.getvalue("confirm")
 
-    @property
+    @cached_property
     def email(self):
         """List of group checkboxes which have been checked."""
         return self.fields.getvalue("email")
 
-    @property
+    @cached_property
     def fullname(self):
         """Value from the form's full_name field."""
         return self.fields.getvalue("full_name")
 
-    @property
+    @cached_property
     def group(self):
         """List of group checkboxes which have been checked."""
         return self.fields.getlist("group")
 
-    @property
+    @cached_property
     def groups(self):
         """Sorted names of all CDR groups."""
+        return self.session.list_groups()
 
-        if not hasattr(self, "_groups"):
-            self._groups = self.session.list_groups()
-        return self._groups
-
-    @property
+    @cached_property
     def loglevel(self):
         if self.fields.getvalue("debug"):
             return "DEBUG"
         return self.LOGLEVEL
 
-    @property
+    @cached_property
     def name(self):
         """Value from the form's name field."""
         return self.fields.getvalue("name")
 
-    @property
+    @cached_property
     def office(self):
         """Value from the form's office field."""
         return self.fields.getvalue("office")
 
-    @property
+    @cached_property
     def password(self):
         """Get the password value from the form field."""
         return self.fields.getvalue("password")
 
-    @property
+    @cached_property
     def phone(self):
         """Value from the form's phone field."""
         return self.fields.getvalue("phone")
 
-    @property
+    @cached_property
+    def same_window(self):
+        """Don't open any new browser tabs."""
+        return self.buttons
+
+    @cached_property
     def subtitle(self):
         """Dynamic string for display under the main banner."""
 
-        if not hasattr(self, "_subtitle"):
-            name = self.user.fullname or self.user.name
-            if name:
-                self._subtitle = f"Editing User Account {name}"
-            else:
-                self._subtitle = "Adding New User Account"
-        return self._subtitle
+        name = self.user.fullname or self.user.name
+        if name:
+            return f"Editing User Account {name}"
+        return "Adding New User Account"
 
-    @subtitle.setter
-    def subtitle(self, value):
-        """Provide status information after a save."""
-        self._subtitle = value
-
-    @property
+    @cached_property
     def user(self):
         """Object for the CDR user account being edited/created."""
 
-        if not hasattr(self, "_user"):
-            name = self.fields.getvalue("usr")
-            self._user = self.session.User(self.session, name=name)
-        return self._user
-
-    @user.setter
-    def user(self, value):
-        """Allow replacement after a save."""
-        self._user = value
+        name = self.fields.getvalue("usr")
+        return self.session.User(self.session, name=name)
 
 
 if __name__ == "__main__":

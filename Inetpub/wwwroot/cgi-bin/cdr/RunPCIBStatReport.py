@@ -6,9 +6,10 @@ This report runs on a monthly schedule but can also be submitted from
 the CDR Admin reports menu.
 """
 
+from datetime import date
+from functools import cached_property
 from cdrcgi import Controller
-import cdr_stats
-import datetime
+from cdr_stats import Control as StatControl
 
 
 class Control(Controller):
@@ -58,7 +59,7 @@ class Control(Controller):
         fieldset.append(page.text_field("max-docs", label="Max Docs"))
         page.form.append(fieldset)
         fieldset = page.fieldset("Sections")
-        for section in cdr_stats.Control.SECTIONS:
+        for section in StatControl.SECTIONS:
             if section != "audio":
                 label = self.SECTION_LABELS.get(section, section.capitalize())
                 opts = dict(value=section, label=label, checked=True)
@@ -87,7 +88,7 @@ class Control(Controller):
             "max-docs": self.max_docs
         }
         try:
-            cdr_stats.Control(opts).run()
+            StatControl(opts).run()
         except Exception as e:
             self.logger.exception("Report failure")
             self.bail("failure: %s" % e)
@@ -98,7 +99,7 @@ class Control(Controller):
         self.report.page.form.append(fieldset)
         self.report.send()
 
-    @property
+    @cached_property
     def end(self):
         """Optional end to the report date range."""
 
@@ -108,9 +109,9 @@ class Control(Controller):
                 return str(self.parse_date(end))
             except Exception:
                 self.bail("Invalid date string")
-        return str(datetime.date.today())
+        return str(date.today())
 
-    @property
+    @cached_property
     def max_docs(self):
         """Cap on the number of documents to include."""
 
@@ -122,17 +123,17 @@ class Control(Controller):
                 self.bail("Max docs must be an integer")
         return None
 
-    @property
+    @cached_property
     def no_results(self):
         """Suppress the normal message show when there are no tables."""
         return None
 
-    @property
+    @cached_property
     def options(self):
         """Report options selected on the form."""
         return self.fields.getlist("options")
 
-    @property
+    @cached_property
     def recips(self):
         """Email recipients for the report."""
 
@@ -144,16 +145,16 @@ class Control(Controller):
             self.bail("At least one email recipient must be specified")
         return recips
 
-    @property
+    @cached_property
     def sections(self):
         """Sections to be included in the report."""
 
         sections = self.fields.getlist("sections")
-        if set(sections) - set(cdr_stats.Control.SECTIONS):
+        if set(sections) - set(StatControl.SECTIONS):
             self.bail()
         return sections
 
-    @property
+    @cached_property
     def start(self):
         """Optional start to the report date range."""
 
@@ -163,10 +164,10 @@ class Control(Controller):
                 return str(self.parse_date(start))
             except Exception:
                 self.bail("Invalid date string")
-        today = datetime.date.today()
-        return datetime.date(today.year, 1, 1)
+        today = date.today()
+        return date(today.year, 1, 1)
 
-    @property
+    @cached_property
     def user(self):
         """The currently logged-in user account."""
         return self.session.User(self.session, id=self.session.user_id)

@@ -1,16 +1,64 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="utf-8">
-    <title>CDR Administration</title>
-    <link href="/favicon.ico" rel="icon">
-    <link href="../../stylesheets/cdr.css?v=20210120" rel="stylesheet">
-  </head>
-  <body id="cdr-page">
-    <header>
-      <h1>CDR Administration</h1>
-      <h2>Internal Error</h2>
-    </header>
-    <p class="error">The server has encountered an unexpected error.</p>
-  </body>
+<head>
+<meta charset="utf-8">
+<meta content="IE=edge" http-equiv="X-UA-Compatible">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="CDR Administration Tools">
+<meta name="author" content="Bob Kline and Volker Englisch">
+<title>CDR Administration</title>
+<link href="/favicon.ico" rel="icon">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/uswds/3.6.0/js/uswds-init.min.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/uswds/3.6.0/css/uswds.min.css" rel="stylesheet">
+<link href="https://code.jquery.com/ui/1.13.0-rc.3/themes/smoothness/jquery-ui.css" rel="stylesheet">
+<script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script><script src="https://code.jquery.com/ui/1.13.0/jquery-ui.min.js" integrity="sha256-hlKLmzaRlE8SCJC1Kw8zoUbU8BxA+8kR3gseuKfMjxA=" crossorigin="anonymous"></script><style>@media (min-width:30em){ .usa-form { max-width: none; }}
+.usa-fieldset { margin-bottom: 2rem; }
+.usa-label { font-weight: bold; max-width: none; }
+.usa-form .usa-input--xl,
+.usa-form .usa-input-group--xl { max-width: none; }
+.usa-legend { font-size: 1.3em; font-weight: bold; }
+.usa-legend { max-width: none; }
+.usa-file-input { max-width: none; }
+.date-range-fields > div { display: inline-block; }
+body.report h1 { margin-bottom: 3rem; }
+table.usa-table { margin-bottom: 3rem; }
+.report-footer {
+  font-style: italic; font-size: .9em; text-align: center;
+}
+.report-footer #elapsed { color: green; }
+.hidden { display: none; }
+.nowrap { white-space: nowrap; }
+.usa-table td.text-bold { font-weight: bold; }
+.report .usa-table { width: 100%; }
+.report .usa-table td { word-wrap: break-word; }
+.break-all, .break-all * { word-break: break-all; }
+.usa-form a:visited { color: #005ea2; }
+.error { color: red; font-weight: bold; }</style>
+</head>
+<body id="cdr-page">
+<a href="#main-content" class="usa-skipnav">Skip to main content</a><section class="usa-banner" aria-label="Official website of the united states government"><div class="usa-accordion">
+<header class="usa-banner__header"><div class="usa-banner__inner">
+<div class="grid-col-auto"><img src="/images/us_flag_small.png" alt="" class="usa-banner__header-flag" aria-hidden="true"></div>
+<div class="grid-col-fill tablet:grid-col-auto" aria-hidden="true">
+<p class="usa-banner__header-text">An official website of the United States government</p>
+<p class="usa-banner__header-action">Here's how you know</p>
+</div>
+<button type="button" class="usa-accordion__button usa-banner__button" aria-expanded="false" aria-controls="gov-banner-default"><span class="usa-banner__button-text">Here's how you know</span></button>
+</div></header><div class="usa-banner__content usa-accordion__content" id="gov-banner-default"><div class="grid-row grid-gap-lg">
+<div class="usa-banner__guidance tablet:grid-col-6"><div class="usa-media-block__body"><p><strong>Official websites use .gov</strong><br>A <strong>.gov</strong> website belongs to an official government organization in the United States.</p></div></div>
+<div class="usa-banner__guidance tablet:grid-col-6">
+<img src="/images/icon-dot-gov.svg" role="img" alt="" class="usa-banner__guidance table:grid-col-6" aria-hidden="true"><div class="usa-media-block__body"><p><strong>Secure .gov websites use HTTPS</strong><br>A <strong>lock</strong> ( <span class="icon-lock"><svg xmlns="http://www.w3.org/2000/svg" width="52" height="64" viewBox="0 0 52 64" role="img" focusable="false" class="usa-banner__lock-image" aria-labelledby="banner-lock-description"><title id="banner-lock-title">Lock</title>
+<desc id="banner-lock-description">Locked padlock icon</desc><path file="#000000" d="M26 0c10.493 0 19 8.507 19 19v9h3a4 4 0 0 1 4 4v28a4 4 0 0 1-4 4H4a4 4 0 0 1-4-4V32a4 4 0 0 1 4-4h3v-9C7 8.507 15.507 0 26 0zm0 8c-5.979 0-10.843 4.77-10.996 10.712L15 19v9h22v-9c0-6.075-4.925-11-11-11z" fill-rule="evenodd"></path></svg></span> ) or <strong>https://</strong> means you've safely connected to the .gov website. Share sensitive information only on official secure websites.</p></div>
+</div>
+</div></div>
+</div></section><div class="usa-overlay"></div>
+<header class="usa-header usa-header--basic"><div class="usa-nav-container"><div class="usa-navbar"><div id="header-logo" class="usa-logo">
+<em><a title="Home" href="/cgi-bin/cdr/Admin.py?Session=guest">CDR Administration</a></em><button type="button" class="usa-menu-btn">Menu</button>
+</div></div></div></header><main class="usa-section padding-top-4"><div class="grid-container">
+<div id="alerts-block" class="padding-bottom-4"><div class="usa-alert usa-alert--error"><div class="usa-alert__body"><p class="usa-alert__text">The server has encountered an unexpected error.</p></div></div></div>
+<h1>Internal Error</h1>
+<form method="post" action="make-error-pages.py" class="usa-form" id="primary-form" target="_blank">
+<input name="Session" value="guest" type="hidden"><p>If the problem persists, please create a <a href="https://tracker.nci.nih.gov/projects/OCECDR/">JIRA</a> ticket in the OCECDR project.</p>
+</form>
+</div></main><script src="https://cdnjs.cloudflare.com/ajax/libs/uswds/3.6.0/js/uswds.min.js"></script>
+</body>
 </html>

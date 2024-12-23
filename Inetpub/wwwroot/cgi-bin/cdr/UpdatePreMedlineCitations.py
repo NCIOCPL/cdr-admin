@@ -6,8 +6,12 @@ Update premedline citations that have had their statuses changed
 since they were last imported or updated.
 """
 
+from collections import defaultdict
 from copy import deepcopy
-from cdrcgi import Controller
+from datetime import datetime
+from functools import cached_property
+from time import sleep
+from cdrcgi import Controller, HTMLPage
 from cdrapi.docs import Doc
 from cdr import prepare_pubmed_article_for_import
 from lxml import etree
@@ -19,6 +23,8 @@ class Control(Controller):
 
     SUBTITLE = "Citation Status Changes"
     LOGNAME = "UpdatePreMedlineCitations"
+    SUBMIT = "Update"
+    CHECK = "Check"
     URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
     COLUMNS = "PMID", "CDR ID", "Old Status", "New Status", "Notes"
     PMID_PATH = "/Citation/PubmedArticle/MedlineCitation/PMID"
@@ -26,103 +32,241 @@ class Control(Controller):
     STATUSES = "In-Process", "Publisher", "In-data-review"
     CAPTION = "{:d} Pre-Medline Citations Examined -- {:d} Statuses Changed"
 
+    B = HTMLPage.B
+    INSTRUCTIONS = (
+        B.P(
+            "This utility checks to see if any of the ",
+            B.CODE("Citation"),
+            " documents in the CDR with a pre-Medline status have a"
+            " new status at NLM, so that the documents can be refreshed"
+            " with any new or corrected bibliographic information.",
+        ),
+        B.UL(
+            B.LI(
+                "Click the ",
+                B.STRONG(CHECK),
+                " button to generate the list of ",
+                B.CODE("Citation"),
+                " documents ready to be updated.",
+            ),
+            B.LI(
+                "If there are any such documents, they will be displayed"
+                " in a list below with an ",
+                B.STRONG(SUBMIT),
+                " button.",
+            ),
+            B.LI(
+                "Upon clicking the ",
+                B.STRONG(SUBMIT),
+                " button, the ",
+                B.CODE("Citation"),
+                " documents will be updated, and a report will be displayed"
+                " in a new browser tab.",
+            ),
+            B.LI(
+                "Close the report browser tab and if that report indicated"
+                " that any updates failed, you can click the ",
+                B.STRONG(CHECK),
+                " button again to update the list on this page and optionally"
+                " try again (after possibly removing any obstacles, such"
+                " as locked documents).",
+            ),
+        ),
+    )
+
     def build_tables(self):
         """Assemble the table showing what we did and return it."""
 
+        if self.request == self.CHECK:
+            return self.show_form()
         if not self.session.can_do("MODIFY DOCUMENT", "Citation"):
             self.bail("You must be authorized to replace Citation documents "
                       "to run this script.")
         opts = dict(caption=self.caption, columns=self.COLUMNS)
         return self.Reporter.Table(self.rows, **opts)
 
-    def show_form(self):
-        """Bypass the form, which isn't needed for this script."""
-        self.show_report()
+    def populate_form(self, page):
+        """Show what the update will do.
 
-    def show_report(self):
-        """Override the base class version so we can show any errors."""
+        Required positional argument:
+          page - HTMLPage class instance
+        """
 
-        if self.citations and self.errors is not None:
-            self.report.page.form.append(self.errors)
-        self.report.page.add_css("table { width: 600px; }")
-        self.report.send(self.format)
+        fieldset = page.fieldset("Instructions")
+        for element in self.INSTRUCTIONS:
+            fieldset.append(element)
+        page.form.append(fieldset)
+        if self.request == self.CHECK:
+            if not self.changed:
+                message = (
+                    "No pre-Medline citations found with updated statuses "
+                    "available."
+                )
+                self.alerts.append(dict(message=message, type="info"))
+            else:
+                for pmid in sorted(self.skipped):
+                    page.form.append(page.hidden_field("skipped", pmid))
+                fieldset = page.fieldset("Available For Refresh")
+                available = page.B.UL()
+                for citation in self.changed:
+                    available.append(page.B.LI(citation.description))
+                fieldset.append(available)
+                page.form.append(fieldset)
+        page.add_css("code { color: brown; }")
 
-    @property
+    @cached_property
+    def buttons(self):
+        """Show the buttons which are appropriate."""
+
+        if self.request == self.SUBMIT:
+            return []
+        if self.request == self.CHECK and self.changed:
+            return [self.CHECK, self.SUBMIT]
+        return [self.CHECK]
+
+    @cached_property
     def caption(self):
         """String to be displayed immediately above the table."""
         return self.CAPTION.format(len(self.citations), len(self.rows))
 
-    @property
+    @cached_property
+    def changed(self):
+        """Determine which citation have changed at NLM."""
+
+        changed = []
+        for pmid in sorted(self.citations):
+            citation = self.citations[pmid]
+            if citation.pubmed_article is not None:
+                if citation.pubmed_article.status != citation.status:
+                    changed.append(citation)
+            else:
+                message = (
+                    f"Unable to fetch PubMed article {citation.pmid} "
+                    f"for CDR{citation.doc.id} with status {citation.status}."
+                )
+                self.alerts.append(dict(message=message, type="warning"))
+                self.skipped.add(pmid)
+        return changed
+
+    @cached_property
     def citations(self):
         """Dictionary (by PMID) of citations with non-terminal statuses."""
 
-        if not hasattr(self, "_citations"):
-            fields = "p.doc_id", "p.value AS pmid", "s.value AS status"
-            query = self.Query("query_term p", *fields)
-            query.join("query_term s", "s.doc_id = p.doc_id")
-            query.where(query.Condition("p.path", self.PMID_PATH))
-            query.where(query.Condition("s.path", self.STATUS_PATH))
-            query.where(query.Condition("s.value", self.STATUSES, "IN"))
-            self._citations = {}
-            self.__errors = []
-            dup_message = "Duplicate PMID {} (CDR{:d} and CDR{:d}"
-            for row in query.execute(self.cursor).fetchall():
-                pmid = row.pmid.strip().upper()
-                if pmid in self._citations:
-                    args = row.pmid, self._citations[pmid].id, row.doc_id
-                    self.__errors.append(dup_message.format(*args))
+        # Find the Citation documents with the target statuses.
+        start = datetime.now()
+        fields = "p.doc_id", "p.value AS pmid", "s.value AS status"
+        query = self.Query("query_term p", *fields).order("p.doc_id")
+        query.join("query_term s", "s.doc_id = p.doc_id")
+        query.where(query.Condition("p.path", self.PMID_PATH))
+        query.where(query.Condition("s.path", self.STATUS_PATH))
+        query.where(query.Condition("s.value", self.STATUSES, "IN"))
+        rows = query.unique().execute(self.cursor).fetchall()
+
+        # Do a preliminary pass to find docs which show up more than once.
+        citations = defaultdict(list)
+        for row in rows:
+            citations[row.doc_id].append((row.pmid, row.status))
+        for doc_id in citations:
+            if len(citations[doc_id]) > 1:
+                pmids = set()
+                statuses = set()
+                for pmid, status in citations[doc_id]:
+                    pmids.add(pmid)
+                    statuses.add(status)
+                for pmid in pmids:
+                    self.skipped.add(pmid)
+                pmids = "; ".join(sorted(pmids))
+                statuses = "; ".join(sorted(statuses))
+                message = (
+                    f"CDR{doc_id} found multiple times with PMID(s) "
+                    f"{pmids} and status(es) {statuses}. Skipping check."
+                )
+                self.logger.warning(message)
+                self.alerts.append(dict(message=message, type="warning"))
+
+        # Now do the real pass to pack up the citations for checking.
+        citations = {}
+        for row in rows:
+            pmid = row.pmid.strip().upper()
+            if pmid in self.skipped:
+                self.logger.info("skipping PMID %s", pmid)
+                continue
+            if pmid in self.duplicates:
+                duplicates = sorted(self.duplicates[pmid] - {row.doc_id})
+                if len(duplicates) == 1:
+                    why = f"CDR{duplicates[0]} also has that PubMed ID"
                 else:
-                    self._citations[pmid] = Citation(self, row)
-            self.__fetch(self._citations)
-        return self._citations
+                    if len(duplicates) == 2:
+                        docs = " and ".join([f"CDR{d}" for d in duplicates])
+                    else:
+                        docs = ", ".join([f"CDR{d}" for d in duplicates[:-1]])
+                        docs += f", and CDR{duplicates[-1]}"
+                    why = f"{docs} also have that PubMed ID"
+                message = (
+                    f"Skipping Citation CDR{row.doc_id} with PMID {pmid} "
+                    f"because {why}."
+                )
+                self.alerts.append(dict(message=message, type="warning"))
+                self.skipped.add(pmid)
+            else:
+                citations[pmid] = Citation(self, row)
+        self.__fetch(citations)
+        elapsed = datetime.now() - start
+        self.logger.info("loaded %d citations in %s", len(citations), elapsed)
+        return citations
 
-    @property
-    def errors(self):
-        """Renderable version of any errors logged."""
+    @cached_property
+    def duplicates(self):
+        """Find PMIDs claimed by more than one CDR document."""
 
-        if not hasattr(self, "_errors"):
-            self._errors = None
-            if self.__errors:
-                self._errors = self.HTMLPage.fieldset("Date Integrity Errors")
-                ul = self.HTMLPage.B.UL()
-                for error in self.__errors:
-                    li = self.HTMLPage.B.LI(error)
-                    li.set("class", "error")
-                    ul.append(li)
-                self._errors.append(ul)
-        return self._errors
+        query = self.Query("query_term", "COUNT(*) n", "value")
+        query.where(query.Condition("path", self.PMID_PATH))
+        query.group("value")
+        query.having("COUNT(*) > 1")
+        rows = query.execute(self.cursor).fetchall()
+        pmids = [row.value.strip().upper() for row in rows]
+        query = self.Query("query_term", "doc_id", "value")
+        query.where(query.Condition("path", self.PMID_PATH))
+        query.where(query.Condition("value", pmids, "IN"))
+        duplicates = defaultdict(set)
+        for doc_id, pmid in query.execute(self.cursor).fetchall():
+            duplicates[pmid.strip().upper()].add(doc_id)
+        return duplicates
 
-    @property
+    @cached_property
     def rows(self):
         """Table rows reporting citations whose statuses have changed."""
 
-        if not hasattr(self, "_rows"):
-            self._rows = []
-            error_opts = dict(classes="error")
-            for pmid in sorted(self.citations):
-                citation = self.citations[pmid]
-                row = [citation.pmid, citation.doc.id, citation.status]
-                changed = False
-                if citation.pubmed_article is not None:
-                    row.append(citation.pubmed_article.status)
-                    if citation.pubmed_article.status != citation.status:
-                        changed = True
-                        try:
-                            citation.update()
-                            row.append("updated")
-                        except Exception:
-                            self.logger.exception("Failure updating %s", pmid)
-                            cell = self.Reporter.Cell("failed", **error_opts)
-                            row.append(cell)
-                else:
-                    changed = True
-                    cell = self.Reporter.Cell("missing", **error_opts)
-                    row += [cell, ""]
-                if changed:
-                    self._rows.append(row)
-        return self._rows
+        rows = []
+        for citation in self.changed:
+            row = [
+                citation.pmid,
+                citation.doc.id,
+                citation.status,
+                citation.pubmed_article.status,
+            ]
+            try:
+                citation.update()
+                row.append("updated")
+            except Exception as e:
+                message = f"Failure updating {citation.pmid}: {e}"
+                self.logger.exception(message)
+                self.alerts.append(dict(message=message, type="error"))
+                row.append(self.Reporter.Cell("failed", classes="error"))
+            rows.append(row)
+        return rows
 
-    def __fetch(self, citations):
+    @cached_property
+    def same_window(self):
+        """Determine whether to open another browser tab."""
+        return [self.CHECK]
+
+    @cached_property
+    def skipped(self):
+        """PubMed IDs which we won't try to refresh."""
+        return {pmid for pmid in self.fields.getlist("skipped")}
+
+    def __fetch(self, citations, retries=3):
         """Get the latest for the citations from NLM.
 
         Attach the PubMed articles to the Citation objects with which
@@ -134,16 +278,26 @@ class Control(Controller):
 
         data = dict(db="pubmed", id=",".join(list(citations)), retmode="xml")
         xml = post(self.URL, data).content
+        fetched = 0
         for node in etree.fromstring(xml).findall("PubmedArticle"):
+            fetched += 1
             article = PubmedArticle(node)
             if len(article.pmids) != 1:
-                self.__errors.append(f"PMIDs: {article.pmids}")
-                continue
-            if article.pmid in citations:
+                message = f"NLM article has multiple IDs {article.pmids}."
+                self.alerts.append(dict(message=message, type="warning"))
+            elif article.pmid in citations:
                 citations[article.pmid].pubmed_article = article
             else:
-                error = f"Unexpected article with PMID {article.pmid}"
-                self.__errors.append(error)
+                message = f"Got unexpected article with PMID {article.pmid}"
+                self.alerts.append(dict(message=message, type="warning"))
+        if fetched < len(citations):
+            args = len(citations), fetched
+            self.logger.warning("expected %d articles, got %d", *args)
+            if not fetched:
+                self.logger.warning("retries=%d response=%s", retries, xml)
+                if retries > 0:
+                    sleep(5-retries)
+                    self.__fetch(citations, retries-1)
 
 
 class Citation:
@@ -171,41 +325,36 @@ class Citation:
         self.__control = control
         self.__row = row
 
-    @property
+    @cached_property
+    def description(self):
+        """Describe a citation available for refresh for the form."""
+
+        return (
+            f"Citation {self.pmid} (CDR{self.id}): status {self.status} "
+            f"will become {self.pubmed_article.status}."
+        )
+
+    @cached_property
     def doc(self):
         """`Doc` object for the CDR Citation document."""
+        return Doc(self.__control.session, id=self.__row.doc_id)
 
-        if not hasattr(self, "_doc"):
-            self._doc = Doc(self.__control.session, id=self.__row.doc_id)
-        return self._doc
-
-    @property
+    @cached_property
     def id(self):
         """Unique ID for the CDR Citation document."""
         return self.__row.doc_id
 
-    @property
+    @cached_property
     def pmid(self):
         """Normalized string for the PubMed ID."""
+        return self.__row.pmid.strip()
 
-        if not hasattr(self, "_pmid"):
-            self._pmid = self.__row.pmid.strip()
-        return self._pmid
-
-    @property
+    @cached_property
     def pubmed_article(self):
-        """Fresh copy of the article from NLM."""
-
-        if hasattr(self, "_pubmed_article"):
-            return self._pubmed_article
+        """Fresh copy of the article from NLM (set later)."""
         return None
 
-    @pubmed_article.setter
-    def pubmed_article(self, value):
-        """This gets set later."""
-        self._pubmed_article = value
-
-    @property
+    @cached_property
     def status(self):
         """What the CDR thinks the status of this citation is."""
         return self.__row.status
@@ -234,35 +383,29 @@ class PubmedArticle:
 
     @property
     def node(self):
-        """Give the caller a copy of the PubmedArticle node."""
+        """Give the caller an uncached copy of the PubmedArticle node."""
         return deepcopy(self.__node)
 
-    @property
+    @cached_property
     def pmid(self):
         """Pick the latest PubMed ID if there is more than one."""
         return self.pmids and self.pmids[-1].value or None
 
-    @property
+    @cached_property
     def pmids(self):
         """Sequence of PubMed IDs found in the node."""
 
-        if not hasattr(self, "_pmids"):
-            pmids = []
-            for child in self.__node.findall("MedlineCitation/PMID"):
-                pmids.append(self.PMID(child))
-            self._pmids = sorted(pmids)
-        return self._pmids
+        pmids = []
+        for child in self.__node.findall("MedlineCitation/PMID"):
+            pmids.append(self.PMID(child))
+        return sorted(pmids)
 
-    @property
+    @cached_property
     def status(self):
         """Current status for the PubMed article."""
 
-        if not hasattr(self, "_status"):
-            self._status = None
-            node = self.__node.find("MedlineCitation")
-            if node is not None:
-                self._status = node.get("Status")
-        return self._status
+        node = self.__node.find("MedlineCitation")
+        return node.get("Status") if node is not None else None
 
     class PMID:
         """PubMed ID with version number (who knew they had more than one?)."""
@@ -271,24 +414,19 @@ class PubmedArticle:
             """Save the node so we can get the ID and version."""
             self.__node = node
 
-        @property
+        @cached_property
         def version(self):
             """Integer for the ID's version."""
 
-            if not hasattr(self, "_version"):
-                try:
-                    self._version = int(self.__node.get("Version"))
-                except Exception:
-                    self._version = 0
-            return self._version
+            try:
+                return int(self.__node.get("Version"))
+            except Exception:
+                return 0
 
-        @property
+        @cached_property
         def value(self):
             """Normalized string for the PubMed ID."""
-
-            if not hasattr(self, "_value"):
-                self._value = self.__node.text.strip()
-            return self._value
+            return self.__node.text.strip()
 
         def __repr__(self):
             """String rendering of the PubMed ID for error reporting."""

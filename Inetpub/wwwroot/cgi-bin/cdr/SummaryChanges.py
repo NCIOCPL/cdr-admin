@@ -6,6 +6,8 @@
 from cdrcgi import Controller
 from cdrapi.docs import Doc
 from datetime import date
+from dateutil.relativedelta import relativedelta
+from functools import cached_property
 import lxml.html
 
 
@@ -14,7 +16,7 @@ class Control(Controller):
 
     SUBTITLE = "History of Changes to Summary"
     METHOD = "get"
-    SCOPES = "all", "range"
+    SCOPES = dict(all="Complete History", range="Date Range")
     FILTER = "name:Summary Changes Report"
     CSS = (
         "#summary-title, #wrapper h2 { text-align: center; }",
@@ -37,10 +39,12 @@ class Control(Controller):
             page - HTMLPage object
         """
 
+        # Don't need a form if we already have a document.
+        if self.doc:
+            return self.show_report()
+
+        # If we have more than one match for the title fragment, pick one.
         if self.summaries:
-            page.form.append(page.hidden_field("start", self.start))
-            page.form.append(page.hidden_field("end", self.end))
-            page.form.append(page.hidden_field("scope", self.scope))
             fieldset = page.fieldset("Select Summary")
             checked = True
             for id, title in self.summaries:
@@ -48,43 +52,47 @@ class Control(Controller):
                 opts = dict(label=label, value=id, checked=checked)
                 fieldset.append(page.radio_button("DocId", **opts))
                 checked = False
-            page.add_css("fieldset { width: 1024px; }")
+            page.form.append(fieldset)
+
+        # Otherwise, show the title and ID fields.
         else:
-            if self.fragment:
-                fieldset = page.fieldset("Error")
-                message = page.B.P(f"No matches for {self.fragment!r}")
-                message.set("class", "error")
-                fieldset.append(message)
-                page.form.append(fieldset)
             fieldset = page.fieldset("Term ID or Title for Summary")
-            fieldset.append(page.text_field("DocId", label="CDR ID"))
-            fieldset.append(page.text_field("title", label="Doc Title"))
+            opts = dict(label="CDR ID", value=self.id)
+            fieldset.append(page.text_field("DocId", **opts))
+            opts = dict(label="Doc Title", value=self.fragment)
+            fieldset.append(page.text_field("title", **opts))
             page.form.append(fieldset)
-            fieldset = page.fieldset("Report Options")
-            opts = dict(value="range", label="Date Range", checked=True)
+
+        # These fields are common to both forms.
+        fieldset = page.fieldset("Report Options")
+        default = self.scope or "range"
+        for value in reversed(sorted(self.SCOPES)):
+            checked = value == default
+            opts = dict(
+                value=value,
+                label=self.SCOPES[value],
+                checked=checked,
+            )
             fieldset.append(page.radio_button("scope", **opts))
-            opts = dict(value="all", label="Complete History")
-            fieldset.append(page.radio_button("scope", **opts))
-            page.form.append(fieldset)
+        page.form.append(fieldset)
+        if self.request:
+            start, end = self.start, self.end
+        else:
             end = date.today()
-            year = end.year - 2
-            day = end.day
-            if day == 29 and end.month == 2:
-                day = 28
-            start = date(year, end.month, day)
-            fieldset = page.fieldset("Date Range Of Report")
-            fieldset.set("id", "date-range")
-            fieldset.append(page.date_field("start", value=start))
-            fieldset.append(page.date_field("end", value=end))
-            page.form.append(fieldset)
-            page.add_script("\n".join(self.SCRIPT))
+            start = end - relativedelta(years=2)
+        fieldset = page.fieldset("Date Range Of Report")
+        fieldset.set("id", "date-range")
+        fieldset.append(page.date_field("start", value=start))
+        fieldset.append(page.date_field("end", value=end))
+        page.form.append(fieldset)
+        page.add_script("\n".join(self.SCRIPT))
         page.form.append(fieldset)
 
     def show_report(self):
         """Override, because this is not a tabular report."""
 
         B = lxml.html.builder
-        if not self.id:
+        if not self.doc:
             self.show_form()
         title = self.doc.title.split(";")[0]
         if self.all:
@@ -112,122 +120,139 @@ class Control(Controller):
         self.report.page.add_css("\n".join(self.CSS))
         self.report.send()
 
-    @property
+    @cached_property
     def all(self):
         """True if we should report on all changes."""
         return self.scope == "all"
 
-    @property
+    @cached_property
     def doc(self):
-        """The summary document for the report."""
+        """The summary document for the report.
 
-        if not hasattr(self, "_doc"):
-            self._doc = Doc(self.session, id=self.id)
-        return self._doc
+        As a side effect, alerts are registered here to show the user
+        useful information.
+        """
 
-    @property
+        id = self.id
+        if not id:
+            if not self.fragment:
+                if self.request:
+                    message = "CDR ID or title is required."
+                    self.alerts.append(dict(message=message, type="error"))
+                return None
+            elif not self.summaries:
+                message = f"No summaries found for {self.fragment!r}."
+                self.alerts.append(dict(message=message, type="warning"))
+                return None
+            elif len(self.summaries) > 1:
+                message = f"Multiple matches found for {self.fragment!r}."
+                self.alerts.append(dict(message=message, type="info"))
+                return None
+            self.logger.info("summmaries=%r", self.summaries)
+            id = self.summaries[0][0]
+        doc = Doc(self.session, id=id)
+        try:
+            doctype = doc.doctype.name
+            if doctype != "Summary":
+                message = f"CDR{doc.id} is a {doctype} document."
+                self.alerts.append(dict(message=message, type="warning"))
+                return None
+            return doc
+        except Exception:
+            message = f"Document {id} not found."
+            self.logger.exception(message)
+            self.alerts.append(dict(message=message, type="error"))
+            return None
+
+    @cached_property
     def end(self):
         """End of date range for the report."""
+        return self.parse_date(self.fields.getvalue("end"))
 
-        if not hasattr(self, "_end"):
-            self._end = self.parse_date(self.fields.getvalue("end"))
-        return self._end
-
-    @property
+    @cached_property
     def fragment(self):
         """Title fragment for the summary."""
         return self.fields.getvalue("title")
 
-    @property
+    @cached_property
     def id(self):
         """Document ID for the report."""
+        return self.fields.getvalue("DocId", "").strip()
 
-        if not hasattr(self, "_id"):
-            self._id = self.fields.getvalue("DocId")
-            if self._id:
-                try:
-                    self._id = Doc.extract_id(self._id)
-                except Exception:
-                    self.bail("Invalid ID")
-            elif self.summaries and len(self.summaries) == 1:
-                self._id = self.summaries[0][0]
-        return self._id
-
-    @property
+    @cached_property
     def no_results(self):
         """Suppress the message we'd get with no tables."""
         return None
 
-    @property
+    @cached_property
     def scope(self):
         """How is the user deciding which versions to report on?"""
 
-        if not hasattr(self, "_scope"):
-            self._scope = self.fields.getvalue("scope")
-            if self._scope not in self.SCOPES:
-                self.bail()
-        return self._scope
+        scope = self.fields.getvalue("scope")
+        if scope and scope not in self.SCOPES:
+            self.bail()
+        return scope
 
-    @property
+    @cached_property
     def sections(self):
         """Sequence of sections of the report, one for each change."""
 
-        if not hasattr(self, "_sections"):
-            last_section = None
-            sections = []
-            for version, version_date in self.versions:
-                display_date = version_date.strftime("%m/%d/%Y")
-                doc = Doc(self.session, id=self.id, version=version)
-                response = doc.filter(self.FILTER)
-                html = str(response.result_tree).strip()
-                if html != last_section:
-                    last_section = html
-                    html = html.replace("@@PubVerDate@@", display_date)
-                    sections.append(lxml.html.fragments_fromstring(html))
-            self._sections = reversed(sections)
-        return self._sections
+        last_section = None
+        sections = []
+        for version, version_date in self.versions:
+            display_date = version_date.strftime("%m/%d/%Y")
+            doc = Doc(self.session, id=self.id, version=version)
+            response = doc.filter(self.FILTER)
+            html = str(response.result_tree).strip()
+            if html != last_section:
+                last_section = html
+                html = html.replace("@@PubVerDate@@", display_date)
+                sections.append(lxml.html.fragments_fromstring(html))
+        return reversed(sections)
 
-    @property
+    @cached_property
     def start(self):
         """Beginning of date range for the report."""
+        return self.parse_date(self.fields.getvalue("start"))
 
-        if not hasattr(self, "_start"):
-            self._start = self.parse_date(self.fields.getvalue("start"))
-        return self._start
+    @cached_property
+    def same_window(self):
+        """Decide when to avoid opening a new browser tab."""
+        return [self.SUBMIT] if self.request else []
 
-    @property
+    @cached_property
+    def suppress_sidenav(self):
+        """Don't show the left navigation column on followup pages."""
+        return True if self.id or self.fragment else False
+
+    @cached_property
     def summaries(self):
         """Sequence of ID/title tuples for the summary picklist."""
 
-        if not hasattr(self, "_summaries"):
-            self._summaries = None
-            if self.fragment:
-                fragment = f"{self.fragment}%"
-                query = self.Query("document d", "d.id", "d.title").order(2)
-                query.join("doc_type t", "t.id = d.doc_type")
-                query.where("t.name = 'Summary'")
-                query.where(query.Condition("d.title", fragment, "LIKE"))
-                rows = query.execute(self.cursor).fetchall()
-                self._summaries = [tuple(row) for row in rows]
-        return self._summaries
+        if not self.fragment:
+            return None
+        query = self.Query("document d", "d.id", "d.title").order(2)
+        query.join("doc_type t", "t.id = d.doc_type")
+        query.where("t.name = 'Summary'")
+        query.where(query.Condition("d.title", f"{self.fragment}%", "LIKE"))
+        rows = query.execute(self.cursor).fetchall()
+        return [tuple(row) for row in rows]
 
-    @property
+    @cached_property
     def versions(self):
         """Sequence of num/date for versions to be included in the report."""
 
-        if not hasattr(self, "_versions"):
-            query = self.Query("doc_version", "num", "dt").order("num")
-            query.where(query.Condition("id", self.id))
-            if not self.all:
-                if self.start:
-                    query.where(query.Condition("dt", self.start, ">="))
-                if self.end:
-                    end = f"{self.end} 23:59:59"
-                    query.where(query.Condition("dt", end, "<="))
-            query.where("publishable = 'Y'")
-            rows = query.execute(self.cursor).fetchall()
-            self._versions = [tuple(row) for row in rows]
-        return self._versions
+        query = self.Query("doc_version", "num", "dt").order("num")
+        query.where(query.Condition("id", self.id))
+        if not self.all:
+            if self.start:
+                query.where(query.Condition("dt", self.start, ">="))
+            if self.end:
+                end = f"{self.end} 23:59:59"
+                query.where(query.Condition("dt", end, "<="))
+        query.where("publishable = 'Y'")
+        rows = query.execute(self.cursor).fetchall()
+        return [tuple(row) for row in rows]
 
 
 if __name__ == "__main__":

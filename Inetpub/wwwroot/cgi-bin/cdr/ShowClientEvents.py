@@ -6,8 +6,9 @@ Tools used for tracking down what really happened when a user
 reports anomalies in stored versions of CDR documents.
 """
 
+from functools import cached_property
 import datetime
-from cdrcgi import Controller
+from cdrcgi import Controller, BasicWebPage
 
 
 class Control(Controller):
@@ -35,24 +36,24 @@ class Control(Controller):
         """Bypass the from, which isn't used."""
         self.show_report()
 
-    def build_tables(self):
-        """Create the only table this report uses."""
+    def show_report(self):
+        """Override to accommodate the report's wide table."""
 
-        opts = dict(columns=self.COLUMNS, caption=self.caption)
-        return self.Reporter.Table(self.rows, **opts)
+        report = BasicWebPage()
+        report.wrapper.append(report.B.H1(self.SUBTITLE))
+        report.wrapper.append(self.table.node)
+        report.wrapper.append(self.footer)
+        report.send()
 
     @property
     def caption(self):
         """The string describing the report's range."""
         return f"{len(self.rows)} Events From {self.start} To {self.end}"
 
-    @property
+    @cached_property
     def end(self):
         """End of the report's date range."""
-
-        if not hasattr(self, "_end"):
-            self._end = self.fields.getvalue("end") or str(self.TODAY)
-        return self._end
+        return str(self.parse_date(self.fields.getvalue("end")) or self.TODAY)
 
     @property
     def rows(self):
@@ -73,14 +74,19 @@ class Control(Controller):
             self._rows = [tuple(row) for row in query.execute(self.cursor)]
         return self._rows
 
-    @property
+    @cached_property
     def start(self):
         """Start of the report's date range."""
 
-        if not hasattr(self, "_start"):
-            default = self.TODAY - datetime.timedelta(7)
-            self._start = self.fields.getvalue("start") or str(default)
-        return self._start
+        default = self.TODAY - datetime.timedelta(7)
+        return str(self.parse_date(self.fields.getvalue("start")) or default)
+
+    @cached_property
+    def table(self):
+        """Create the single table used for this report."""
+
+        opts = dict(columns=self.COLUMNS, caption=self.caption)
+        return self.Reporter.Table(self.rows, **opts)
 
     @property
     def user(self):

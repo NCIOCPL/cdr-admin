@@ -3,15 +3,16 @@
 """Report on the last modifications to Drug Information Summary documents.
 """
 
+from functools import cached_property
 from datetime import date, timedelta
 from cdrapi.docs import Doc
-from cdrcgi import Controller, WEBSERVER, BASE
+from cdrcgi import Controller
 
 
 class Control(Controller):
     """Access to report-building tools."""
 
-    SUBTITLE = "Drug Information Summary Date Last Modified"
+    SUBTITLE = "DIS Date Last Modified"
     REPORT_TYPES = "user", "system"
 
     def build_tables(self):
@@ -44,7 +45,7 @@ class Control(Controller):
         page.form.append(fieldset)
         page.add_output_options(default="html")
 
-    @property
+    @cached_property
     def caption(self):
         """Rows to be displayed at the top of the report's table."""
 
@@ -54,105 +55,98 @@ class Control(Controller):
             f"{self.start} \u2014 {self.end}",
         )
 
-    @property
+    @cached_property
     def columns(self):
         """Headers for the top of each report table column."""
 
-        if not hasattr(self, "_columns"):
-            Column = self.Reporter.Column
-            self._columns = (
-                Column("DocId", width="100px"),
-                Column("Summary Title", width="350px"),
-                Column("Date Last Modified", width="130px"),
-                Column("Last Modify Action Date (System)", width="130px"),
-                Column("LastV Publishable?", width="100px"),
-                Column("User", width="150px"),
-            )
-        return self._columns
+        flavor = self.report_type.capitalize()
+        date_label = flavor
+        Column = self.Reporter.Column
+        return (
+            Column("DocId", width="100px"),
+            Column("Summary Title", width="350px"),
+            Column("Date Last Modified", width="130px"),
+            Column("Last Modify Action Date (System)", width="130px"),
+            Column("LastV Publishable?", width="100px"),
+            Column("User", width="150px"),
+        )
 
-    @property
+    @cached_property
     def drugs(self):
         """Collect the documents which match the report's date range."""
 
-        if not hasattr(self, "_drugs"):
-            cols = (
-                "t.doc_id",
-                "t.value AS title",
-                "m.value AS modified",
-                "s.last_save_date",
-            )
-            query = self.Query("query_term t", *cols).unique().order("t.value")
-            query.where("t.path = '/DrugInformationSummary/Title'")
-            query.join("doc_last_save s", "s.doc_id = t.doc_id")
-            start = str(self.start)
-            end = f"{self.end} 23:59:59"
-            m_path = "m.path = '/DrugInformationSummary/DateLastModified'"
-            m_join = ["m.doc_id = t.doc_id", m_path]
-            if self.report_type == "user":
-                query.where("m.value IS NOT NULL")
-                m_join.append(query.Condition("m.value", start, ">="))
-                m_join.append(query.Condition("m.value", end, "<="))
-            else:
-                query.where(query.Condition("s.last_save_date", start, ">="))
-                query.where(query.Condition("s.last_save_date", end, "<="))
-            query.outer("query_term m", *m_join)
-            rows = query.execute(self.cursor).fetchall()
-            query.log(label="Drug DLM")
-            self._drugs = [Drug(self, row) for row in rows]
-        return self._drugs
+        cols = (
+            "t.doc_id",
+            "t.value AS title",
+            "m.value AS modified",
+            "s.last_save_date",
+        )
+        query = self.Query("query_term t", *cols).unique().order("t.value")
+        query.where("t.path = '/DrugInformationSummary/Title'")
+        query.join("doc_last_save s", "s.doc_id = t.doc_id")
+        start = str(self.start)
+        end = f"{self.end} 23:59:59"
+        m_path = "m.path = '/DrugInformationSummary/DateLastModified'"
+        m_join = ["m.doc_id = t.doc_id", m_path]
+        if self.report_type == "user":
+            query.where("m.value IS NOT NULL")
+            m_join.append(query.Condition("m.value", start, ">="))
+            m_join.append(query.Condition("m.value", end, "<="))
+        else:
+            query.where(query.Condition("s.last_save_date", start, ">="))
+            query.where(query.Condition("s.last_save_date", end, "<="))
+        query.outer("query_term m", *m_join)
+        rows = query.execute(self.cursor).fetchall()
+        query.log(label="Drug DLM")
+        return [Drug(self, row) for row in rows]
 
-    @property
+    @cached_property
     def end(self):
         """Get the `datetime.date` object for the end of the range."""
 
-        if not hasattr(self, "_end"):
-            end = self.fields.getvalue("end")
-            if end:
-                try:
-                    self._end = self.parse_date(end)
-                except Exception:
-                    self.bail("Invalid end date")
-            else:
-                self._end = date.today()
-        return self._end
+        end = self.fields.getvalue("end")
+        if end:
+            try:
+                return self.parse_date(end)
+            except Exception:
+                self.bail("Invalid end date")
+        return date.today()
 
-    @property
+    @cached_property
     def report_type(self):
         """Ensure that the report type parameter hasn't been tampered with."""
 
-        if not hasattr(self, "_report_type"):
-            self._report_type = self.fields.getvalue("report-type", "user")
-            if self._report_type not in self.REPORT_TYPES:
-                self.bail()
-        return self._report_type
+        report_type = self.fields.getvalue("report-type", "user")
+        if report_type not in self.REPORT_TYPES:
+            self.bail()
+        return report_type
 
-    @property
+    @cached_property
     def rows(self):
         """Table rows for the report."""
         return [drug.values for drug in self.drugs]
 
-    @property
+    @cached_property
     def start(self):
         """Get the `datetime.date` object for the start of the range."""
 
-        if not hasattr(self, "_start"):
-            start = self.fields.getvalue("start")
-            if start:
-                try:
-                    self._start = self.parse_date(start)
-                    if self._start > self.end:
-                        self.bail("Invalid date range")
-                except Exception:
-                    self.bail("Invalid start date")
-            else:
-                self._start = self.end - timedelta(6)
-        return self._start
+        start = self.fields.getvalue("start")
+        if start:
+            try:
+                start = self.parse_date(start)
+                if start > self.end:
+                    self.bail("Invalid date range")
+            except Exception:
+                self.bail("Invalid start date")
+        else:
+            start = self.end - timedelta(6)
+        return start
 
 
 class Drug:
     """Drug Information Summary information needed for the report."""
 
-    BASE = f"https://{WEBSERVER}{BASE}"
+    BASE = f"https://{Controller.WEBSERVER}{Controller.BASE}"
     URL = BASE + "/DocVersionHistory.py?Session=guest&DocId={:d}"
 
     def __init__(self, control, row):
@@ -167,20 +161,17 @@ class Drug:
         self.__control = control
         self.__row = row
 
-    @property
+    @cached_property
     def doc(self):
         """`Doc` object for the CDR DrugInformationSummary document."""
+        return Doc(self.__control.session, id=self.__row.doc_id)
 
-        if not hasattr(self, "_doc"):
-            self._doc = Doc(self.__control.session, id=self.__row.doc_id)
-        return self._doc
-
-    @property
+    @cached_property
     def title(self):
         """Pull the CDR document title from the database result set row."""
         return self.__row.title
 
-    @property
+    @cached_property
     def modified(self):
         """Get the date portion of the "date last modified" value.
 
@@ -188,28 +179,24 @@ class Drug:
         when the "system" report has been requested).
         """
 
-        if not self.__row.modified:
-            return ""
-        return str(self.__row.modified)[:10]
+        return str(self.__row.modified)[:10] if self.__row.modified else ""
 
-    @property
+    @cached_property
     def saved(self):
         """Drop the time from the DATETIME when the doc was last saved."""
         return str(self.__row.last_save_date)[:10]
 
-    @property
+    @cached_property
     def user(self):
         """Return the name of the user who last saved the document."""
 
-        if not hasattr(self, "_user"):
-            if self.doc.modification is not None:
-                user = self.doc.modification.user
-            else:
-                user = self.doc.creation.user
-            self._user = user.fullname or user.name or "[unknown]"
-        return self._user
+        if self.doc.modification is not None:
+            user = self.doc.modification.user
+        else:
+            user = self.doc.creation.user
+        return user.fullname or user.name or "[unknown]"
 
-    @property
+    @cached_property
     def publishable(self):
         """
         String for column indicating whether last version can be published
@@ -221,36 +208,34 @@ class Drug:
           Exception string if an exception is thrown
         """
 
-        if not hasattr(self, "_publishable"):
-            try:
-                last_version = self.doc.last_version
-                if last_version is None:
-                    self._publishable = "N/A"
-                elif last_version == self.doc.last_publishable_version:
-                    self._publishable = "Y"
-                else:
-                    self._publishable = "N"
-            except Exception as e:
-                self._publishable = str(e)
-        return self._publishable
+        try:
+            last_version = self.doc.last_version
+            if last_version is None:
+                return "N/A"
+            elif last_version == self.doc.last_publishable_version:
+                return "Y"
+            else:
+                return "N"
+        except Exception as e:
+            return str(e)
 
-    @property
+    @cached_property
     def url(self):
         """Link to the Document Version History report for this document."""
         return self.URL.format(self.doc.id)
 
-    @property
+    @cached_property
     def values(self):
         """Assemble the table row for this drug information summary."""
 
         Cell = self.__control.Reporter.Cell
         return (
-            Cell(f"CDR{self.doc.id:d}", href=self.url, center=True),
+            Cell(f"CDR{self.doc.id:d}", href=self.url),
             Cell(self.title),
-            Cell(self.modified, center=True),
-            Cell(self.saved, center=True),
+            Cell(self.modified),
+            Cell(self.saved),
             Cell(self.publishable, center=True),
-            Cell(self.user, center=True),
+            Cell(self.user),
         )
 
 

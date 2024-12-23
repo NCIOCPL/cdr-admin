@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""Display all summaries including a list of special elements.
+"""Display counts of selected elements in summaries.
 
    The elements currently included are:
      - Comment
@@ -11,11 +11,12 @@
      - SummaryModuleLink
      - Table
 
-   This report can help answering questions like: Give me a summary
-   including a video? or "I need a summary with multiple tables"
+   This report can help answering questions like: "Which summaries
+   include a video?" or "I need a drug summary with a table."
 """
 
-from cdrcgi import Controller
+from functools import cached_property
+from cdrcgi import Controller, BasicWebPage
 from cdrapi.docs import Doc
 
 
@@ -41,50 +42,85 @@ class Control(Controller):
         ".standard-wording { color: lime; }",
         ".comment          { color: fuchsia; }",
         ".error            { color: red; font-weight: bold; }",
-        "dl                { width: 1200px; margin: 10px auto; }",
+        ".element-list     { margin-bottom: 2rem; }",
+        ".element-list li  { margin-bottom: 0; line-height: 1.5 }",
+        ".element-list, dl { font-size: 1.06rem; }",
+        "dl *              { line-height: 1.3 }",
+    )
+    DOCTYPES = [
+        ("cis", "Cancer Information Summaries", True),
+        ("dis", "Drug Information Summaries", False),
+    ]
+    DOCTYPE_NAMES = dict(
+        cis="Summary",
+        dis="DrugInformationSummary",
     )
 
-    def show_form(self):
-        """Skip past the form, which isn't needed for this report."""
-        return self.show_report()
+    def populate_form(self, page):
+        """Choose document type for report.
+
+        Required positional argument:
+          page - HTMLPage object
+        """
+
+        fieldset = page.fieldset("Choose summary type")
+        for value, label, checked in self.DOCTYPES:
+            opts = dict(value=value, label=label, checked=checked)
+            fieldset.append(page.radio_button("doctype", **opts))
+        page.form.append(fieldset)
 
     def show_report(self):
         """Override the base class version, as this isn't a tabular report."""
 
-        dl = self.HTMLPage.B.DL()
+        B = self.HTMLPage.B
+        dl = B.DL()
         for summary in self.summaries:
             dl.append(summary.dt)
             for dd in summary.dds:
                 dl.append(dd)
-        elements = []
+        elements = B.UL(B.CLASS("usa-list element-list"))
         for tag in sorted(self.ELEMENTS):
-            span = self.HTMLPage.B.SPAN(f" {tag}")
-            span.set("class", self.ELEMENTS[tag])
-            elements.append(span)
-        key = self.HTMLPage.B.H3("Elements included:", *elements)
-        key.set("class", "center")
-        self.report.page.form.append(key)
-        self.report.page.form.append(dl)
-        self.report.page.add_css("\n".join(self.CSS))
-        self.report.send()
+            element = B.LI(tag, B.CLASS(self.ELEMENTS[tag]))
+            elements.append(element)
+        report = BasicWebPage()
+        report.wrapper.append(report.B.H1(self.SUBTITLE))
+        report.wrapper.append(B.H2("Report Elements"))
+        report.wrapper.append(elements)
+        report.wrapper.append(B.H2("Summaries"))
+        report.wrapper.append(dl)
+        report.wrapper.append(self.footer)
+        report.head.append(report.B.STYLE("\n".join(self.CSS)))
+        report.send()
+
+    @cached_property
+    def doctype(self):
+        """Key to document type selection from form."""
+        return self.fields.getvalue("doctype") or "cis"
 
     @property
     def no_results(self):
         """Suppress the message we'd normally get with no report tables."""
         return None
 
-    @property
+    @cached_property
+    def subtitle(self):
+        """Override page title for DIS report."""
+
+        if self.doctype == "dis":
+            return "Elements Included in PDQ Drug Information Summaries"
+        return self.SUBTITLE
+
+    @cached_property
     def summaries(self):
         """PDQ Summaries included in the report."""
 
-        if not hasattr(self, "_summaries"):
-            query = self.Query("document d", "d.id").order("d.title")
-            query.join("doc_type t", "t.id = d.doc_type")
-            query.where("t.name = 'Summary'")
-            query.where("d.title NOT LIKE '%BLOCKED%'")
-            rows = query.execute(self.cursor).fetchall()
-            self._summaries = [Summary(self, row.id) for row in rows]
-        return self._summaries
+        doctype = self.DOCTYPE_NAMES[self.doctype]
+        query = self.Query("document d", "d.id").order("d.title")
+        query.join("doc_type t", "t.id = d.doc_type")
+        query.where(query.Condition("t.name", doctype))
+        query.where("d.title NOT LIKE '%BLOCKED%'")
+        rows = query.execute(self.cursor).fetchall()
+        return [Summary(self, row.id) for row in rows]
 
 
 class Summary:

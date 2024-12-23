@@ -3,6 +3,8 @@
 """Report on phrases matching specified glossary term.
 """
 
+from functools import cached_property
+from cdrapi.docs import Doc
 from cdrcgi import Controller
 from cdrbatch import CdrBatch
 
@@ -49,15 +51,33 @@ class Control(Controller):
             page.form.append(page.hidden_field("language", self.language))
             for summary_type in self.types:
                 page.form.append(page.hidden_field("types", summary_type))
-            page.add_css("fieldset { width: 1000px; }")
         else:
+            entered_id = self.fields.getvalue("id")
+            entered_name = self.fields.getvalue("name")
+            if self.request == self.SUBMIT:
+                if not self.email:
+                    self.alerts.append(dict(
+                        message="At least one email address is required.",
+                        type="warning"))
+                if not self.types:
+                    self.alerts.append(dict(
+                        message="At least one document type is required.",
+                        type="warning"))
+                if not entered_id and not entered_name:
+                    self.alerts.append(dict(
+                        message="ID or name must be specified.",
+                        type="warning"))
+                if entered_id and entered_name:
+                    self.alerts.append(dict(
+                        message="ID and name may not both be specified.",
+                        type="warning"))
             fieldset = page.fieldset("Instructions")
             fieldset.append(page.B.P(self.INSTRUCTIONS))
             page.form.append(fieldset)
             fieldset = page.fieldset("Enter Document ID or Glossary Term Name")
-            opts = dict(label="Document ID", value=self.id)
+            opts = dict(label="Document ID", value=entered_id)
             fieldset.append(page.text_field("id", **opts))
-            opts = dict(label="Term Name", value=self.name)
+            opts = dict(label="Term Name", value=entered_name)
             fieldset.append(page.text_field("name", **opts))
             page.form.append(fieldset)
             fieldset = page.fieldset("Enter Required Email Address")
@@ -77,21 +97,20 @@ class Control(Controller):
                 fieldset.append(page.radio_button("language", **opts))
             page.form.append(fieldset)
             fieldset = page.fieldset()
-            fieldset.append(page.B.P(self.NOTE, page.B.CLASS("warning")))
+            classes = "text-red text-bold"
+            fieldset.append(page.B.P(self.NOTE, page.B.CLASS(classes)))
+            page.form.append(fieldset)
 
     def run(self):
         """Customize the routing."""
 
         try:
             if self.email and self.types and self.id:
-                if not self.request or self.request == self.SUBMIT:
-                    return self.show_report()
-            elif self.request == self.SUBMIT:
-                return self.show_form()
+                return self.show_report()
+            return self.show_form()
         except Exception as e:
             self.logger.exception("Report ailure")
             self.bail(e)
-        Controller.run(self)
 
     def show_report(self):
         """Queue the report and display its status."""
@@ -101,11 +120,9 @@ class Control(Controller):
         except Exception as e:
             self.logger.exception("Failure queueing report")
             self.bail(f"Unable to start job: {e}")
-        session = self.session.name
-        args = session, self.title, self.JOB_NAME, self.script, self.SUBMENU
-        self.job.show_status_page(*args)
+        self.job.show_status_page(self.session)
 
-    @property
+    @cached_property
     def args(self):
         """Arguments for the batch job."""
 
@@ -115,70 +132,74 @@ class Control(Controller):
             ("language", self.language),
         )
 
-    @property
+    @cached_property
     def email(self):
         """Email address(es) to which to send notification of the report."""
 
-        if not hasattr(self, "_email"):
-            self._email = (self.fields.getvalue("email") or "").strip()
-            if not self._email:
-                self._email = self.user.email
-        return self._email
+        email = (self.fields.getvalue("email") or "").strip()
+        return email or self.user.email
 
-    @property
+    @cached_property
     def id(self):
         """Glossary term document selected for the report.
 
         XMetaL spells the CGI parameter with an uppercase first letter.
         """
 
-        if not hasattr(self, "_id"):
-            self._id = self.fields.getvalue("id")
-            if not self._id:
-                self._id = self.fields.getvalue("Id")
-            if not self._id and len(self.names) == 1:
-                self._id = str(self.names[0][0])
-        return self._id
+        if self.name:
+            return None
+        id = self.fields.getvalue("id") or self.fields.getvalue("Id")
+        if not id and len(self.names) == 1:
+            id = str(self.names[0][0])
+        if id:
+            warning = None
+            doc = Doc(self.session, id=id)
+            if not doc.title:
+                warning = f"Document CDR{id} not found."
+            elif doc.doctype.name != "GlossaryTermName":
+                warning = f"CDR{id} is a {doc.doctype.name} document."
+            if warning:
+                self.alerts.append(dict(message=warning, type="warning"))
+                return None
+        return id
 
-    @property
+    @cached_property
     def job(self):
         """Batch job for the report."""
+        return CdrBatch(**self.opts)
 
-        if not hasattr(self, "_job"):
-            self._job = CdrBatch(**self.opts)
-        return self._job
-
-    @property
+    @cached_property
     def language(self):
         """English or Spanish."""
         return self.fields.getvalue("language") or ""
 
-    @property
+    @cached_property
     def name(self):
         """Name fragment entered by the user on the form."""
         return (self.fields.getvalue("name") or "").strip()
 
-    @property
+    @cached_property
     def names(self):
         """Picklist for glossary term names matching the user's fragment."""
 
-        if not hasattr(self, "_names"):
-            self._names = []
-            fragment = self.name
-            if fragment:
-                fields = "d.id", "d.title"
-                query = self.Query("document d", *fields).order("d.title")
-                query.join("doc_type t", "t.id = d.doc_type")
-                query.where("t.name = 'GlossaryTermName'")
-                query.where(query.Condition("d.title", f"{fragment}%", "LIKE"))
-                rows = query.execute(self.cursor).fetchall()
-                if not rows:
-                    self.bail("No matching documents")
-                for id, title in rows:
-                    self._names.append((id, f"CDR{id:010d}: {title}"))
-        return self._names
+        if self.fields.getvalue("id"):
+            return None
+        names = []
+        if self.name and self.types:
+            fields = "d.id", "d.title"
+            query = self.Query("document d", *fields).order("d.title")
+            query.join("doc_type t", "t.id = d.doc_type")
+            query.where("t.name = 'GlossaryTermName'")
+            query.where(query.Condition("d.title", f"{self.name}%", "LIKE"))
+            rows = query.execute(self.cursor).fetchall()
+            for id, title in rows:
+                names.append((id, f"CDR{id:010d}: {title}"))
+            if not names:
+                message = f"No names found starting with {self.name!r}."
+                self.alerts.append(dict(message=message, types="warning"))
+        return names
 
-    @property
+    @cached_property
     def opts(self):
         """Options for the batch job constructor."""
 
@@ -189,19 +210,25 @@ class Control(Controller):
             command=self.LONG_REPORTS,
         )
 
-    @property
+    @cached_property
+    def same_window(self):
+        """Only create one new browser tab."""
+        return [self.SUBMIT] if self.request else []
+
+    @cached_property
     def types(self):
         """Which type(s) of linking summaries should we look for?"""
         return self.fields.getlist("types")
 
-    @property
+    @cached_property
+    def suppress_sidenav(self):
+        """Use the full grid container width for the second form."""
+        return True if self.email and self.types and self.names else False
+
+    @cached_property
     def user(self):
         """Object representing the currently logged-on CDR user."""
-
-        if not hasattr(self, "_user"):
-            opts = dict(id=self.session.user_id)
-            self._user = self.session.User(self.session, **opts)
-        return self._user
+        return self.session.User(self.session, id=self.session.user_id)
 
 
 if __name__ == "__main__":

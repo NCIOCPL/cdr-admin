@@ -8,8 +8,9 @@ information about the selected document's versions and display it.
 """
 
 from collections import defaultdict
+from functools import cached_property
 from cdrapi.docs import Doc
-from cdrcgi import Controller, DOCID
+from cdrcgi import Controller
 
 
 class Control(Controller):
@@ -20,11 +21,11 @@ class Control(Controller):
     def build_tables(self):
         """Pass on the work to the `Document` object."""
 
-        if self.document:
-            return self.document.tables
-        self.bail("Document ID or title must be specified")
+        if not self.doc_id:
+            self.show_form()
+        return self.document.tables
 
-    def populate_form(self, page, titles=None):
+    def populate_form(self, page):
         """Show one of two forms, or jump to report, depending.
 
         Pass:
@@ -32,9 +33,10 @@ class Control(Controller):
             titles - sequence of documents to choose from
         """
 
-        if self.document:
+        if self.doc_id:
             self.show_report()
-        elif titles:
+        elif self.titles:
+            titles = self.titles
             legend = "Choose Document"
             if len(titles) > 500:
                 legend += " (First 500 Shown)"
@@ -51,54 +53,63 @@ class Control(Controller):
                     checked=checked,
                     tooltip=tooltip,
                 )
-                fieldset.append(page.radio_button(DOCID, **opts))
+                fieldset.append(page.radio_button(self.DOCID, **opts))
                 checked = False
             page.form.append(fieldset)
-            page.add_css("fieldset { width: 800px; }")
         else:
             fieldset = page.fieldset("Specify Document ID or Title")
-            fieldset.append(page.text_field(DOCID, label="Doc ID"))
+            fieldset.append(page.text_field(self.DOCID, label="Doc ID"))
             fieldset.append(page.text_field("DocTitle", label="Doc Title"))
             page.form.append(fieldset)
 
-    @property
+    def show_report(self):
+        """Override to add some styling to the version table."""
+
+        elapsed = self.report.page.html.get_element_by_id("elapsed", None)
+        if elapsed is not None:
+            elapsed.text = str(self.elapsed)
+        self.report.page.add_css("#version-table td { vertical-align: top; }")
+        self.report.send(self.format)
+
+    @cached_property
+    def doc_id(self):
+        """Integer for CDR ID of selected document."""
+
+        doc_id = self.fields.getvalue(self.DOCID)
+        if doc_id:
+            try:
+                return Doc.extract_id(doc_id)
+            except Exception:
+                self.bail("Not a valid document ID")
+        elif self.titles and len(self.titles) == 1:
+            return self.titles[0][0]
+        return None
+
+    @cached_property
     def document(self):
         """`Document` object for the subject of the report."""
+        return Document(self, self.doc_id)
 
-        if not hasattr(self, "_document"):
-            self._document = None
-            doc_id = self.fields.getvalue(DOCID)
-            if doc_id:
-                try:
-                    int_id = Doc.extract_id(doc_id)
-                    self._document = Document(self, int_id)
-                except Exception:
-                    self.bail("Not a valid document ID")
-            else:
-                fragment = self.fields.getvalue("DocTitle", "").strip()
-                if fragment:
-                    fragment = f"{fragment}%"
-                    fields = "d.id", "d.title", "t.name"
-                    query = self.Query("document d", *fields).order(2)
-                    query.join("doc_type t", "t.id = d.doc_type")
-                    query.where(query.Condition("title", fragment, "LIKE"))
-                    rows = query.execute(self.cursor).fetchall()
-                    if not rows:
-                        self.bail("No matching documents found")
-                    elif len(rows) > 1:
-                        self.populate_form(self.form_page, rows)
-                        self.form_page.send()
-                    else:
-                        self._document = Document(self, rows[0][0])
-        return self._document
+    @cached_property
+    def titles(self):
+        """Document titles matching title fragment."""
 
-    @property
+        if self.fragment:
+            fragment = f"{self.fragment}%"
+            fields = "d.id", "d.title", "t.name"
+            query = self.Query("document d", *fields).order(2)
+            query.join("doc_type t", "t.id = d.doc_type")
+            query.where(query.Condition("title", fragment, "LIKE"))
+            rows = query.execute(self.cursor).fetchall()
+            if not rows:
+                self.bail("No matching documents found.")
+            return rows
+        return None
+
+    @cached_property
     def fragment(self):
         """Title fragment for selecting a matching document."""
-
-        if not hasattr(self, "_fragment"):
-            self._fragment = self.fields.getvalue("DocTitle", "").strip()
-        return self._fragment
+        return self.fields.getvalue("DocTitle", "").strip()
 
     @property
     def method(self):
@@ -106,15 +117,14 @@ class Control(Controller):
         return "GET"
 
     @property
-    def subtitle(self):
-        """What we display below the main banner."""
+    def same_window(self):
+        """Decide when to avoid opening a new browser tab."""
+        return [self.SUBMIT] if self.fragment or self.doc_id else []
 
-        if not hasattr(self, "_subtitle"):
-            if not self.document and self.fragment:
-                self._subtitle = "Multiple matching documents found"
-            else:
-                self._subtitle = self.SUBTITLE
-        return self._subtitle
+    @cached_property
+    def suppress_sidenav(self):
+        """Don't show the left navigation column on followup pages."""
+        return True if self.doc_id or self.fragment else False
 
 
 class Document:
@@ -142,12 +152,12 @@ class Document:
 
         if not hasattr(self, "_columns"):
             self._columns = (
-                self.__control.Reporter.Column("Version"),
+                self.__control.Reporter.Column("Ver"),
                 self.__control.Reporter.Column("Comment"),
                 self.__control.Reporter.Column("Date"),
                 self.__control.Reporter.Column("User"),
-                self.__control.Reporter.Column("Validity"),
-                self.__control.Reporter.Column("Publishable?"),
+                self.__control.Reporter.Column("Val"),
+                self.__control.Reporter.Column("Pub?"),
                 self.__control.Reporter.Column("Publication Date(s)"),
             )
         return self._columns
@@ -378,7 +388,7 @@ class Document:
 
         if not hasattr(self, "_version_table"):
             rows = [version.row for version in self.versions]
-            opts = dict(columns=self.columns)
+            opts = dict(columns=self.columns, id="version-table")
             self._version_table = self.control.Reporter.Table(rows, **opts)
         return self._version_table
 
@@ -519,12 +529,12 @@ class Document:
 
             Cell = self.__document.control.Reporter.Cell
             return [
-                Cell(self.num, classes="center"),
+                Cell(self.num, center=True),
                 self.__row.comment or "",
-                str(self.__row.dt)[:16],
+                Cell(str(self.__row.dt)[:16], classes="nowrap"),
                 self.__row.fullname or self.__row.name,
-                Cell(self.__row.val_status, classes="center"),
-                Cell(self.__row.publishable, classes="center"),
+                Cell(self.__row.val_status, center=True),
+                Cell(self.__row.publishable, center=True),
                 Cell(self.publication_events, classes="nowrap"),
             ]
 

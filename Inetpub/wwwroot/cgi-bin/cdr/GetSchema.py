@@ -12,6 +12,7 @@ class Control(Controller):
     """Script logic."""
 
     SUBMIT = None
+    SUBTITLE = "Show Schema"
 
     def run(self):
         """Override router."""
@@ -32,15 +33,20 @@ class Control(Controller):
 
         page.body.set("class", "admin-menu")
         fieldset = page.fieldset("Schemas")
-        fieldset.set("class", "flexlinks")
+        fieldset.set("id", "schema-list")
         ul = page.B.UL()
         script = self.script
         for schema in self.schemas:
             link = page.menu_link(script, schema.name, id=schema.id)
+            link.set("target", "_blank")
             ul.append(page.B.LI(link))
         fieldset.append(ul)
         page.form.append(fieldset)
-        page.add_css(".flexlinks ul { height: 400px; }")
+        page.add_css("""
+#schema-list ul { list-style-type: none; column-width: 15rem; }
+#schema-list a { text-decoration: none; }
+""")
+        # page.add_css(".flexlinks ul { height: 400px; }")
 
     @property
     def doc(self):

@@ -7,7 +7,6 @@ from cdrcgi import Controller
 from functools import cached_property
 from pathlib import Path
 from sys import stdout
-from cdr import run_command
 
 
 class Control(Controller):
@@ -51,11 +50,6 @@ class Control(Controller):
                 stdout.buffer.write(file_bytes)
 
     @cached_property
-    def buttons(self):
-        """Customize the action buttons on the banner bar."""
-        return self.SUBMIT, self.DEVMENU, self.ADMINMENU, self.LOG_OUT
-
-    @cached_property
     def client_files(self):
         """Location where the client files are stored."""
 
@@ -73,7 +67,7 @@ class Control(Controller):
         paths = [p for p in self.client_files.rglob("*") if p.is_file()]
         paths = [p.relative_to(self.client_files) for p in paths]
         paths = [str(p) for p in paths]
-        return [["", "- Select file -"]] + sorted(paths)
+        return [["", "- Select file -"]] + sorted(paths, key=str.lower)
 
 
 if __name__ == "__main__":

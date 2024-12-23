@@ -3,6 +3,7 @@
 """Show the XML for CDR documents.
 """
 
+from functools import cached_property
 from collections import OrderedDict
 from cdrcgi import Controller
 from cdrapi.docs import Doc, Doctype
@@ -16,8 +17,8 @@ class Control(Controller):
     BY_ID = "id"
     BY_TITLE = "title"
     SELECTION_METHODS = (
-        (BY_ID, "By document ID", True),
-        (BY_TITLE, "By document title", False),
+        (BY_ID, "By document ID"),
+        (BY_TITLE, "By document title"),
     )
     VHELP = (
         "Integer (negative for recent versions: -1 is last version saved; "
@@ -47,10 +48,7 @@ class Control(Controller):
             self.show_report()
         elif self.titles:
             self.logger.info("showing %d titles", len(self.titles))
-            version = self.fields.getvalue("version", "").strip()
             page.form.append(page.hidden_field("selection_method", self.BY_ID))
-            page.form.append(page.hidden_field("version", version))
-            page.form.append(page.hidden_field("vtype", self.version_type))
             fieldset = page.fieldset("Choose Document")
             for title in self.titles:
                 opts = dict(value=title.value, label=title.label)
@@ -59,146 +57,146 @@ class Control(Controller):
                 fieldset.append(page.radio_button("doc-id", **opts))
             page.form.append(fieldset)
             page.add_css("fieldset { width: 1024px; }")
-            self.new_tab_on_submit(page)
         else:
             fieldset = page.fieldset("Selection Method")
-            for value, label, checked in self.SELECTION_METHODS:
+            for value, label in self.SELECTION_METHODS:
+                checked = value == self.selection_method
                 opts = dict(value=value, label=label, checked=checked)
                 fieldset.append(page.radio_button("selection_method", **opts))
             page.form.append(fieldset)
             fieldset = page.fieldset("Document ID", id="by-id-block")
-            fieldset.append(page.text_field("doc-id", label="CDR ID"))
+            opts = dict(label="CDR ID", value=self.id)
+            fieldset.append(page.text_field("doc-id", **opts))
             page.form.append(fieldset)
             fieldset = page.fieldset("Title Or Title Pattern")
             fieldset.set("id", "by-title-block")
             fieldset.append(page.B.P(self.TITLE_HELP))
-            fieldset.append(page.text_field("title"))
+            fieldset.append(page.text_field("title", value=self.fragment))
             opts = dict(label="Doc Type", options=self.doctypes, multiple=True)
             fieldset.append(page.select("doctype", **opts))
             page.form.append(fieldset)
-            fieldset = page.fieldset("Document Version")
-            checked = True
-            for value, label in self.VERSION_TYPES.items():
-                opts = dict(value=value, label=label, checked=checked)
-                fieldset.append(page.radio_button("vtype", **opts))
-                checked = False
-            page.form.append(fieldset)
-            fieldset = page.fieldset("Version Number")
-            fieldset.set("id", "version-number-block")
-            fieldset.append(page.text_field("version", tooltip=self.VHELP))
-            page.form.append(fieldset)
-            page.head.append(page.B.LINK(href=self.CSS, rel="stylesheet"))
-            page.head.append(page.B.SCRIPT(src=self.SCRIPT))
+        fieldset = page.fieldset("Document Version")
+        for value, label in self.VERSION_TYPES.items():
+            checked = value == self.version_type
+            opts = dict(value=value, label=label, checked=checked)
+            fieldset.append(page.radio_button("vtype", **opts))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Version Number")
+        fieldset.set("id", "version-number-block")
+        opts = dict(tooltip=self.VHELP, value=self.version)
+        fieldset.append(page.text_field("version", **opts))
+        page.form.append(fieldset)
+        page.head.append(page.B.LINK(href=self.CSS, rel="stylesheet"))
+        page.head.append(page.B.SCRIPT(src=self.SCRIPT))
 
     def show_report(self):
         """Display the version of the CDR document requested by the user."""
 
         if not self.xml:
-            if self.selection_method == self.BY_TITLE and self.fragment:
-                if not self.titles:
-                    self.bail("No matching documents found")
-            elif self.id:
-                if self.version_type == "exported":
-                    self.bail(f"CDR{self.id} not published")
-                elif self.version == 0:
-                    self.bail(f"CDR{self.id} not found")
-                elif self.version:
-                    self.bail(f"CDR{self.id} version {self.version} not found")
             self.show_form()
         else:
             self.send_page(self.xml, text_type="xml")
 
-    @property
+    @cached_property
     def doctype(self):
         """Document type string(s) selected by the user to narrow search."""
 
-        if not hasattr(self, "_doctype"):
-            self._doctype = self.fields.getlist("doctype")
-            if set(self._doctype) - set(self.doctypes):
-                self.bail()
-        return self._doctype
+        doctype = self.fields.getlist("doctype")
+        if set(doctype) - set(self.doctypes):
+            self.bail()
+        return doctype
 
-    @property
+    @cached_property
     def doctypes(self):
         """Valid value strings for available CDR document types."""
+        return Doctype.list_doc_types(self.session)
 
-        if not hasattr(self, "_doctypes"):
-            self._doctypes = Doctype.list_doc_types(self.session)
-        return self._doctypes
-
-    @property
+    @cached_property
     def fragment(self):
         """String for matching CDR document by title substring."""
 
-        if not hasattr(self, "_fragment"):
-            self._fragment = self.fields.getvalue("title", "").strip()
-        return self._fragment
+        if self.selection_method != self.BY_TITLE:
+            return ""
+        fragment = self.fields.getvalue("title", "").strip()
+        if self.request and not fragment:
+            message = "Required title fragment not provided."
+            self.alerts.append(dict(message=message, type="error"))
+        return fragment
 
-    @property
+    @cached_property
     def id(self):
         """Integer for the document to be displayed."""
 
-        if not hasattr(self, "_id"):
-            self._id = self.fields.getvalue("doc-id")
-            if self._id:
-                try:
-                    self._id = Doc.extract_id(self._id)
-                except Exception:
-                    self.bail("invalid document ID format")
-            elif len(self.titles) == 1:
-                self._id = self.titles[0].value
-        return self._id
+        if self.selection_method != self.BY_ID:
+            if len(self.titles) == 1:
+                return self.titles[0].value
+            return None
+        id = self.fields.getvalue("doc-id", "").strip()
+        if not id:
+            if self.request:
+                message = "Required ID not provided."
+                self.alerts.append(dict(message=message, type="error"))
+            return None
+        try:
+            return Doc.extract_id(id)
+        except Exception:
+            message = "Invalid document ID format."
+            self.alerts.append(dict(message=message, type="error"))
+            return None
 
-    @property
-    def method(self):
-        """Carry the parameters in the URL."""
-        return "GET"
+    @cached_property
+    def same_window(self):
+        """Should we avoid opening a new browser tab?"""
+        return [self.SUBMIT] if self.request else []
 
-    @property
+    @cached_property
     def selection_method(self):
         """How the user wants to select the document to show."""
 
-        if not hasattr(self, "_selection_method"):
-            methods = [method[0] for method in self.SELECTION_METHODS]
-            method = self.fields.getvalue("selection_method", "id")
-            if method not in methods:
-                self.bail()
-            else:
-                self._selection_method = method
-        return self._selection_method
+        method = self.fields.getvalue("selection_method", self.BY_ID)
+        if method not in {values[0] for values in self.SELECTION_METHODS}:
+            self.bail()
+        return method
 
-    @property
+    @cached_property
+    def suppress_sidenav(self):
+        """Once we've moved from the original form, use more space."""
+        return True if self.request else False
+
+    @cached_property
     def titles(self):
         """Find documents matching the specified title fragment."""
 
-        if not hasattr(self, "_titles"):
-            self._titles = []
-            if self.fragment and self.selection_method == self.BY_TITLE:
-                fragment = self.fragment
-                query = self.Query("document d", "d.id", "d.title", "t.name")
-                query.join("doc_type t", "t.id = d.doc_type")
-                query.where(query.Condition("d.title", fragment, "LIKE"))
-                if self.doctype:
-                    query.where(query.Condition("t.name", self.doctype, "IN"))
-                    types = ", ".join(sorted(self.doctype))
-                    self.logger.info("matching %r in %s", fragment, types)
-                else:
-                    self.logger.info("matching title fragment %r", fragment)
-                rows = query.order("d.id").execute(self.cursor).fetchall()
+        titles = []
+        if self.fragment and self.selection_method == self.BY_TITLE:
+            fragment = self.fragment
+            query = self.Query("document d", "d.id", "d.title", "t.name")
+            query.join("doc_type t", "t.id = d.doc_type")
+            query.where(query.Condition("d.title", fragment, "LIKE"))
+            if self.doctype:
+                query.where(query.Condition("t.name", self.doctype, "IN"))
+                types = ", ".join(sorted(self.doctype))
+                self.logger.info("matching %r in %s", fragment, types)
+            else:
+                self.logger.info("matching title fragment %r", fragment)
+            rows = query.order("d.id").execute(self.cursor).fetchall()
 
-                class Doc:
-                    def __init__(self, row):
-                        self.value = row.id
-                        self.tooltip = None
-                        self.label = f"CDR{row.id:d} [{row.name}] {row.title}"
-                        if len(self.label) > 125:
-                            self.tooltip = self.label
-                            self.label = self.label[:125] + "..."
-                for row in rows:
-                    self._titles.append(Doc(row))
-        return self._titles
+            class Doc:
+                def __init__(self, row):
+                    self.value = row.id
+                    self.tooltip = None
+                    self.label = f"CDR{row.id:d} [{row.name}] {row.title}"
+                    if len(self.label) > 125:
+                        self.tooltip = self.label
+                        self.label = self.label[:125] + "..."
+            for row in rows:
+                titles.append(Doc(row))
+            if not titles:
+                message = "No matching titles found."
+                self.alerts.append(dict(message=message, type="warning"))
+        return titles
 
-    @property
+    @cached_property
     def version(self):
         """Integer version number for the user's request.
 
@@ -211,68 +209,99 @@ class Control(Controller):
         unlikely to know the numbers of the versions).
         """
 
-        if not hasattr(self, "_version"):
-            self._version = None
-            if self.id:
-                if self.version_type == "cwd":
-                    self._version = 0
-                else:
-                    doc = Doc(self.session, id=self.id)
-                if self.version_type == "latest":
-                    self._version = doc.last_version
-                elif self.version_type == "lastpub":
-                    self._version = doc.last_publishable_version
-                elif self.version_type == "num":
-                    version = self.fields.getvalue("version", "").strip()
-                    try:
-                        self._version = int(version)
-                    except Exception:
-                        self.bail("invalid version")
-                    if self._version < 0:
-                        back = abs(self._version)
-                        versions = doc.list_versions(limit=back)
-                        if len(versions) == back:
-                            self._version = versions[-1][0]
-        return self._version
+        if not self.id:
+            return None
+        if self.version_type == "cwd":
+            return 0
+        doc = Doc(self.session, id=self.id)
+        if self.version_type == "latest":
+            last_version = doc.last_version
+            if not last_version:
+                self.alerts.append(dict(
+                    message=f"CDR{self.id} has no versions.",
+                    type="warning",
+                ))
+            return last_version
+        if self.version_type == "lastpub":
+            last_publishable_version = doc.last_publishable_version
+            if not last_publishable_version:
+                self.alerts.append(dict(
+                    message=f"CDR{self.id} has no publishable versions.",
+                    type="warning",
+                ))
+            return last_publishable_version
+        elif self.version_type == "num":
+            version = self.fields.getvalue("version", "").strip()
+            try:
+                version = int(version)
+            except Exception:
+                self.alerts.append(dict(
+                    message="Version must be a (possibly positive) integer.",
+                    type="error",
+                ))
+                return None
+            versions = [values[0] for values in doc.list_versions()]
+            versions = list(reversed(versions))
+            count = len(versions)
+            if version < 0:
+                if abs(version) > count:
+                    self.alerts.append(dict(
+                        message=f"CDR{self.id} has only {count} versions.",
+                        type="warning",
+                    ))
+                    return None
+                return versions[version]
+            if version not in versions:
+                self.alerts.append(dict(
+                    message=f"CDR{self.id} has only {count} versions.",
+                    type="warning",
+                ))
+                return None
+            return version
+        return None
 
-    @property
+    @cached_property
     def version_type(self):
         """How the user wants to identify the selected version."""
 
-        if not hasattr(self, "_version_type"):
-            self._version_type = self.fields.getvalue("vtype", "cwd")
-            if self._version_type not in self.VERSION_TYPES:
-                self.bail()
-        return self._version_type
+        type = self.fields.getvalue("vtype", "cwd")
+        return type if type in self.VERSION_TYPES else self.bail()
 
-    @property
+    @cached_property
     def xml(self):
         """What we came to display."""
 
-        if not hasattr(self, "_xml"):
-            self._xml = what = None
-            if self.id:
-                if self.version_type == "exported":
-                    query = self.Query("pub_proc_cg", "xml")
-                    query.where(query.Condition("id", self.id))
-                    row = query.execute(self.cursor).fetchone()
-                    if row:
-                        self._xml = row.xml
-                        what = "exported XML"
-                elif self.version is not None:
-                    doc = Doc(self.session, id=self.id, version=self.version)
-                    try:
-                        self._xml = doc.xml
-                        if doc.version:
-                            what = f"version {doc.version:d}"
-                        else:
-                            what = "current working document"
-                    except Exception:
-                        message = "fetching XML for CDR%dV%d"
-                        self.logger.exception(message, self.id, self.version)
-                if what:
-                    self.logger.info("showing %s for CDR%d", what, self.id)
-        return self._xml
+        if not self.id:
+            return None
+        what = None
+        if self.version_type == "exported":
+            query = self.Query("pub_proc_cg", "xml")
+            query.where(query.Condition("id", self.id))
+            row = query.execute(self.cursor).fetchone()
+            if row:
+                self.logger.info("showing exported XML for CDR%d", self.id)
+                return row.xml
+            self.alerts.append(dict(
+                message=f"CDR{self.id} is not published.",
+                type="warning",
+            ))
+            return None
+        if self.version is None:
+            return None
+        doc = Doc(self.session, id=self.id, version=self.version)
+        try:
+            if doc.version:
+                what = f"version {doc.version:d}"
+            else:
+                what = "current working document"
+            self.logger.info("showing %s for CDR%d", what, self.id)
+            return doc.xml
+        except Exception as e:
+            id_version = f"CDR{self.id}V{self.version}"
+            message = f"Failure fetching XML for {id_version}: {e}"
+            self.alerts.append(dict(message=message, type="error"))
+            self.logger.exception(message)
+            return None
 
 
 if __name__ == "__main__":

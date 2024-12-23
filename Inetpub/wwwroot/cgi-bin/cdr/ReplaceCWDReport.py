@@ -3,7 +3,8 @@
 """Show documents for which the CWD was replaced by an earlier version.
 """
 
-from cdrcgi import Controller
+from functools import cached_property
+from cdrcgi import Controller, BasicWebPage
 
 
 class Control(Controller):
@@ -15,15 +16,15 @@ class Control(Controller):
         ("Date/time", "When did the replacement occur?"),
         ("DocID", "CDR ID of the affected document"),
         ("Doc type", "Document type for the affected document"),
-        ("User", "User ID of the user promoting the version"),
-        ("LV", "Version number of last version at time of promotion"),
+        ("User", "ID of the user promoting the version"),
+        ("LV", "Version number of last version after promotion"),
         ("PV",
          "Version number of last publishable version at that time, -1 = None"),
         ("Chg", "'Y' = CWD was different from last version, else 'N'"),
         ("V#", "Version number promoted to become CWD"),
         ("V", "Was new CWD also versioned? (Y/N)"),
         ("P", "Was new CWD also versioned as publishable? (Y/N)"),
-        ("Comment", "System generated comment ':' user entered comment"),
+        ("Comment", "System-generated comment ':' user-entered comment"),
     )
     INSTRUCTIONS = (
         "Retrieve information on documents for which someone has replaced "
@@ -51,18 +52,22 @@ class Control(Controller):
         fieldset.append(page.text_field("id", label="CDR ID"))
         page.form.append(fieldset)
 
-    def build_tables(self):
-        """Assemble the report table."""
+    def show_report(self):
+        """Overridden because the table is too wide for the standard layout."""
 
-        opts = dict(columns=self.columns, caption=self.caption)
-        return self.Reporter.Table(self.rows, **opts)
+        report = BasicWebPage()
+        report.wrapper.append(report.B.H1(self.subtitle))
+        report.wrapper.append(self.table.node)
+        report.wrapper.append(self.footer)
+        report.page.head.append(report.B.STYLE("table { width: 100%; }"))
+        report.send()
 
-    @property
+    @cached_property
     def caption(self):
         """String to be display directly above the report table."""
-        return f"Replaced Documents ({len(self.rows)})"
+        return f"Document Replacements ({len(self.rows)})"
 
-    @property
+    @cached_property
     def columns(self):
         """Column headers for the report."""
 
@@ -71,35 +76,41 @@ class Control(Controller):
             columns.append(self.Reporter.Column(label, tooltip=tooltip))
         return columns
 
-    @property
+    @cached_property
     def doctype(self):
         """Optional document type for filtering the report."""
         return self.fields.getvalue("doctype", "").lower()
 
-    @property
+    @cached_property
     def id(self):
         """Optional document ID for filtering the report."""
         return self.fields.getvalue("id", "").lower()
 
-    @property
+    @cached_property
     def rows(self):
         """Values for the report's table."""
 
-        if not hasattr(self, "_rows"):
-            self._rows = []
-            with open(f"{self.session.tier.basedir}/Log/{self.SOURCE}") as fp:
-                for line in fp:
-                    record = Record(self, line)
-                    if record.in_scope:
-                        self._rows.append(record.row)
-        return self._rows
+        rows = []
+        with open(f"{self.session.tier.basedir}/Log/{self.SOURCE}") as fp:
+            for line in fp:
+                record = Record(self, line)
+                if record.in_scope:
+                    rows.append(record.row)
+        return rows
 
-    @property
+    @cached_property
     def start(self):
         """Optional cutoff for the earliest replacements to include."""
-        return self.fields.getvalue("start")
+        return str(self.parse_date(self.fields.getvalue("start")) or "")
 
-    @property
+    @cached_property
+    def table(self):
+        """Assemble the table for the report."""
+
+        opts = dict(columns=self.columns, caption=self.caption)
+        return self.Reporter.Table(self.rows, **opts)
+
+    @cached_property
     def user(self):
         """Optional user for filtering the report."""
         return self.fields.getvalue("user", "").lower()
@@ -118,39 +129,34 @@ class Record:
             line - string for the line from the log file we're parsing
         """
 
-        self.__control = control
-        self.__fields = line.strip().split("\t")
+        self.control = control
+        self.fields = line.strip().split("\t")
 
-    @property
-    def control(self):
-        """Access to the report settings."""
-        return self.__control
-
-    @property
+    @cached_property
     def date(self):
         """When the replacement occurred."""
-        return self.__fields[0]
+        return self.fields[0]
 
-    @property
+    @cached_property
     def id(self):
         """CDR ID for the document."""
-        return self.__fields[1]
+        return self.fields[1]
 
-    @property
+    @cached_property
     def doctype(self):
         """Normalized string for the document's type."""
-        return self.__fields[2].lower()
+        return self.fields[2].lower()
 
-    @property
+    @cached_property
     def user(self):
         """Normalized account name for the user."""
-        return self.__fields[3].lower()
+        return self.fields[3].lower()
 
-    @property
+    @cached_property
     def in_scope(self):
         """Boolean: should this record be included in the report?"""
 
-        if len(self.__fields) != len(self.TIPS):
+        if len(self.fields) != len(self.TIPS):
             return False
         if self.control.start and self.date < self.control.start:
             return False
@@ -162,14 +168,14 @@ class Record:
             return False
         return True
 
-    @property
+    @cached_property
     def row(self):
         """Values for the report table."""
 
         values = []
-        for i, field in enumerate(self.__fields):
+        for i, field in enumerate(self.fields):
             opts = dict(tooltip=self.TIPS[i])
-            cell = self.__control.Reporter.Cell(field.strip(), **opts)
+            cell = self.control.Reporter.Cell(field.strip(), **opts)
             values.append(cell)
         return values
 

@@ -7,6 +7,7 @@ track of the development and processing statuses of the Media
 documents."
 """
 
+from functools import cached_property
 from cdrcgi import Controller
 from cdrapi.docs import Doc
 
@@ -68,10 +69,10 @@ class Control(Controller):
             self.Reporter.Column("Comments", width="300px"),
         )
 
-    @property
+    @cached_property
     def end(self):
         """Optional conclusion of the report's date range."""
-        return self.fields.getvalue("end")
+        return self.parse_date(self.fields.getvalue("end"))
 
     @property
     def format(self):
@@ -98,10 +99,10 @@ class Control(Controller):
         docs = [MediaDoc(self, row.id) for row in rows]
         return [doc.row for doc in sorted(docs)]
 
-    @property
+    @cached_property
     def start(self):
         """Optional beginning of the report's date range."""
-        return self.fields.getvalue("start")
+        return self.parse_date(self.fields.getvalue("start"))
 
 
 class MediaDoc:

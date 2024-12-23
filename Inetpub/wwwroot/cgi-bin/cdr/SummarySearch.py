@@ -3,6 +3,7 @@
 """Search for CDR Summary documents.
 """
 
+from functools import cached_property
 from cdrcgi import AdvancedSearch
 
 
@@ -53,7 +54,7 @@ class SummarySearch(AdvancedSearch):
             field = self.QueryField(getattr(self, name), paths)
             self.query_fields.append(field)
 
-    @property
+    @cached_property
     def audiences(self):
         """Valid values for the audience field"""
 
@@ -64,7 +65,7 @@ class SummarySearch(AdvancedSearch):
         rows = query.execute(self.session.cursor).fetchall()
         return [row.value for row in rows]
 
-    @property
+    @cached_property
     def section_types(self):
         """Valid summary section types."""
 
@@ -76,12 +77,12 @@ class SummarySearch(AdvancedSearch):
         rows = query.execute(self.session.cursor).fetchall()
         return [row.value for row in rows]
 
-    @property
+    @cached_property
     def diagnoses(self):
         """Picklist values for diagnosis field."""
         return self.__linked_docs("diagnosis")
 
-    @property
+    @cached_property
     def topics(self):
         """Picklist values for topic field."""
         return self.__linked_docs("topic")

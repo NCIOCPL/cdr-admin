@@ -3,7 +3,7 @@
 """Generate hierarchical report of terminology under Disease/Diagnosis.
 """
 
-from cdrcgi import Controller
+from cdrcgi import Controller, HTMLPage
 
 
 class Control(Controller):
@@ -11,39 +11,71 @@ class Control(Controller):
     SUBTITLE = "CDR Cancer Diagnosis Hierarchy Report"
     LOGNAME = "TerminologyReports"
     CSS = (
-        "ul.t { width: 600px; margin: 15px auto; }",
-        "li { list-style: none; font-size: 14px; }",
-        "li.u { color: green; font-weight: bold; font-family: serif; }",
-        "li.i { font-variant: small-caps; }",
-        "li.l { color: blue; font-variant: normal; }",
-        "li.a { color: #ff2222; font-size: 12px; font-style: italic; }",
-        "li.a { font-variant: normal; }",
+        "ul.t li { list-style: none; }",
+        "li.u{ color: green; }",
+        "li.l { color: blue; }",
+        "li.a { color: #ff2222; font-style: italic; }",
+        ".usa-list li { max-width: none; }",
+    )
+    FORM_CSS = (
+        ".green { color: green; }",
+        ".blue { color: blue; }",
+        ".red-italics { color: #ff2222; font-style: italic; }",
+    )
+    FLAVORS = (
+        ("full", "Full (includes alternate names)", True),
+        ("short", "Short (shows only preferred names for the terms)", False),
+    )
+    INSTRUCTIONS = (
+        "This report represents the hierarchy for the cancer diagnosis terms "
+        "as nested lists, using color and indentation to indicate "
+        "characteristics of the various terms. Terms at the top of the "
+        "hierarchy (those which have no parent) and their direct descendants "
+        "are displayed in ",
+        HTMLPage.B.SPAN("green", HTMLPage.B.CLASS("green")),
+        ", while terms lower in the hierarchy are shown in ",
+        HTMLPage.B.SPAN("blue", HTMLPage.B.CLASS("blue")),
+        ". For the full report, aliases (alternate names) are displayed in ",
+        HTMLPage.B.SPAN("italicized red", HTMLPage.B.CLASS("red-italics")),
+        ", and are prefixed with a lowercase x."
     )
 
-    def show_form(self):
-        """Bypass the form, which isn't needed for this report."""
-        self.show_report()
+    def populate_form(self, page):
+        """Bypass the form unless running from the menus.
+
+        Required positional argument:
+          page - HTMLPage instance
+        """
+
+        if self.fields.getvalue("prompt") != "yes":
+            self.show_report()
+        fieldset = page.fieldset("Instructions")
+        fieldset.append(page.B.P(*self.INSTRUCTIONS))
+        page.form.append(fieldset)
+        fieldset = page.fieldset("Select Report Option")
+        for value, label, checked in self.FLAVORS:
+            opts = dict(value=value, label=label, checked=checked)
+            fieldset.append(page.radio_button("flavor", **opts))
+        page.form.append(fieldset)
+        page.add_css("\n".join(self.FORM_CSS))
 
     def show_report(self):
         """Override base class method, because we're not using Report class."""
 
-        buttons = (
-            self.HTMLPage.button(self.SUBMENU),
-            self.HTMLPage.button(self.ADMINMENU),
-            self.HTMLPage.button(self.LOG_OUT),
-        )
         opts = dict(
-            buttons=buttons,
             session=self.session,
             action=self.script,
             banner=self.title,
             footer=self.footer,
             subtitle=self.subtitle,
+            control=self,
+            suppress_sidenav=True,
         )
         top = self.tree.terms[self.tree.top].node
         report = self.HTMLPage(self.title, **opts)
-        wrapper = report.B.UL(top, self.footer, report.B.CLASS("t"))
-        report.body.append(wrapper)
+        classes = "t usa-list"
+        wrapper = report.B.UL(top, self.footer, report.B.CLASS(classes))
+        report.form.append(wrapper)
         report.body.set("class", "report")
         report.add_css("\n".join(self.CSS))
         report.send()
@@ -62,6 +94,7 @@ class Control(Controller):
                 self._tree = Tree(self)
             except Exception:
                 self.logger.exception("Failure building tree")
+                self.bail("Failure building tree")
         return self._tree
 
 
@@ -233,7 +266,7 @@ class Tree:
             B = self.tree.control.HTMLPage.B
             node = B.LI(self.name, B.CLASS(self.level))
             if self.children or self.aliases:
-                ul = B.UL()
+                ul = B.UL(B.CLASS("usa-list"))
                 for alias in sorted(self.aliases, key=str.lower):
                     ul.append(B.LI(f"x {alias}", B.CLASS("a")))
                 for child in sorted(self.children):

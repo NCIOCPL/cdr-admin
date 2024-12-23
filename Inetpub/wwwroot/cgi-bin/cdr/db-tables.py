@@ -60,14 +60,8 @@ fieldset dd.col { color: blue; font-size: 10pt; font-style: normal; }""")
 
     @property
     def buttons(self):
-        """Override the default set of buttons to add the dev menu."""
-
-        return (
-            self.REPORTS_MENU,
-            self.DEVMENU,
-            self.ADMINMENU,
-            self.LOG_OUT,
-        )
+        """No buttons required."""
+        return []
 
 
 class Database:

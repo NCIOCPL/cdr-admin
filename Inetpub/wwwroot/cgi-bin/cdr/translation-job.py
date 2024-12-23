@@ -8,11 +8,12 @@ JIRA::OCECDR-4504 - make the status date field read-only
 JIRA::OCECDR-4664 - automatically update status date
 """
 
+from functools import cached_property
 from datetime import date
 from operator import itemgetter
 from lxml import etree
 from cdr import EmailMessage, EmailAttachment, isProdHost, getEmailList
-from cdrcgi import Controller, navigateTo
+from cdrcgi import Controller
 from cdrapi import db
 
 
@@ -29,9 +30,7 @@ class Control(Controller):
     LOGNAME = "translation-workflow"
     MEDIA = "Media"
     GLOSSARY = "Glossary"
-    REPORTS_MENU = SUBMENU = "Reports"
-    ADMINMENU = "Admin"
-    SUBTITLE = "Translation Job"
+    SUBTITLE = "Summary Translation Job"
     ACTION = "MANAGE TRANSLATION QUEUE"
     INSERT = "INSERT INTO {} ({}) VALUES ({})"
     UPDATE = "UPDATE {} SET {} WHERE {} = ?"
@@ -42,67 +41,25 @@ class Control(Controller):
         " attached, check the box next to the file name. More files can"
         " be added in the field set below."
     )
+    DELETE_INSTRUCTIONS = "Use Checkbox to Delete an Attachment"
 
-    def run(self):
+    def delete_job(self):
         """
-        Override the base class method to handle additional buttons.
-        """
+        Drop the table row for the job."""
 
-        if not self.session or not self.session.can_do(self.ACTION):
-            self.bail("not authorized")
-        if self.request == self.JOBS:
-            navigateTo("translation-jobs.py", self.session.name)
-        elif self.request == self.DELETE:
-            self.delete_job()
-        elif self.request == self.GLOSSARY:
-            navigateTo("glossary-translation-jobs.py", self.session.name)
-        elif self.request == self.MEDIA:
-            navigateTo("media-translation-jobs.py", self.session.name)
-        Controller.run(self)
-
-    def show_report(self):
-        """
-        Override the base class because we're storing data, not
-        creating a report. Modified to also populate the history
-        table.
-        """
-
-        if self.have_required_values:
-            self.process_attachments()
-            if self.job.changed:
-                conn = db.connect()
-                cursor = conn.cursor()
-                params = [getattr(self, name) for name in Job.FIELDS]
-                params.append(getattr(self, Job.KEY))
-                self.logger.info("storing translation job state %s", params)
-                placeholders = ", ".join(["?"] * len(params))
-                cols = ", ".join(Job.FIELDS + (Job.KEY,))
-                strings = Job.HISTORY, cols, placeholders
-                cursor.execute(self.INSERT.format(*strings), params)
-                if self.job.new:
-                    strings = (Job.TABLE, cols, placeholders)
-                    query = self.INSERT.format(*strings)
-                else:
-                    cols = [f"{name} = ?" for name in Job.FIELDS]
-                    strings = (Job.TABLE, ", ".join(cols), Job.KEY)
-                    query = self.UPDATE.format(*strings)
-                try:
-                    cursor.execute(query, params)
-                    conn.commit()
-                except Exception as e:
-                    if "duplicate key" in str(e).lower():
-                        self.logger.error("duplicate translation job ID")
-                        self.bail("attempt to create duplicate job")
-                    else:
-                        self.logger.error("database failure: %s", e)
-                        self.bail(f"database failure: {e}")
-                self.logger.info("translation job state stored successfully")
-                job = Job(self)
-                if self.alert_needed(job):
-                    self.alert(job)
-            navigateTo("translation-jobs.py", self.session.name)
-        else:
-            self.show_form()
+        query = f"DELETE FROM {Job.TABLE} WHERE english_id = ?"
+        self.cursor.execute(query, self.english_id)
+        query = f"DELETE FROM {Job.ATTACHMENT} WHERE english_id = ?"
+        self.cursor.execute(query, self.english_id)
+        self.conn.commit()
+        self.logger.info("removed translation job for CDR%d", self.english_id)
+        message = (
+            f"Translation job for CDR{self.english_id} successfully removed."
+        )
+        params = dict(message=message)
+        if self.testing:
+            params["testing"] = True
+        self.redirect("translation-jobs.py", **params)
 
     def populate_form(self, page):
         """
@@ -112,6 +69,8 @@ class Control(Controller):
             page - object used to collect the form fields
         """
 
+        if self.testing:
+            page.form.append(page.hidden_field("testing", "True"))
         if self.english_id:
             self.populate_editing_form(page)
         else:
@@ -160,9 +119,14 @@ jQuery(function() {{
         change_type = self.job.change_type or types[0][0]
         state_id = self.job.state_id or states[0][0]
         comments = (self.job.comments or "").replace("\r", "")
+        identification = page.B.DIV(id="doc-identification")
+        for line in self.job.identification:
+            if len(line) > 120:
+                line = f"{line[:120]} ...)"
+            identification.append(page.B.DIV(line))
+        page.main.find(".//h1").addnext(identification)
         action = "Create" if self.job.new else "Edit"
-        legend = f"{action} Translation Job for CDR{self.english_id:d}"
-        fieldset = page.fieldset(legend)
+        fieldset = page.fieldset(f"{action} Translation Job")
         opts = dict(options=types, default=change_type)
         fieldset.append(page.select("change_type", **opts))
         opts = dict(options=users, default=user)
@@ -171,45 +135,35 @@ jQuery(function() {{
         fieldset.append(page.select("status", **opts))
         fieldset.append(page.textarea("comments", value=comments))
         page.form.append(page.hidden_field("english_id", self.english_id))
-        page.form.append(page.hidden_field("nfiles", "1"))
         page.form.append(fieldset)
+        fieldset = page.fieldset("QC Report Attachments")
         if self.attachments:
-            fieldset = page.fieldset("Attached Files")
             fieldset.append(page.B.P(self.QC_REPORT_INSTRUCTIONS))
-            fieldset.append(page.B.P("Delete"))
+            fieldset.append(page.B.P(page.B.STRONG(self.DELETE_INSTRUCTIONS)))
             for id in sorted(self.attachments):
                 opts = dict(label=self.attachments[id], value=id)
                 fieldset.append(page.checkbox(self.DROP, **opts))
-            page.form.append(fieldset)
-        fieldset = page.fieldset("Add QC Report Attachments", id="new-files")
-        opts = dict(label="QC Report", classes="file-field")
-        file = page.file_field("file-1", **opts)
-        opts = {
-            "src": "/images/add.gif",
-            "onclick": "add_file_field()",
-            "class": "clickable",
-            "title": "Add another file",
-        }
-        image = page.B.IMG(**opts)
-        button = page.B.SPAN(image, id="add-file-button")
-        file.append(button)
-        fieldset.append(file)
+        field = page.B.DIV(
+            page.B.LABEL(
+                "Add QC Report Attachments",
+                page.B.CLASS("usa-label"),
+                page.B.FOR("files")
+            ),
+            page.B.INPUT(
+                page.B.CLASS("usa-file-input"),
+                type="file",
+                id="files",
+                name="files",
+                multiple="multiple"
+            )
+        )
+        field.find("input").set("aria-describedby", "files-hint")
+        fieldset.append(field)
         page.form.append(fieldset)
-        page.add_script("""\
-function add_file_field() {
-    var nfiles = jQuery("#new-files .file-field").length + 1;
-    var id = "file-" + nfiles;
-    var field = jQuery("<div>", {class: "labeled-field"});
-    field.append(jQuery("<label>", {for: id, text: "QC Report"}));
-    field.append(jQuery("<input>", {
-        name: id,
-        type: "file",
-        id: id,
-        class: "file-field"
-    }));
-    jQuery("#new-files").append(field);
-    jQuery("input[name='nfiles']").val(nfiles);
-}""")
+        page.add_css(
+            "#doc-identification { margin-bottom: 1.5rem; }\n"
+            "#doc-identification div { font-weight: bold; }\n"
+        )
 
     def populate_summary_selection_form(self, page):
         """
@@ -232,211 +186,228 @@ function add_file_field() {
         fieldset.append(page.select("english_id", **opts))
         page.form.append(fieldset)
 
-    def delete_job(self):
+    def run(self):
         """
-        Drop the table row for a job (we already have confirmation from
-        the user).
+        Override the base class method to handle additional buttons.
         """
 
-        query = f"DELETE FROM {Job.TABLE} WHERE english_id = ?"
-        conn = db.connect()
-        cursor = conn.cursor()
-        cursor.execute(query, self.english_id)
-        query = f"DELETE FROM {Job.ATTACHMENT} WHERE english_id = ?"
-        cursor.execute(query, self.english_id)
-        conn.commit()
-        self.logger.info("removed translation job for CDR%d", self.english_id)
-        navigateTo("translation-jobs.py", self.session.name)
+        if not self.session or not self.session.can_do(self.ACTION):
+            self.bail("not authorized")
+        if self.request == self.JOBS:
+            params = dict(testing=True) if self.testing else {}
+            self.redirect("translation-jobs.py", **params)
+        elif self.request == self.DELETE:
+            self.delete_job()
+        elif self.request == self.GLOSSARY:
+            self.redirect("glossary-translation-jobs.py")
+        elif self.request == self.MEDIA:
+            self.redirect("media-translation-jobs.py")
+        Controller.run(self)
 
-    @property
+    def show_report(self):
+        """
+        Override the base class because we're storing data, not
+        creating a report. Modified to also populate the history
+        table.
+        """
+
+        if self.have_required_values:
+            self.process_attachments()
+            if self.job.changed:
+                conn = db.connect()
+                cursor = conn.cursor()
+                params = [getattr(self, name) for name in Job.FIELDS]
+                params.append(getattr(self, Job.KEY))
+                self.logger.info("storing translation job state %s", params)
+                placeholders = ", ".join(["?"] * len(params))
+                cols = ", ".join(Job.FIELDS + (Job.KEY,))
+                strings = Job.HISTORY, cols, placeholders
+                cursor.execute(self.INSERT.format(*strings), params)
+                if self.job.new:
+                    strings = (Job.TABLE, cols, placeholders)
+                    query = self.INSERT.format(*strings)
+                else:
+                    cols = [f"{name} = ?" for name in Job.FIELDS]
+                    strings = (Job.TABLE, ", ".join(cols), Job.KEY)
+                    query = self.UPDATE.format(*strings)
+                try:
+                    cursor.execute(query, params)
+                    conn.commit()
+                except Exception as e:
+                    if "duplicate key" in str(e).lower():
+                        self.logger.error("duplicate translation job ID")
+                        self.bail("attempt to create duplicate job")
+                    else:
+                        self.logger.error("database failure: %s", e)
+                        self.bail(f"database failure: {e}")
+                self.logger.info("translation job state stored successfully")
+                job = Job(self)
+                if self.alert_needed(job):
+                    self.alert(job)
+                message = "Translation job state stored successfully."
+                params = dict(message=message)
+            else:
+                message = "No changes found to store."
+                params = dict(warning=message)
+            if self.testing:
+                params["testing"] = True
+            self.redirect("translation-jobs.py", **params)
+        else:
+            self.show_form()
+
+    @cached_property
     def assigned_to(self):
         """Translator to whom this translation task is currently assigned."""
+        return self.get_id("assigned_to", self.users)
 
-        if not hasattr(self, "_assigned_to"):
-            self._assigned_to = self.get_id("assigned_to", self.users)
-        return self._assigned_to
-
-    @property
+    @cached_property
     def attachments(self):
         """Dictionary of QC reports already attached to job.
 
         Key is attachment ID, value is display label.
         """
 
-        if not hasattr(self, "_attachments"):
-            self._attachments = {}
-            query = db.Query(Job.ATTACHMENT, "attachment_id", "file_name")
-            query.where(query.Condition("english_id", self.english_id))
-            for row in query.execute(self.cursor).fetchall():
-                self._attachments[row.attachment_id] = row.file_name
-        return self._attachments
+        attachments = {}
+        query = db.Query(Job.ATTACHMENT, "attachment_id", "file_name")
+        query.where(query.Condition("english_id", self.english_id))
+        for row in query.execute(self.cursor).fetchall():
+            attachments[row.attachment_id] = row.file_name
+        return attachments
 
-    @property
+    @cached_property
     def banner(self):
         """Customize the display banner if we have a job."""
         return self.job.banner if self.job else self.title
 
-    @property
+    @cached_property
     def buttons(self):
         """Customize the action buttons."""
 
-        if not hasattr(self, "_buttons"):
-            self._buttons = [self.SUBMIT, self.JOBS]
-            if self.job and not self.job.new:
-                self._buttons.append(self.DELETE)
-            self._buttons.append(self.MEDIA)
-            self._buttons.append(self.GLOSSARY)
-            self._buttons.append(self.SUBMENU)
-            self._buttons.append(self.ADMINMENU)
-            self._buttons.append(self.LOG_OUT)
-        return self._buttons
+        if not self.job or self.job.new:
+            return self.SUBMIT, self.JOBS, self.GLOSSARY, self.MEDIA
+        return self.SUBMIT, self.JOBS, self.DELETE, self.GLOSSARY, self.MEDIA
 
-    @property
+    @cached_property
     def change_type(self):
         """Primary key for the change type for the English summary."""
+        return self.get_id("change_type", self.change_types.map)
 
-        if not hasattr(self, "_change_type"):
-            _type = self.get_id("change_type", self.change_types.map)
-            self._change_type = _type
-        return self._change_type
-
-    @property
+    @cached_property
     def change_types(self):
         """Valid values for types of summary changes."""
+        return self.load_values("summary_change_type")
 
-        if not hasattr(self, "_change_types"):
-            self._change_types = self.load_values("summary_change_type")
-        return self._change_types
-
-    @property
+    @cached_property
     def comments(self):
         """Notes on the translation job."""
+        comments = self.fields.getvalue("comments", "").strip()
+        return comments if comments else None
 
-        if not hasattr(self, "_comments"):
-            comments = self.fields.getvalue("comments", "").strip()
-            self._comments = comments if comments else None
-        return self._comments
+    @cached_property
+    def drop(self):
+        """Attachments which should be removed from the job."""
+        return self.fields.getlist(self.DROP)
 
-    @property
+    @cached_property
     def english_id(self):
         """CDR ID of English PDQ Summary being translated."""
+        return self.get_id("english_id", self.english_summaries)
 
-        if not hasattr(self, "_english_id"):
-            _id = self.get_id("english_id", self.english_summaries)
-            self._english_id = _id
-        return self._english_id
-
-    @property
+    @cached_property
     def english_summaries(self):
         """Dictionary of titles of English PDQ summaries."""
+        return self.get_summaries("English")
 
-        if not hasattr(self, "_english_summaries"):
-            self._english_summaries = self.get_summaries("English")
-        return self._english_summaries
-
-    @property
+    @cached_property
     def files(self):
         """Attachments to be appended to email notification."""
 
-        if not hasattr(self, "_files"):
-            self._files = []
-            if self.english_id:
-                query = db.Query(Job.ATTACHMENT, "file_bytes", "file_name")
-                query.order("registered")
-                query.where(query.Condition("english_id", self.english_id))
-                for row in query.execute(self.cursor).fetchall():
-                    attachment = EmailAttachment(row.file_bytes, row.file_name)
-                    self._files.append(attachment)
-        return self._files
+        files = []
+        if self.english_id:
+            query = db.Query(Job.ATTACHMENT, "file_bytes", "file_name")
+            query.order("registered")
+            query.where(query.Condition("english_id", self.english_id))
+            for row in query.execute(self.cursor).fetchall():
+                attachment = EmailAttachment(row.file_bytes, row.file_name)
+                files.append(attachment)
+        return files
 
-    @property
+    @cached_property
     def have_required_values(self):
         """
         Determine whether we have values for all of the required job fields.
         """
 
-        if not hasattr(self, "_have_required_values"):
-            self._have_required_values = True
-            for name in (Job.KEY,) + Job.FIELDS:
-                if name != "comments" and not getattr(self, name):
-                    self._have_required_values = False
-                    return False
-        return self._have_required_values
+        for name in (Job.KEY,) + Job.FIELDS:
+            if name != "comments" and not getattr(self, name):
+                return False
+        return True
 
-    @property
+    @cached_property
     def job(self):
         """Translation job being displayed/edited."""
+        return Job(self) if self.english_id else None
 
-        if not hasattr(self, "_job"):
-            self._job = Job(self) if self.english_id else None
-        return self._job
-
-    @property
+    @cached_property
     def lead_translators(self):
         """Lead users for the PDQ Summary translation team."""
+        return self.load_group("Spanish Translators Leads")
 
-        if not hasattr(self, "_lead_translators"):
-            group_name = "Spanish Translators Leads"
-            self._lead_translators = self.load_group(group_name)
-        return self._lead_translators
+    @cached_property
+    def posted_files(self):
+        """Attachments to be added to the job."""
 
-    @property
+        if "files" not in self.fields:
+            return []
+        files = self.fields["files"]
+        if not isinstance(files, (list, tuple)):
+            files = [files]
+        return [file for file in files if file.filename]
+
+    @cached_property
+    def same_window(self):
+        """Ease up on the opening of new browser tabs."""
+        return self.buttons
+
+    @cached_property
     def spanish_summaries(self):
         """Dictionary of titles of Spanish PDQ summaries."""
+        return self.get_summaries("Spanish")
 
-        if not hasattr(self, "_spanish_summaries"):
-            self._spanish_summaries = self.get_summaries("Spanish")
-        return self._spanish_summaries
-
-    @property
+    @cached_property
     def state_id(self):
         """Primary key for the job's current translation state."""
+        return self.get_id("status", self.states.map)
 
-        if not hasattr(self, "_state_id"):
-            self._state_id = self.get_id("status", self.states.map)
-        return self._state_id
-
-    @property
+    @cached_property
     def state_date(self):
         """If we save or update a job, set its state to today."""
 
-        if not hasattr(self, "_state_date"):
-            if self.job and self.state_id == self.job.state_id:
-                self._state_date = self.job.state_date
-            else:
-                self._state_date = date.today()
-        return self._state_date
+        if self.job and self.state_id == self.job.state_id:
+            return self.job.state_date
+        return date.today()
 
-    @property
+    @cached_property
     def states(self):
         """Valid values for summary translation states."""
+        return self.load_values("summary_translation_state")
 
-        if not hasattr(self, "_states"):
-            self._states = self.load_values("summary_translation_state")
-        return self._states
+    @cached_property
+    def testing(self):
+        """Used by automated tests to avoid spamming the users."""
+        return self.fields.getvalue("testing")
 
-    @property
-    def subtitle(self):
-        """Customize the string below the main banner."""
-        return self.job.banner if self.job else self.SUBTITLE
-
-    @property
+    @cached_property
     def translators(self):
         """Users who are authorized to translate PDQ summaries."""
+        return self.load_group("Spanish Translators")
 
-        if not hasattr(self, "_translators"):
-            self._translators = self.load_group("Spanish Translators")
-        return self._translators
-
-    @property
+    @cached_property
     def user(self):
         """Instance of `UserInfo` class."""
+        return self.UserInfo(self)
 
-        if not hasattr(self, "_user"):
-            self._user = self.UserInfo(self)
-        return self._user
-
-    @property
+    @cached_property
     def users(self):
         """Dictionary of all active users.
 
@@ -447,34 +418,93 @@ function add_file_field() {
         group.
         """
 
-        if not hasattr(self, "_users"):
-            query = db.Query("usr", "id", "fullname")
-            query.where("fullname IS NOT NULL")
-            rows = query.execute(self.cursor).fetchall()
-            self._users = dict([(row[0], row[1]) for row in rows])
-        return self._users
+        query = db.Query("usr", "id", "fullname")
+        query.where("fullname IS NOT NULL")
+        rows = query.execute(self.cursor).fetchall()
+        return dict([(row[0], row[1]) for row in rows])
 
-    def load_values(self, table_name):
+    def alert(self, job):
         """
-        Factor out logic for collecting a valid values set.
+        Send an email alert to the user to whom the translation job
+        is currently assigned.
 
-        This works because our tables for valid values both
-        have the same structure.
-
-        Returns a populated Values object.
+        Note that the `testing` property is set by the automated
+        test suite, in which the account to which the job is
+        assigned is a test account, so it's OK to use the recipient
+        address instead of the Test Translation Queue Recips group
+        addresses.
         """
 
-        query = db.Query(table_name, "value_id", "value_name")
-        rows = query.order("value_pos").execute(self.cursor).fetchall()
+        recip = self.UserInfo(self, job.assigned_to)
+        if not recip.email:
+            error = f"no email address found for user {recip.name}"
+            self.logger.error(error)
+            self.bail(error)
+        recips = [recip.email]
+        sender = "cdr@cancer.gov"
+        body = []
+        subject = f"[{self.session.tier}] Translation Queue Notification"
+        log_message = f"mailed translation job state alert to {recip}"
+        if not isProdHost():
+            if not self.testing:
+                recips = getEmailList("Test Translation Queue Recips")
+                body.append(
+                    "[*** THIS IS A TEST MESSAGE ON THE "
+                    f"{self.session.tier} TIER. "
+                    f"ON PRODUCTION IT WOULD HAVE GONE TO {recip}. ***]\n"
+                )
+                log_message = f"test alert for {recip} sent to {recips}"
+            else:
+                self.logger.info("sending mail to the regression tester email")
+        if self.job.new:
+            body.append("A new translation job has been assigned to you.")
+        else:
+            body.append("A translation job assigned to you has a new status.")
+        body.append(f"Assigned by: {self.user}")
+        body.append(f"English summary document ID: CDR{job.english_id:d}")
+        body.append(f"English summary title: {job.english_title}")
+        if job.spanish_title:
+            body.append(f"Spanish summary document ID: CDR{job.spanish_id:d}")
+            body.append(f"Spanish summary title: {job.spanish_title}")
+        body.append(f"Summary audience: {job.english_audience}")
+        body.append(f"Job status: {self.states.map.get(job.state_id)}")
+        state_date = str(job.state_date)[:10]
+        body.append(f"Date of status transition: {state_date}")
+        body.append(f"Comments: {job.comments}")
+        opts = dict(subject=subject, body="\n".join(body))
+        if self.files:
+            opts["attachments"] = self.files
+        try:
+            message = EmailMessage(sender, recips, **opts)
+            message.send()
+        except Exception as e:
+            self.logger.error("sending mail: %s", e)
+            self.bail(f"sending mail: {e}")
+        self.logger.info(log_message)
 
-        class Values:
-            def __init__(self, rows):
-                self.map = {}
-                self.values = []
-                for value_id, value_name in rows:
-                    self.map[value_id] = value_name
-                    self.values.append((value_id, value_name))
-        return Values(rows)
+    def alert_needed(self, job):
+        """
+        Determine whether an email alert to the job's assignee is
+        required. We only send such an alert if the assignee is
+        different from the current user, and either the job's state
+        or it's assignee has changed.
+
+        Pass:
+            job - Job object created after changes were saved (to
+                  compared to the Job object created before that
+                  point)
+
+        Return:
+            boolean reflecting the tests described above
+        """
+
+        if job.assigned_to == self.user.id:
+            return False
+        if self.job.state_id != job.state_id:
+            return True
+        if self.job.assigned_to != job.assigned_to:
+            return True
+        return False
 
     def get_id(self, name, valid_values):
         """
@@ -554,118 +584,62 @@ function add_file_field() {
         rows = query.execute(self.cursor).fetchall()
         return dict([(row[0], row[1]) for row in rows])
 
-    def alert_needed(self, job):
+    def load_values(self, table_name):
         """
-        Determine whether an email alert to the job's assignee is
-        required. We only send such an alert if the assignee is
-        different from the current user, and either the job's state
-        or it's assignee has changed.
+        Factor out logic for collecting a valid values set.
 
-        Pass:
-            job - Job object created after changes were saved (to
-                  compared to the Job object created before that
-                  point)
+        This works because our tables for valid values both
+        have the same structure.
 
-        Return:
-            boolean reflecting the tests described above
+        Returns a populated Values object.
         """
 
-        if job.assigned_to == self.user.id:
-            return False
-        if self.job.state_id != job.state_id:
-            return True
-        if self.job.assigned_to != job.assigned_to:
-            return True
-        return False
+        query = db.Query(table_name, "value_id", "value_name")
+        rows = query.order("value_pos").execute(self.cursor).fetchall()
 
-    def alert(self, job):
-        """
-        Send an email alert to the user to whom the translation job
-        is currently assigned.
-        """
-
-        recip = self.UserInfo(self, job.assigned_to)
-        if not recip.email:
-            error = f"no email address found for user {recip.name}"
-            self.logger.error(error)
-            self.bail(error)
-        recips = [recip.email]
-        sender = "cdr@cancer.gov"
-        body = []
-        subject = f"[{self.session.tier}] Translation Queue Notification"
-        log_message = f"mailed translation job state alert to {recip}"
-        if not isProdHost():
-            recips = getEmailList("Test Translation Queue Recips")
-            body.append(
-                f"[*** THIS IS A TEST MESSAGE ON THE {self.session.tier} TIER."
-                f" ON PRODUCTION IT WOULD HAVE GONE TO {recip}. ***]\n"
-            )
-            log_message = f"test alert for {recip} sent to {recips}"
-        if self.job.new:
-            body.append("A new translation job has been assigned to you.")
-        else:
-            body.append("A translation job assigned to you has a new status.")
-        body.append(f"Assigned by: {self.user}")
-        body.append(f"English summary document ID: CDR{job.english_id:d}")
-        body.append(f"English summary title: {job.english_title}")
-        if job.spanish_title:
-            body.append(f"Spanish summary document ID: CDR{job.spanish_id:d}")
-            body.append(f"Spanish summary title: {job.spanish_title}")
-        body.append(f"Summary audience: {job.english_audience}")
-        body.append(f"Job status: {self.states.map.get(job.state_id)}")
-        state_date = str(job.state_date)[:10]
-        body.append(f"Date of status transition: {state_date}")
-        body.append(f"Comments: {job.comments}")
-        opts = dict(subject=subject, body="\n".join(body))
-        if self.files:
-            opts["attachments"] = self.files
-        try:
-            message = EmailMessage(sender, recips, **opts)
-            message.send()
-        except Exception as e:
-            self.logger.error("sending mail: %s", e)
-            self.bail(f"sending mail: {e}")
-        self.logger.info(log_message)
+        class Values:
+            def __init__(self, rows):
+                self.map = {}
+                self.values = []
+                for value_id, value_name in rows:
+                    self.map[value_id] = value_name
+                    self.values.append((value_id, value_name))
+        return Values(rows)
 
     def process_attachments(self):
         """Update the attachment table from the current form information."""
 
         conn = db.connect()
         cursor = conn.cursor()
-        drop = self.fields.getlist(self.DROP)
-        if drop:
+        if self.drop:
             sql = f"DELETE FROM {Job.ATTACHMENT} WHERE attachment_id = ?"
-            for attachment_id in drop:
+            for attachment_id in self.drop:
                 if int(attachment_id) not in self.attachments:
                     self.bail()
                 cursor.execute(sql, (attachment_id,))
             conn.commit()
-        nfiles = int(self.fields.getvalue("nfiles", "0"))
-        keys = set(self.fields.keys())
         columns = "english_id, file_bytes, file_name, registered"
         values = "?, ?, ?, GETDATE()"
         insert = self.INSERT.format(Job.ATTACHMENT, columns, values)
-        for i in range(nfiles):
-            name = f"file-{i+1}"
-            if name in keys:
-                f = self.fields[name]
-                if f.file:
-                    file_bytes = []
-                    while True:
-                        more_bytes = f.file.read()
-                        if not more_bytes:
-                            break
-                        file_bytes.append(more_bytes)
-                    file_bytes = b"".join(file_bytes)
-                else:
-                    file_bytes = f.value
-                if file_bytes:
-                    self.logger.info("filename=%s", f.filename)
-                    values = self.english_id, file_bytes, f.filename
-                    cursor.execute(insert, values)
-                    conn.commit()
-                else:
-                    self.logger.warning("%s empty", name)
+        for f in self.posted_files:
+            self.logger.info("filename is %s", f.filename)
+            if f.file:
+                file_bytes = []
+                while True:
+                    more_bytes = f.file.read()
+                    if not more_bytes:
+                        break
+                    file_bytes.append(more_bytes)
+                file_bytes = b"".join(file_bytes)
+            else:
+                file_bytes = f.value
+            if file_bytes:
+                self.logger.info("filename=%s", f.filename)
+                values = self.english_id, file_bytes, f.filename
+                cursor.execute(insert, values)
+                conn.commit()
+            else:
+                self.logger.warning("%s empty", f.filename)
 
     @staticmethod
     def sort_dict(d):
@@ -744,25 +718,12 @@ class Job:
 
         self.__control = control
 
-    @property
+    @cached_property
     def assigned_to(self):
         """ID of user to whom the translation job has been assigned."""
         return self.row.assigned_to if self.row else None
 
-    @property
-    def banner(self):
-        """Use English summary title for the main banner (possible shortened).
-        """
-
-        if not hasattr(self, "_banner"):
-            self._banner = self.english_title
-            if len(self._banner) > 40:
-                self._banner = f"{self._banner[:40]} ..."
-            if self.subtitle:
-                self._banner = f"{self._banner} ({self.subtitle})"
-        return self._banner
-
-    @property
+    @cached_property
     def change_type(self):
         """Primary key for the type of change for the English summary.
 
@@ -770,42 +731,38 @@ class Job:
         parsing the summary.
         """
 
-        if not hasattr(self, "_change_type"):
-            if self.row:
-                self._change_type = self.row.change_type
-            else:
-                self._change_type = None
-                query = db.Query("document", "xml")
-                query.where(query.Condition("id", self.english_id))
-                try:
-                    xml = query.execute(self.__control.cursor).fetchone().xml
-                    root = etree.fromstring(xml.encode("utf-8"))
+        if self.row:
+            return self.row.change_type
+        query = db.Query("document", "xml")
+        query.where(query.Condition("id", self.english_id))
+        try:
+            xml = query.execute(self.__control.cursor).fetchone().xml
+            root = etree.fromstring(xml.encode("utf-8"))
 
-                    class Change:
-                        def __init__(self, node):
-                            self.value = self.date = ""
-                            child = node.find("TypeOfSummaryChangeValue")
-                            if child is not None and child.text is not None:
-                                self.value = child.text.lower()
-                            child = node.find("Date")
-                            if child is not None and child.text is not None:
-                                self.date = child.text
+            class Change:
+                def __init__(self, node):
+                    self.value = self.date = ""
+                    child = node.find("TypeOfSummaryChangeValue")
+                    if child is not None and child.text is not None:
+                        self.value = child.text.lower()
+                    child = node.find("Date")
+                    if child is not None and child.text is not None:
+                        self.date = child.text
 
-                        def __lt__(self, other):
-                            return self.date < other.date
-                    name = "TypeOfSummaryChange"
-                    change_types = [Change(n) for n in root.findall(name)]
-                    if change_types:
-                        change_type = sorted(change_types)[-1].value
-                        for id, value in self.__control.change_types.values:
-                            if change_type.startswith(value.lower()):
-                                self._change_type = id
-                                break
-                except Exception:
-                    self.__control.logger.exception("Parsing change types")
-        return self._change_type
+                def __lt__(self, other):
+                    return self.date < other.date
+            name = "TypeOfSummaryChange"
+            change_types = [Change(n) for n in root.findall(name)]
+            if change_types:
+                change_type = sorted(change_types)[-1].value
+                for id, value in self.__control.change_types.values:
+                    if change_type.startswith(value.lower()):
+                        return id
+        except Exception:
+            self.__control.logger.exception("Parsing change types")
+        return None
 
-    @property
+    @cached_property
     def changed(self):
         """
         Determine whether any of the fields on the editing form have
@@ -813,138 +770,120 @@ class Job:
         to the database.
         """
 
+        changed = False
+        self.__control.logger.info("checking to see if the job has changed")
         for name in self.FIELDS:
-            if getattr(self, name) != getattr(self.__control, name):
-                return True
-        return False
+            job, form = getattr(self, name), getattr(self.__control, name)
+            if job != form:
+                args = name, job, form
+                self.__control.logger.info("%s: %s <> %s", *args)
+                changed = True
+        count = len(self.__control.posted_files)
+        if count:
+            self.__control.logger.info("%d new files posted", count)
+            changed = True
+        count = len(self.__control.drop)
+        if count:
+            self.__control.logger.info("dropping %d attachments", count)
+            changed = True
+        return changed
 
-    @property
+    @cached_property
     def comments(self):
         """Notes on the translation job."""
         return self.row.comments if self.row else None
 
-    @property
+    @cached_property
     def english_id(self):
         """CDR ID for the English PDQ Summary being translated."""
         return self.__control.english_id
 
-    @property
+    @cached_property
     def english_title(self):
         """Title for the original English summary document."""
+        return self.full_english_title.split(";")[0].strip()
 
-        if not hasattr(self, "_english_title"):
-            parts = self.full_english_title.split(";")
-            self._english_title = parts[0].strip()
-        return self._english_title
-
-    @property
+    @cached_property
     def english_audience(self):
         """Audience for the original English summary document."""
+        return self.full_english_title.split(";")[-1].strip()
 
-        if not hasattr(self, "_english_audience"):
-            parts = self.full_english_title.split(";")
-            self._audience = parts[-1].strip()
-        return self._audience
-
-    @property
+    @cached_property
     def full_english_title(self):
         """Title column for the original English summary document."""
+        return self.__control.english_summaries[self.english_id]
 
-        if not hasattr(self, "_full_english_title"):
-            title = self.__control.english_summaries[self.english_id]
-            self._full_english_title = title
-        return self._full_english_title
-
-    @property
+    @cached_property
     def full_spanish_title(self):
         """Title column for the translated summary (if it exists)."""
 
-        if not hasattr(self, "_full_spanish_title"):
-            if self.spanish_id is None:
-                self._full_spanish_title = None
-            else:
-                title = self.__control.spanish_summaries.get(self.spanish_id)
-                if not title:
-                    message = f"CDR{self.spanish_id} is not a Spanish summary"
-                    self.__control.bail(message)
-                self._full_spanish_title = title
-        return self._full_spanish_title
+        if self.spanish_id is None:
+            return None
+        title = self.__control.spanish_summaries.get(self.spanish_id)
+        if not title:
+            message = f"CDR{self.spanish_id} is not a Spanish summary"
+            self.__control.bail(message)
+        return title
 
-    @property
+    @cached_property
+    def identification(self):
+        """Lines displayed at the top of the form to identify the docs."""
+
+        cdr_id, title = f"CDR{self.english_id}", self.english_title
+        lines = [f"English summary: {cdr_id} ({title})"]
+        if self.spanish_title:
+            cdr_id, title = f"CDR{self.spanish_id}", self.spanish_title
+            lines.append(f"Spanish summary: {cdr_id} ({title})")
+        return lines
+
+    @cached_property
     def new(self):
         """True if we don't already have a job for this summary."""
         return False if self.row else True
 
-    @property
+    @cached_property
     def row(self):
         """Current values for an existing job, if applicable."""
 
-        if not hasattr(self, "_row"):
-            query = db.Query(self.TABLE, *self.FIELDS)
-            query.where(query.Condition(self.KEY, self.english_id))
-            self._row = query.execute(self.__control.cursor).fetchone()
-        return self._row
+        query = db.Query(self.TABLE, *self.FIELDS)
+        query.where(query.Condition(self.KEY, self.english_id))
+        return query.execute(self.__control.cursor).fetchone()
 
-    @property
+    @cached_property
     def spanish_id(self):
         """CDR ID for the translated summary document (if it exists)."""
 
-        if not hasattr(self, "_spanish_id"):
-            query = db.Query("query_term", "doc_id")
-            query.where("path = '/Summary/TranslationOf/@cdr:ref'")
-            query.where(query.Condition("int_val", self.english_id))
-            row = query.execute(self.__control.cursor).fetchone()
-            self._spanish_id = row.doc_id if row else None
-        return self._spanish_id
+        query = db.Query("query_term", "doc_id")
+        query.where("path = '/Summary/TranslationOf/@cdr:ref'")
+        query.where(query.Condition("int_val", self.english_id))
+        row = query.execute(self.__control.cursor).fetchone()
+        return row.doc_id if row else None
 
-    @property
+    @cached_property
     def spanish_audience(self):
         """Audience for the translated summary document (if it exists)."""
 
-        if not hasattr(self, "_spanish_audience"):
-            if self.full_spanish_title is None:
-                self._spanish_audience = None
-            else:
-                parts = self.full_spanish_title.split(";")
-                self._spanish_audience = parts[-1].strip()
-        return self._spanish_audience
+        if self.full_spanish_title is None:
+            return None
+        return self.full_spanish_title.split(";")[-1].strip()
 
-    @property
+    @cached_property
     def spanish_title(self):
         """Title for translated summary document (if it exists)."""
 
-        if not hasattr(self, "_spanish_title"):
-            if self.full_spanish_title is None:
-                self._spanish_title = None
-            else:
-                parts = self.full_spanish_title.split(";")
-                self._spanish_title = parts[0].strip()
-        return self._spanish_title
+        if self.full_spanish_title is None:
+            return None
+        return self.full_spanish_title.split(";")[0].strip()
 
-    @property
+    @cached_property
     def state_date(self):
         """Date the job state last changed or set."""
         return self.row.state_date if self.row else None
 
-    @property
+    @cached_property
     def state_id(self):
         """Primary key for the job's state."""
         return self.row.state_id if self.row else None
-
-    @property
-    def subtitle(self):
-        """Override for string below banner if we have a Spanish summary."""
-
-        if not hasattr(self, "_subtitle"):
-            if self.spanish_title is None:
-                self._subtitle = None
-            else:
-                title = self.spanish_title
-                if len(title) > 40:
-                    title = f"{title[:40]} ..."
-                args = self.spanish_id, title
-                self._subtitle = "Spanish summary: CDR{} ({})".format(*args)
-        return self._subtitle
 
 
 if __name__ == "__main__":

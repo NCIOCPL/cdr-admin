@@ -3,6 +3,7 @@
 """Report on documents unchanged for a specified number of days.
 """
 
+from functools import cached_property
 from cdrcgi import Controller
 import datetime
 
@@ -33,7 +34,7 @@ class Control(Controller):
         fieldset.append(page.text_field("max", label="Max Rows", value="1000"))
         page.form.append(fieldset)
 
-    @property
+    @cached_property
     def caption(self):
         """String to display above the table."""
 
@@ -43,7 +44,7 @@ class Control(Controller):
             caption = f"{self.doctype} {caption}"
         return caption
 
-    @property
+    @cached_property
     def columns(self):
         """Column headers for the report table."""
 
@@ -53,86 +54,69 @@ class Control(Controller):
             self.Reporter.Column("Last Change"),
         )
 
-    @property
+    @cached_property
     def cutoff(self):
         """How far back the report should go."""
+        return self.today - datetime.timedelta(self.days)
 
-        if not hasattr(self, "_cutoff"):
-            self._cutoff = self.today - datetime.timedelta(self.days)
-        return self._cutoff
-
-    @property
+    @cached_property
     def days(self):
         """How far back the report should go."""
 
-        if not hasattr(self, "_days"):
-            try:
-                self._days = int(self.fields.getvalue("days"))
-            except Exception:
-                self._days = 365
-        return self._days
+        try:
+            return int(self.fields.getvalue("days"))
+        except Exception:
+            return 365
 
-    @property
+    @cached_property
     def docs(self):
-        """Unchanged document to be displayed for the report."""
+        """Unchanged documents to be displayed for the report."""
 
-        if not hasattr(self, "_docs"):
-            fields = "d.id", "d.title", "MAX(a.dt) AS last_saved"
-            query = self.Query("document d", *fields).order("d.title", "d.id")
-            query.join("audit_trail a", "a.document = d.id")
-            query.group("d.id", "d.title")
-            query.having(query.Condition("MAX(a.dt)", self.cutoff, ">="))
-            query.limit(self.max)
-            if self.doctype and self.doctype != "all":
-                query.join("doc_type t", "t.id = d.doc_type")
-                query.where(query.Condition("t.name", self.doctype))
-            rows = query.execute(self.cursor).fetchall()
-            self._docs = [self.Doc(row) for row in rows]
-        return self._docs
+        fields = "d.id", "d.title", "MAX(a.dt) AS last_saved"
+        query = self.Query("document d", *fields).order("d.title", "d.id")
+        query.join("audit_trail a", "a.document = d.id")
+        query.group("d.id", "d.title")
+        query.having(query.Condition("MAX(a.dt)", self.cutoff, "<"))
+        query.limit(self.max)
+        if self.doctype and self.doctype != "all":
+            query.join("doc_type t", "t.id = d.doc_type")
+            query.where(query.Condition("t.name", self.doctype))
+        rows = query.execute(self.cursor).fetchall()
+        return [self.Doc(row) for row in rows]
 
-    @property
+    @cached_property
     def doctype(self):
         """Document type selected from the form."""
         return self.fields.getvalue("doctype")
 
-    @property
+    @cached_property
     def doctypes(self):
         """Sorted sequence of the document type names for the picklist."""
 
-        if not hasattr(self, "_doctypes"):
-            query = self.Query("doc_type", "name").order("name")
-            query.where("name IS NOT NULL")
-            query.where("name <> ''")
-            query.where("active = 'Y'")
-            self._doctypes = [row.name for row in query.execute(self.cursor)]
-        return self._doctypes
+        query = self.Query("doc_type", "name").order("name")
+        query.where("name IS NOT NULL")
+        query.where("name <> ''")
+        query.where("active = 'Y'")
+        return [row.name for row in query.execute(self.cursor)]
 
-    @property
+    @cached_property
     def max(self):
         """Throttle on the number of documents to show."""
 
-        if not hasattr(self, "_max"):
-            try:
-                self._max = int(self.fields.getvalue("max"))
-            except Exception:
-                self._max = 1000
-        return self._max
+        try:
+            return int(self.fields.getvalue("max"))
+        except Exception:
+            return 1000
 
-    @property
+    @cached_property
     def rows(self):
         """Data rows for the report table."""
+        return [doc.row for doc in self.docs]
 
-        if not hasattr(self, "_rows"):
-            self._rows = [doc.row for doc in self.docs]
-        return self._rows
-
-    @property
+    @cached_property
     def today(self):
         """Date of the report."""
-
-        if not hasattr(self, "_today"):
-            self._today = datetime.date.today()
-        return self._today
+        return datetime.date.today()
 
     class Doc:
         def __init__(self, row):
@@ -144,36 +128,27 @@ class Control(Controller):
 
             self.__row = row
 
-        @property
+        @cached_property
         def id(self):
             """CDR ID of the document."""
+            return f"CDR{self.__row.id:010d}"
 
-            if not hasattr(self, "_id"):
-                self._id = f"CDR{self.__row.id:010d}"
-            return self.__row.id
-
-        @property
+        @cached_property
         def last_change(self):
             """Date of the last save."""
+            return str(self.__row.last_saved)[:10]
 
-            if not hasattr(self, "_last_change"):
-                self._last_change = str(self.__row.last_saved)[:10]
-            return self._last_change
-
-        @property
+        @cached_property
         def row(self):
             """Values for the report table."""
             return self.id, self.title, self.last_change
 
-        @property
+        @cached_property
         def title(self):
             """Title of the document, possibly shortened for the report."""
 
-            if not hasattr(self, "_title"):
-                self._title = self.__row.title[:100]
-                if len(self.__row.title) > 100:
-                    self._title = f"{self._title} ..."
-            return self._title
+            title = self.__row.title
+            return f"{title[:75]} ..." if len(title) > 80 else title
 
 
 if __name__ == "__main__":

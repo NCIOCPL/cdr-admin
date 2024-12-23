@@ -14,6 +14,7 @@ function check_board(whatever) {
     if (board_id != current_board) {
 
         // Renew the radio button fields for the available letters.
+        current_board = board_id;
         jQuery("#letters div").remove();
         let board = boards[board_id];
         let type = board.type;
@@ -24,12 +25,15 @@ function check_board(whatever) {
             var key = letter[1];
             // let [name, key] = letter; poor IE can't cope
             let button = jQuery('<input type="radio", name="letter">');
+            button.attr("class", "usa-radio__input");
             button.attr("value", key);
             button.attr("id", key);
             let label = jQuery("<label>");
+            label.attr("class", "usa-radio__label");
             label.attr("for", key);
             label.text(name);
             let div = jQuery("<div>");
+            div.attr("class", "usa-radio");
             div.append(button);
             div.append(label);
             jQuery("#letters").append(div);
@@ -46,12 +50,15 @@ function check_board(whatever) {
             // let [id, name] = member; aargh!
             let key = "member-" + id;
             let checkbox = jQuery('<input type="checkbox", name="member">');
+            checkbox.attr("class", "usa-checkbox__input");
             checkbox.attr("value", id);
             checkbox.attr("id", key);
             let label = jQuery("<label>");
+            label.attr("class", "usa-checkbox__label");
             label.attr("for", key);
             label.text(name);
             let div = jQuery("<div>");
+            div.attr("class", "usa-checkbox");
             div.append(checkbox);
             div.append(label);
             jQuery("#members").append(div);
@@ -85,16 +92,14 @@ function check_submit_button() {
     let letter = jQuery("#letters input:checked").val();
     console.log("recipients: " + recipients + " letter: " + letter);
     if (!letter || recipients < 1)
-        jQuery("#submit-button").hide();
+        jQuery("#submit-button-submit").hide();
     else
-        jQuery("#submit-button").show();
+        jQuery("#submit-button-submit").show();
 }
 
 // Plug in the handler for changes to the board selection, and run it now.
 jQuery(function() {
-    jQuery("#board input").click(function() { check_board(); });
+    jQuery("#boards input").click(function() { check_board(); });
     check_board();
-    let submit = jQuery("#header-buttons input[value='Submit']");
-    submit.attr("id", "submit-button");
     check_submit_button();
 });

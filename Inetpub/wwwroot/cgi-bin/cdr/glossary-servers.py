@@ -8,6 +8,7 @@ popups. That data is serialized and sent to each of the servers on the
 list managed by this script.
 """
 
+from functools import cached_property
 from cdrcgi import Controller
 from cdr import getControlGroup, updateCtl
 
@@ -58,7 +59,7 @@ class Control(Controller):
         counter = 1
         for alias in sorted(servers):
             fieldset = page.fieldset("Server")
-            fieldset.set("class", "server-block")
+            fieldset.set("class", "server-block usa-fieldset")
             fieldset.set("id", f"server-block-{counter}")
             opts = dict(label="Alias", classes="alias", value=alias)
             fieldset.append(page.text_field(f"alias-{counter:d}", **opts))
@@ -93,16 +94,21 @@ class Control(Controller):
             alias = self.fields.getvalue(f"alias-{i:d}")
             if url and alias:
                 if alias in new:
-                    self.bail(f"Duplicate alias {alias!r}")
+                    message = f"Duplicate alias {alias!r}."
+                    self.alerts.append(dict(message=message, type="error"))
                 if not url.startswith("http"):
-                    self.bail(f"{url!r} is not an HTTP URL")
+                    message = f"{url!r} is not an HTTP URL."
+                    self.alerts.append(dict(message=message, type="error"))
                 url = url.strip("/")
                 key = url.lower()
                 if key in urls:
-                    self.bail("f{key!r} appears more than once")
+                    message = f"{key!r} appears more than once."
+                    self.alerts.append(dict(message=message, type="error"))
                 urls.add(key)
                 new[alias] = url
             i += 1
+        if self.alerts:
+            return self.show_form()
         opts = dict(group=self.GROUP)
         for alias in new:
             url = new[alias]
@@ -115,17 +121,18 @@ class Control(Controller):
             if alias not in new:
                 opts["name"] = alias
                 updateCtl(self.session.name, "Inactivate", **opts)
-        self.subtitle = f"Glossary Servers Saved: {len(new):d}"
         s = "" if len(new) == 1 else "s"
+        alert = f"Successfully stored {len(new):d} glossary server{s}."
+        self.alerts.append(dict(message=alert, type="success"))
         self.logger.info("%d server%s saved by %s", len(new), s, self.user)
         self.show_form()
 
-    @property
-    def buttons(self):
-        """Customize the action buttons to add DEVMENU."""
-        return self.SUBMIT, self.DEVMENU, self.ADMINMENU, self.LOG_OUT
+    @cached_property
+    def same_window(self):
+        """Keep everything on the same tab."""
+        return [self.SUBMIT]
 
-    @property
+    @cached_property
     def servers(self):
         """Dictionary of name->URL mappings for the glossary servers.
 
@@ -147,25 +154,7 @@ class Control(Controller):
             group = dict(Primary="https://{}".format(server))
         return group
 
-    @property
-    def subtitle(self):
-        """String displayed directly below the main banner."""
-
-        if not hasattr(self, "_subtitle"):
-            self._subtitle = self.SUBTITLE
-        return self._subtitle
-
-    @subtitle.setter
-    def subtitle(self, value):
-        """Let the save routing show what it did.
-
-        Pass:
-            value - new value to be displayed
-        """
-
-        self._subtitle = value
-
-    @property
+    @cached_property
     def user(self):
         """User account name string (for logging)."""
         return self.session.user_name

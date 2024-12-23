@@ -6,7 +6,7 @@
 from datetime import date, timedelta
 from json import dumps, loads
 from lxml import html
-from cdrcgi import Controller, DATETIMELEN
+from cdrcgi import Controller
 from cdrapi.docs import Doc
 
 
@@ -71,7 +71,7 @@ class Control(Controller):
         # Picklist for selecting drugs by name or group.
         fieldset = page.fieldset("Select Drugs For Report", id="name-block")
         if self.selection_method != "name":
-            fieldset.set("class", "hidden")
+            fieldset.set("class", "hidden usa-fieldset")
         opts = dict(
             label="Drug(s)",
             multiple=True,
@@ -86,7 +86,7 @@ class Control(Controller):
         fieldset = page.fieldset("Date Range of Last Published Version")
         fieldset.set("id", "date-block")
         if self.selection_method != "date":
-            fieldset.set("class", "hidden")
+            fieldset.set("class", "hidden usa-fieldset")
         opts = dict(label="Start Date", value=self.start)
         fieldset.append(page.date_field("start", **opts))
         opts = dict(label="End Date", value=self.end)
@@ -96,7 +96,7 @@ class Control(Controller):
         # Radio buttons for selecting drugs by reference type.
         fieldset = page.fieldset("Select Drug Reference Type", id="type-block")
         if self.selection_method != "type":
-            fieldset.set("class", "hidden")
+            fieldset.set("class", "hidden usa-fieldset")
         for value in self.REFTYPES:
             checked = value == self.reftype
             opts = dict(value=value, label=value, checked=checked)
@@ -106,7 +106,7 @@ class Control(Controller):
         # Extra choices for the "FDA approval" selection method.
         fieldset = page.fieldset("By FDA Approval Information", id="fda-block")
         if self.selection_method != "fda":
-            fieldset.set("class", "hidden")
+            fieldset.set("class", "hidden usa-fieldset")
         for value in self.FDA_APPROVAL_STATUSES:
             opts = dict(value=value, label=value, checked=True)
             fieldset.append(page.checkbox("fda-approval-status", **opts))
@@ -125,14 +125,7 @@ class Control(Controller):
     def show_report(self):
         """Override base table because this report doesn't fit the mold."""
 
-        buttons = (
-            self.HTMLPage.button("Back"),
-            self.HTMLPage.button(self.SUBMENU),
-            self.HTMLPage.button(self.ADMINMENU),
-            self.HTMLPage.button(self.LOG_OUT),
-        )
         opts = dict(
-            buttons=buttons,
             action=self.script,
             subtitle=self.subtitle,
             session=self.session,
@@ -140,7 +133,7 @@ class Control(Controller):
         )
         page = self.HTMLPage(self.PAGE_TITLE, **opts)
         page.form.append(page.hidden_field("vals", self.current_values))
-        now = str(self.started)[:DATETIMELEN]
+        now = str(self.started)[:self.DATETIMELEN]
         count = f"{len(self.summaries):d} documents found"
         if self.criteria:
             count = f"{count} {self.criteria}"

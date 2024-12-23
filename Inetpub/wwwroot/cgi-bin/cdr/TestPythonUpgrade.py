@@ -5,6 +5,7 @@
 Shows versions of everything.
 """
 
+from functools import cached_property
 from importlib import import_module
 from importlib.metadata import packages_distributions, version
 from os import devnull
@@ -13,7 +14,7 @@ from cdrcgi import Controller, Reporter
 
 
 class Control(Controller):
-    SUBTITLE = f"Python Upgrade Information ({str(sys.version)})"
+    SUBTITLE = "Python Upgrade Information"
     SUBMIT = None
     MODULES = (
         ("apscheduler", "Required by cdr_scheduler"),
@@ -49,8 +50,21 @@ class Control(Controller):
         """Go directly to the report."""
         self.show_report()
 
-    def build_tables(self):
+    @cached_property
+    def report(self):
+        """Overridden so we can add system information for the server."""
+
+        report = Reporter(self.title, self.tables, subtitle=self.subtitle)
+        page = report.page
+        B = page.B
+        table = page.main.find(".//table")
+        table.addprevious(B.P(B.EM(f"Python version {sys.version}")))
+        return report
+
+    @cached_property
+    def tables(self):
         """Test essential imports and show versions."""
+
         caption = "Module Import Status"
         cols = "Module", "Description", "Status"
         rows = []

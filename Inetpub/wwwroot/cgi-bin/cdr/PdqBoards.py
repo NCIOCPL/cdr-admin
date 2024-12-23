@@ -232,12 +232,13 @@ class Control(Controller):
             if self.include == "m":
                 query.join(f"{query_term} m", "m.doc_id = b.doc_id",
                            "m.path = '/Summary/@ModuleOnly'",
-                           "AND m.value = 'Yes'")
+                           "m.value = 'Yes'")
             else:
                 query.outer(f"{query_term} m", "m.doc_id = b.doc_id",
                             "m.path = '/Summary/@ModuleOnly'")
                 if self.include == "s":
                     query.where("(m.value IS NULL OR m.value <> 'Yes')")
+            query.log()
             rows = query.unique().execute(self.cursor).fetchall()
             self._summaries = [Summary(self, row) for row in rows]
         return self._summaries

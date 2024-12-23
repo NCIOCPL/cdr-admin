@@ -3,6 +3,7 @@
 """Report on unmapped values in the external mapping table.
 """
 
+from functools import cached_property
 from cdrcgi import Controller
 import datetime
 
@@ -46,34 +47,31 @@ class Control(Controller):
                 tables.append(table)
         return tables
 
-    @property
+    @cached_property
     def options(self):
         """Report options."""
         return self.fields.getlist("options")
 
-    @property
+    @cached_property
     def start(self):
         """Start date for the report based on the age value from the form."""
 
-        if not hasattr(self, "_start"):
-            age = self.fields.getvalue("age")
-            if not age:
-                self._start = None
-            else:
-                try:
-                    days = int(age)
-                except Exception:
-                    self.bail("Age must be an integer")
-                today = datetime.date.today()
-                self._start = today - datetime.timedelta(days)
-        return self._start
+        age = self.fields.getvalue("age")
+        if not age:
+            return None
+        try:
+            days = int(age)
+        except Exception:
+            self.bail("Age must be an integer")
+        today = datetime.date.today()
+        return today - datetime.timedelta(days)
 
-    @property
+    @cached_property
     def usage(self):
         """Mapping type(s) selected by the user from the form."""
         return self.fields.getlist("usage")
 
-    @property
+    @cached_property
     def usages(self):
         """Valid usage values for the form's picklist."""
 
@@ -97,43 +95,49 @@ class Usage:
         self.__control = control
         self.__name = name
 
-    @property
+    @cached_property
     def columns(self):
         """Column headers for the report table."""
+
         return (
-            self.__control.Reporter.Column("Value", width="800px"),
-            self.__control.Reporter.Column("Recorded", width="100px"),
+            self.__control.Reporter.Column("Value", width="80%"),
+            self.__control.Reporter.Column("Recorded", width="20%"),
         )
 
-    @property
+    @cached_property
     def rows(self):
         """Values for the report table."""
 
-        if not hasattr(self, "_rows"):
-            query = self.__control.Query("external_map m", *self.FIELDS)
-            query.order("m.last_mod DESC", "m.value")
-            query.join("external_map_usage u", "u.id = m.usage")
-            query.where("m.doc_id IS NULL")
-            query.where(query.Condition("u.name", self.__name))
-            if self.start:
-                query.where(query.Condition("m.last_mod", self.start, ">="))
-            if Control.NON_MAPPABLE not in self.__control.options:
-                query.where("m.mappable <> 'N'")
-            self._rows = query.execute(self.__control.cursor).fetchall()
-        return self._rows
+        query = self.__control.Query("external_map m", *self.FIELDS)
+        query.order("m.last_mod DESC", "m.value")
+        query.join("external_map_usage u", "u.id = m.usage")
+        query.where("m.doc_id IS NULL")
+        query.where(query.Condition("u.name", self.__name))
+        if self.start:
+            query.where(query.Condition("m.last_mod", self.start, ">="))
+        if Control.NON_MAPPABLE not in self.__control.options:
+            query.where("m.mappable <> 'N'")
+        rows = []
+        for value, last_mod in query.execute(self.__control.cursor).fetchall():
+            rows.append([value, str(last_mod).split(".")[0]])
+        return rows
 
-    @property
+    @cached_property
     def start(self):
         """Start date for the report based on the age value from the form."""
         return self.__control.start
 
-    @property
+    @cached_property
     def table(self):
         """Report table for this mapping type."""
 
         if not self.rows:
             return None
-        opts = dict(columns=self.columns, caption=self.__name)
+        opts = dict(
+            columns=self.columns,
+            caption=self.__name,
+            fixed=True
+        )
         return self.__control.Reporter.Table(self.rows, **opts)
 
 

@@ -81,7 +81,7 @@ class Control(Controller):
 
         # These are only shown when the selection method is document type.
         fieldset = page.fieldset("Document Type")
-        fieldset.set("class", "by-doctype-block")
+        fieldset.set("class", "by-doctype-block usa-fieldset")
         for doctype in self.DOCTYPES:
             checked = doctype == "Citation"
             opts = dict(value=doctype, label=doctype, checked=checked)
@@ -95,8 +95,7 @@ class Control(Controller):
 
         # Suppress this block if selecting documents by type (the default).
         fieldset = page.fieldset("Document ID")
-        fieldset.set("class", "by-id-block")
-        fieldset.set("hidden")
+        fieldset.set("class", "hidden by-id-block usa-fieldset")
         fieldset.append(page.text_field("cdr-id", label="CDR ID"))
         page.form.append(fieldset)
 
@@ -115,7 +114,7 @@ class Control(Controller):
         # Options available only for the "quick" (testing) version.
         fieldset = page.fieldset("Report Limits")
         fieldset.set("id", "throttle-block")
-        fieldset.set("class", "hidden")
+        fieldset.set("class", "hidden usa-fieldset")
         for what, value, tooltip in self.REPORT_LIMITS:
             opts = dict(label=f"Max {what}", value=value, tooltip=tooltip)
             fieldset.append(page.text_field(f"max-{what.lower()}", **opts))
@@ -166,8 +165,7 @@ class Control(Controller):
                 job.queue()
             except Exception as e:
                 self.bail(f"Could not start job: {e}")
-            args = self.TITLE, self.subtitle, self.script, self.SUBMENU
-            job.show_status_page(self.session, *args)
+            job.show_status_page(self.session)
 
     @property
     def args(self):
@@ -283,6 +281,8 @@ class Control(Controller):
                     if address:
                         self._email.append(address)
             else:
+                self.logger.info(str(dir(self.session)))
+                self.logger.info(self.session.name)
                 self._email = self.session.user.email
         return self._email
 

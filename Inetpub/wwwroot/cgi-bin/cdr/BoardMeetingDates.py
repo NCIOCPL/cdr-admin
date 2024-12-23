@@ -3,8 +3,9 @@
 """List PDQ editorial board meetings by date or board.
 """
 
-import datetime
-from cdrcgi import Controller, Reporter, bail
+from datetime import date
+from functools import cached_property
+from cdrcgi import Controller, Reporter
 from cdr import Board
 from cdrapi import db
 
@@ -46,9 +47,9 @@ class Control(Controller):
             fieldset.append(page.checkbox("board", **opts))
         page.form.append(fieldset)
         fieldset = page.fieldset("Date Range for Report")
-        today = datetime.date.today()
-        start = datetime.date(today.year, 1, 1)
-        end = datetime.date(today.year, 12, 31)
+        today = date.today()
+        start = date(today.year, 1, 1)
+        end = date(today.year, 12, 31)
         fieldset.append(page.date_field("start", value=str(start)))
         fieldset.append(page.date_field("end", value=str(end)))
         page.form.append(fieldset)
@@ -65,72 +66,62 @@ function check_board(val) {
         jQuery("#board-all").prop("checked", true);
 }""")
 
-    @property
+    @cached_property
     def caption(self):
         """Display string for the top of the table."""
 
-        if not hasattr(self, "_caption"):
-            caption = [self.SUBTITLE]
-            if self.start:
-                if self.end:
-                    caption.append(f"(between {self.start} and {self.end})")
-                else:
-                    caption.append(f"(on or after {self.start})")
-            elif self.end:
-                caption.append(f"(up through {self.end})")
-            self._caption = caption
-        return self._caption
+        caption = [self.SUBTITLE]
+        if self.start:
+            if self.end:
+                caption.append(f"(between {self.start} and {self.end})")
+            else:
+                caption.append(f"(on or after {self.start})")
+        elif self.end:
+            caption.append(f"(up through {self.end})")
+        return caption
 
-    @property
+    @cached_property
     def board(self):
         """Sequence of IDs for the boards to be included."""
-        if not hasattr(self, "_board"):
-            self._board = self.fields.getlist("board")
-            for board in self._board:
-                if board != "all" and int(board) not in self.boards:
-                    bail()
-        return self._board
 
-    @property
+        boards = self.fields.getlist("board")
+        for board in boards:
+            if board != "all" and int(board) not in self.boards:
+                self.bail()
+        return boards
+
+    @cached_property
     def boards(self):
         """PDQ boards for the form's picklist."""
-        if not hasattr(self, "_boards"):
-            self._boards = Board.get_boards(cursor=self.cursor)
-        return self._boards
+        return Board.get_boards(cursor=self.cursor)
 
-    @property
+    @cached_property
     def end(self):
         """End of the date range for the report."""
-        if not hasattr(self, "_end"):
-            self._end = self.fields.getvalue("end")
-        return self._end
+        return self.parse_date(self.fields.getvalue("end"))
 
-    @property
+    @cached_property
     def meetings(self):
         """Find the meetings which are in-scope for this report."""
-        if not hasattr(self, "_meetings"):
-            self._meetings = Meeting.get_meetings(self)
-        return self._meetings
+        return Meeting.get_meetings(self)
 
-    @property
+    @cached_property
     def report_type(self):
         """User's decision as to whether to report by board or by date."""
-        if not hasattr(self, "_report_type"):
-            self._report_type = self.fields.getvalue("report_type")
-            if not self._report_type:
-                self._report_type = self.BY_BOARD
-            elif self._report_type not in self.REPORT_TYPES:
-                bail()
-        return self._report_type
 
-    @property
+        report_type = self.fields.getvalue("report_type")
+        if not report_type:
+            report_type = self.BY_BOARD
+        elif report_type not in self.REPORT_TYPES:
+            self.bail()
+        return report_type
+
+    @cached_property
     def start(self):
         """Beginning of the date range for the report."""
-        if not hasattr(self, "_start"):
-            self._start = self.fields.getvalue("start")
-        return self._start
+        return self.parse_date(self.fields.getvalue("start"))
 
-    @property
+    @cached_property
     def table_by_board(self):
         """Create the 'by board' flavor of the report."""
 
@@ -151,7 +142,7 @@ function check_board(val) {
                 rows.append([meeting])
         return Reporter.Table(rows, caption=self.caption)
 
-    @property
+    @cached_property
     def table_by_date(self):
         """Create the 'by date' flavor of the report."""
 
@@ -164,8 +155,10 @@ function check_board(val) {
             prev = meeting.date.year, meeting.date.month
             classes = ["strikethrough"] if meeting.canceled else []
             center = classes + ["center"]
+            args = "-", self.NONBREAKING_HYPHEN
+            meeting_date = str(meeting.date).replace(*args)
             row = (
-                Reporter.Cell(meeting.date, classes=center),
+                Reporter.Cell(meeting_date, classes=center),
                 Reporter.Cell(meeting.day, classes=center),
                 Reporter.Cell(meeting.time, classes=center),
                 Reporter.Cell("Yes" if meeting.webex else "", classes=center),
@@ -173,6 +166,14 @@ function check_board(val) {
             )
             rows.append(row)
         return Reporter.Table(rows, columns=cols, caption=self.caption)
+
+    @cached_property
+    def wide_css(self):
+        """The "by date" flavor needs more room."""
+
+        if self.report_type == self.BY_DATE:
+            return self.Reporter.Table.WIDE_CSS
+        return None
 
 
 class Meeting:
@@ -201,40 +202,39 @@ class Meeting:
         self.__control = control
         self.__row = row
 
-    @property
+    @cached_property
     def board(self):
         """Board holding the meeting (`cdr.Board` object)."""
         return self.__control.boards.get(self.__row.board_id)
 
-    @property
+    @cached_property
     def canceled(self):
         """Boolean indicating whether the meeting has been canceled."""
         return self.__row.cancellation_reason is not None
 
-    @property
+    @cached_property
     def date(self):
         """Date of the meeting (a `datetime.date` object)."""
-        if not hasattr(self, "_date"):
-            y, m, d = self.__row.meeting_date.split("-")
-            self._date = datetime.date(int(y), int(m), int(d))
-        return self._date
 
-    @property
+        y, m, d = self.__row.meeting_date.split("-")
+        return date(int(y), int(m), int(d))
+
+    @cached_property
     def day(self):
         """String for the meeting's day of the week."""
         return self.date.strftime("%A")
 
-    @property
+    @cached_property
     def english_date(self):
         """Localized form of the date (no longer used)."""
         return self.date.strftime("%B %d, &Y")
 
-    @property
+    @cached_property
     def time(self):
         """String for the meeting's time block."""
         return self.__row.meeting_time
 
-    @property
+    @cached_property
     def webex(self):
         """Boolean indicating whether this is a remote meeting."""
         return self.__row.webex is not None
@@ -263,9 +263,10 @@ class Meeting:
         if control.board and "all" not in control.board:
             query.where(query.Condition("d.doc_id", list(control.board), "IN"))
         if control.start:
-            query.where(query.Condition("d.value", control.start, ">="))
+            query.where(query.Condition("d.value", str(control.start), ">="))
         if control.end:
-            query.where(query.Condition("d.value", control.end, "<="))
+            end = f"{control.end} 23:59:59"
+            query.where(query.Condition("d.value", end, "<="))
         query.log()
         return [cls(control, row) for row in query.execute(control.cursor)]
 
