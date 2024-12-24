@@ -6691,7 +6691,8 @@ class SummaryTests(Tester):
         self.set_field_value("DocId", summary_id)
         self.submit_form()
         self.assert_title("PT Bold/Underline QC Report")
-        self.assertTrue(self.select_version("RL"))
+        version_comment = "Edits to bone scan in RLSO; 1/8/18"
+        self.assertTrue(self.select_version(version_comment))
         self.submit_form()
         self.assert_page_has(summary_title)
         self.assert_page_has("<h3>Treatment - Patients</h3>")
@@ -6710,10 +6711,15 @@ class SummaryTests(Tester):
         self.set_field_value("DocId", summary_id)
         self.submit_form()
         self.assert_title("PT Redline/Strikeout QC Report")
-        self.assertTrue(self.select_version("RL"))
+        self.assertTrue(self.select_version(version_comment))
+        self.click("options-com-all")
         self.submit_form()
         self.assert_page_has(summary_title)
         self.assert_page_has("<h3>Treatment - Patients</h3>")
+        self.assert_page_has("[Comment: ")
+        self.assert_page_has("[Permanent-Comment: ")
+        self.assert_page_has('<span class="deleteapproved">08/18/2017</span>')
+        self.assert_page_has('<span class="insertapproved">01/08/2018</span>')
         styles = (
             ("insertproposed", "color", "green"),
             ("deleteproposed", "color", "green"),

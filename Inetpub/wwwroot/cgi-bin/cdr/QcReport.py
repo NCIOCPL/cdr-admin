@@ -408,7 +408,7 @@ class Control(Controller):
             name = label.split()[0].lower()
             key = ""
             for option in options:
-                key += "Y" if option in self.options else "N"
+                key += "Y" if option[0] in self.options else "N"
             setattr(comment_options, name, values[key])
         if "com-int" in self.options and "com-perm" in self.options:
             comment_options.external_permanent = "Y"
@@ -536,6 +536,8 @@ class Control(Controller):
             if name in self.options:
                 board_type = name.split("-")[1] + "-board"
                 board_types.append(board_type)
+        if self.patient and not board_types:
+            board_types = ["editorial-board"]
         markup_options.boards = "_".join(board_types)
         return markup_options
 
