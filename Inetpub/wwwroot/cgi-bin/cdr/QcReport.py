@@ -583,8 +583,8 @@ class Control(Controller):
                 ["IncludeExtPerm", self.comment_options.external_permanent],
                 ["IncludeIntAdv", self.comment_options.internal_advisory],
                 ["DisplayModuleMarkup", self.yn_flags.shade_modules],
-                ["DisplaySectMetaData", self.yn_flags.section_metadata],
-                ["DisplayQcOnlyMod", self.yn_flags.qc_only],
+                ["DisplaySectMetaData", self.yn_flags.section_meta],
+                ["DisplayQcOnlyMod", self.yn_flags.qc_only_mods],
                 ["displayBoard", self.markup_options.boards],
             ]
         if self.doctype and self.doctype.startswith("GlossaryTerm"):
@@ -752,6 +752,7 @@ class Control(Controller):
         """Convert Boolean options to "Y" or "N" strings."""
 
         class Flags:
+            """Boolean values dynamically extracted from self.options."""
             def __init__(self, options):
                 self.options = options
 
