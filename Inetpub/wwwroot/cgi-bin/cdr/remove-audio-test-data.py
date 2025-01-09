@@ -194,6 +194,6 @@ class Control(Controller):
         return self.fields.getvalue("sftp-dir") or self.SFTP_DIR
 
 
+# Don't run script if loaded as a module.
 if __name__ == "__main__":
-    """Don't run script if loaded as a module."""
     Control().run()

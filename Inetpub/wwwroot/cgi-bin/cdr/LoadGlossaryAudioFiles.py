@@ -122,6 +122,7 @@ class Control(Controller):
             return {}
 
         # Process each zip archive.
+        term_docs = {}
         for path in self.zipfiles:
             zipfile = ZipFile(f"{self.directory}/{path}")
 
@@ -130,7 +131,6 @@ class Control(Controller):
             termnames = set()
 
             # Find the Excel workbook in the zipfile.
-            term_docs = {}
             bookpath = None
             for name in zipfile.namelist():
                 if "MACOSX" not in name and name.endswith(".xlsx"):
@@ -622,7 +622,7 @@ class Updater(Job):
         For English, use the TermNameString for the English TermName
         For Spanish, use the same (English) name with "-Spanish" appended
       Update MediaSource/OriginalSource elements
-        Creator = "Vanessa RichardsonVanessa Richardson, VR Voice"
+        Creator = "Vanessa Richardson, VR Voice"
         DateCreated = today (YYYY-MM-DD string)
         SourceFilename = WEEK_DIRECTORY/GTN-CDR-INTEGER-ID_e[ns]_rr.mp3
       Update ContentDescription element:

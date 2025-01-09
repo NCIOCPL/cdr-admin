@@ -5004,6 +5004,8 @@ class MediaTests(Tester):
         source_directory = f"{audio_directory}/Term_Audio"
         path = f"{source_directory}/Week_2099_01.zip"
         self.assert_page_has(f"Successfully stored {path}.")
+        path = f"{source_directory}/Week_2099_01_Rev1.zip"
+        self.assert_page_has(f"Successfully stored {path}.")
         pattern = r"Created test GlossaryTermName document CDR0*(\d+)\."
         re_match = re_search(pattern, self.get_page_source())
         self.assertIsNotNone(re_match)
@@ -5030,7 +5032,9 @@ class MediaTests(Tester):
         self.assert_page_has(f"Destination directory: {destination_directory}")
         self.assert_page_has(f"Transferred directory: {transferred_directory}")
         self.assert_page_has("Retrieved Week_2099_01.zip")
+        self.assert_page_has("Retrieved Week_2099_01_Rev1.zip")
         self.assert_page_has("Moved Week_2099_01.zip to Transferred directory")
+        self.assert_page_has("Moved Week_2099_01_Rev1.zip to Transferred")
 
         # Bring up the review landing page.
         self.navigate_to("GlossaryTermAudioReview.py")
@@ -5041,8 +5045,8 @@ class MediaTests(Tester):
         columns = "File name", "Review status", "Date modified"
         table.check_headers(columns)
 
-        # Find the archive we just created.
-        def find_test_archive(driver):
+        # Find one of the archives we just created.
+        def find_test_archive(driver, name):
             logger = self.logger
 
             class Archive:
@@ -5076,11 +5080,11 @@ class MediaTests(Tester):
 
             for row in driver.find_elements(By.CSS_SELECTOR, "tbody tr"):
                 archive = Archive(row)
-                if archive.name == "Week_2099_01.zip":
+                if archive.name == name:
                     return archive
             return None
 
-        archive = find_test_archive(self.driver)
+        archive = find_test_archive(self.driver, "Week_2099_01.zip")
         self.assertIsNotNone(archive)
         self.assertIsNotNone(archive.link)
         self.assertEqual(archive.status, "Unreviewed")
@@ -5172,21 +5176,56 @@ class MediaTests(Tester):
 
         # Perform and save the reviews.
         self.click(f"status-{rows[0].id}-a")
-        self.click(f"status-{rows[1].id}-a")
+        self.click(f"status-{rows[1].id}-r")
         self.driver.find_element(By.ID, "submit-button-save").click()
         self.assert_title("Glossary Term Audio Review")
         self.assert_page_has("Audio Set Week_2099_01.zip Review Complete")
-        archive = find_test_archive(self.driver)
+        archive = find_test_archive(self.driver, "Week_2099_01.zip")
         self.assertIsNotNone(archive)
         self.assertIsNone(archive.link)
         self.assertEqual(archive.status, "Completed")
         self.assertTrue(archive.modified.startswith(str(date.today())))
+        self.assert_page_has("You can retrieve")
+
+        # Open up the followup set for review.
+        archive = find_test_archive(self.driver, "Week_2099_01_Rev1.zip")
+        self.assertIsNotNone(archive)
+        self.assertIsNotNone(archive.link)
+        self.assertEqual(archive.status, "Unreviewed")
+        self.assertTrue(archive.modified.startswith(str(date.today())))
+        archive.link.click()
+        self.select_new_tab()
+        table = self.load_table()
+        rows = []
+        for row in self.driver.find_elements(By.CSS_SELECTOR, "tbody tr"):
+            rows.append(MP3Row(row))
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].name, "término de prueba de muestra")
+        self.assertEqual(rows[0].language, "Spanish")
+        self.assertEqual(rows[0].pronunciation, "")
+        self.assertEqual(rows[0].path, f"Week_2099_01_Rev1/{doc_id}_es.mp3")
+        self.assertEqual(rows[0].reader_note, "Second time's the charm!")
+
+        # Perform and save the review.
+        self.click(f"status-{rows[0].id}-a")
+        self.driver.find_element(By.ID, "submit-button-save").click()
+        self.assert_title("Glossary Term Audio Review")
+        self.assert_page_has("Audio Set Week_2099_01_Rev1.zip Review Complete")
+        archive = find_test_archive(self.driver, "Week_2099_01_Rev1.zip")
+        self.assertIsNotNone(archive)
+        self.assertIsNone(archive.link)
+        self.assertEqual(archive.status, "Completed")
+        self.assertTrue(archive.modified.startswith(str(date.today())))
+        self.assert_page_not_has("You can retrieve")
+        self.assert_page_has("None of the files in the set were rejected")
+        self.assert_page_has(", so there is no new workbook for a subsequent")
 
         # Import the media documents and link them to the glossary term doc.
         self.navigate_to("LoadGlossaryAudioFiles.py")
         self.assert_title("Load Glossary Audio Files")
         self.assert_page_has("Compressed Archives containing Audio files")
         self.assert_page_has("Week_2099_01.zip")
+        self.assert_page_has("Week_2099_01_Rev1.zip")
         self.submit_form()
         self.assert_title("Load Glossary Audio Files")
         self.assert_tables_in_grid_container()
@@ -5203,7 +5242,7 @@ class MediaTests(Tester):
         self.assertEqual(table.rows[0][1].text, expected)
         expected = (
             f"created Media doc for CDR{doc_id} ('término de prueba de "
-            "muestra' [es]) from Week_2099_01.zip"
+            "muestra' [es]) from Week_2099_01_Rev1.zip"
         )
         self.assertEqual(table.rows[1][1].text, expected)
         self.assertEqual(table.rows[2][0].text, f"CDR{doc_id}")
@@ -5218,9 +5257,12 @@ class MediaTests(Tester):
         alerts = (
            f"Removed remote /sftp/sftphome/cdrstaging/ciat/{tier}/Audio"
            "/Audio_Transferred/Week_2099_01.zip.",
+           f"Removed remote /sftp/sftphome/cdrstaging/ciat/{tier}/Audio"
+           "/Audio_Transferred/Week_2099_01_Rev1.zip.",
            r"Removed local D:\cdr\Audio_from_CIPSFTP\Week_2099_01.zip.",
-           "Removed 2 rows from the term_audio_mp3 table.",
-           "Removed 1 row from the term_audio_zipfile table.",
+           r"Removed local D:\cdr\Audio_from_CIPSFTP\Week_2099_01_Rev1.zip.",
+           "Removed 3 rows from the term_audio_mp3 table.",
+           "Removed 2 rows from the term_audio_zipfile table.",
            f"Deleted GlossaryTermName document CDR{doc_id:010d}.",
            f"Deleted Media document CDR{int(media_en[3:]):010d}.",
            f"Deleted Media document CDR{int(media_es[3:]):010d}.",
