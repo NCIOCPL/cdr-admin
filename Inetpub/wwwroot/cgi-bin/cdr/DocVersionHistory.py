@@ -254,17 +254,28 @@ class Document:
                     return event.job_id
         return self._last_push_job
 
-    @property
+    @cached_property
     def pub_events(self):
         """Sequence of publishing events in reverse chronological order."""
 
-        if not hasattr(self, "_pub_events"):
-            query = self.control.Query("primary_pub_doc", "*")
-            query.where(query.Condition("doc_id", self.doc.id))
-            query.order("started DESC", "pub_proc DESC")
-            rows = query.execute(self.control.cursor).fetchall()
-            self._pub_events = [self.PubEvent(self, row) for row in rows]
-        return self._pub_events
+        fields = (
+            "d.doc_version",
+            "d.pub_proc",
+            "d.removed",
+            "p.output_dir",
+            "p.started",
+        )
+        query = self.control.Query("pub_proc_doc d", *fields)
+        query.join("pub_proc p", "p.id = d.pub_proc")
+        query.where(f"d.doc_id = {self.doc.id}")
+        query.where(f"p.pub_system = {self.pub_system_id}")
+        query.where("p.status = 'Success'")
+        query.where("p.completed IS NOT NULL")
+        query.where("d.failure IS NULL")
+        query.order("p.started DESC", "d.pub_proc DESC")
+        query.log()
+        rows = query.execute(self.control.cursor).fetchall()
+        return [self.PubEvent(self, row) for row in rows]
 
     @property
     def pub_events_by_version(self):
@@ -289,6 +300,16 @@ class Document:
             rows = query.execute(self.control.cursor).fetchall()
             self._published = True if rows else False
         return self._published
+
+    @cached_property
+    def pub_system_id(self):
+        """Used to narrow down the publishing events to primary events."""
+
+        query = self.control.Query("document d", "d.id")
+        query.join("doc_type t", "t.id = d.doc_type")
+        query.where("t.name = 'PublishingSystem'")
+        query.where("d.title = 'Primary'")
+        return query.execute(self.control.cursor).fetchone().id
 
     @property
     def removal(self):
