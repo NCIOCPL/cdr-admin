@@ -193,7 +193,11 @@ class Control(Controller):
                 self.show_form()
         except Exception as e:
             self.logger.exception("Filter failure")
-            self.bail(f"Filter failure: {e}")
+            try:
+                self.bail(f"Filter failure: {e}")
+            except Exception:
+                self.logger.exception("failure bailing")
+                self.bail()
 
     def show_report(self):
         """Override the base class method to add custom styling."""
@@ -582,16 +586,16 @@ class FilterSpec:
         if self.set_name:
             if self.set_name.upper() not in self.control.all_filter_sets:
                 args = self.set_name, self.control.session.tier
-                message = "{} is not a filter set on the CDR {} server"
+                message = "{!r} is not a filter set on the CDR {} server"
                 error = message.format(*args)
         elif self.filter_name:
             if self.filter_name.upper() not in self.control.all_filters:
                 args = self.filter_name, self.control.session.tier
-                message = "{} is not a filter name on the CDR {} server"
+                message = "{!r} is not a filter name on the CDR {} server"
                 error = message.format(*args)
         elif self.filter_id not in self.control.all_filter_ids:
             args = self.identifier, self.control.session.tier
-            message = "{} is not a filter ID on the CDR {} server"
+            message = "{!r} is not a filter ID on the CDR {} server"
             error = message.format(*args)
         return error
 
