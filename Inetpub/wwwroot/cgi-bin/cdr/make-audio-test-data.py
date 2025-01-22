@@ -42,8 +42,8 @@ class Control(Controller):
     AUDIO_DIR = f"{CDRSTAGING}/ciat/{TIER.name.lower()}/Audio"
     TARGET_DIR = f"{AUDIO_DIR}/Term_Audio"
     INSTRUCTIONS = (
-        "This script generates a zip-compressed archive containing an Excel "
-        "workbook and two sample MP3 files, and stores that file in the "
+        "This script generates two zip-compressed archives containing Excel "
+        "workbooks and sample MP3 files, and stores those archive in the "
         "directory specified below. If you invoke this script directly, "
         "you should be careful to run the ",
         HTMLPage.B.A("companion script for cleaning up the test data"),
@@ -83,15 +83,24 @@ class Control(Controller):
             message = "This account is not permitted to create term documents."
             self.alerts.append(dict(message=message, type="error"))
             return self.show_form()
-        target = f"{self.target}/{self.WEEK}.zip"
         try:
-            source = BytesIO(self.zipfile)
+            targets = (
+                f"{self.target}/{self.WEEK}.zip",
+                f"{self.target}/{self.WEEK}_Rev1.zip",
+            )
+            sources = (
+                BytesIO(self.base_zipfile),
+                BytesIO(self.followup_zipfile),
+            )
             with self.connection.open_sftp() as sftp:
-                sftp.putfo(source, target)
-            message = f"Successfully stored {target}."
-            self.alerts.append(dict(message=message, type="success"))
+                sftp.putfo(sources[0], targets[0])
+                message = f"Successfully stored {targets[0]}."
+                self.alerts.append(dict(message=message, type="success"))
+                sftp.putfo(sources[1], targets[1])
+                message = f"Successfully stored {targets[1]}."
+                self.alerts.append(dict(message=message, type="success"))
         except Exception as e:
-            message = f"Failed pushing to {target}"
+            message = f"Failed pushing {targets[0]} and {targets[1]}"
             self.logger.exception(message)
             self.alerts.append(dict(message=f"{message}: {e}", type="error"))
         self.show_form()
@@ -158,8 +167,8 @@ class Control(Controller):
         return etree.tostring(root, **opts)
 
     @cached_property
-    def workbook(self):
-        """Bytes for workbook of test audio pronunciations """
+    def base_workbook(self):
+        """Bytes for first workbook of test audio pronunciations."""
 
         excel = Excel(self.WEEK)
         excel.add_sheet("Term Names")
@@ -183,18 +192,50 @@ class Control(Controller):
         return iobytes.getvalue()
 
     @cached_property
-    def zipfile(self):
+    def base_zipfile(self):
         """File to be dropped on the s/FTP server."""
 
         iobytes = BytesIO()
         zipfile = ZipFile(iobytes, "w")
-        zipfile.writestr(f"{self.WEEK}/{self.WEEK}.xlsx", self.workbook)
+        zipfile.writestr(f"{self.WEEK}/{self.WEEK}.xlsx", self.base_workbook)
         zipfile.writestr(f"{self.WEEK}/{self.doc.id}_en.mp3", self.mp3)
         zipfile.writestr(f"{self.WEEK}/{self.doc.id}_es.mp3", self.mp3)
         zipfile.close()
         return iobytes.getvalue()
 
+    @cached_property
+    def followup_workbook(self):
+        """Bytes for a second workbook."""
 
+        excel = Excel(f"{self.WEEK}_Rev1")
+        excel.add_sheet("Term Names")
+        styles = dict(alignment=excel.center, font=excel.bold)
+        col = 1
+        for col, (name, width) in enumerate(self.COLUMNS, start=1):
+            excel.set_width(col, width)
+            excel.write(1, col, name, styles)
+        excel.write(2, 1, self.doc.id)
+        excel.write(2, 2, self.SPANISH_NAME)
+        excel.write(2, 3, "Spanish")
+        excel.write(2, 5, f"{self.WEEK}_Rev1/{self.doc.id}_es.mp3")
+        excel.write(2, 6, "Second time's the charm!")
+        iobytes = BytesIO()
+        excel.book.save(iobytes)
+        return iobytes.getvalue()
+
+    @cached_property
+    def followup_zipfile(self):
+        """Second file to be dropped on the s/FTP server."""
+
+        iobytes = BytesIO()
+        zipfile = ZipFile(iobytes, "w")
+        workbook = self.followup_workbook
+        zipfile.writestr(f"{self.WEEK}_Rev1/{self.WEEK}_Rev1.xlsx", workbook)
+        zipfile.writestr(f"{self.WEEK}_Rev1/{self.doc.id}_es.mp3", self.mp3)
+        zipfile.close()
+        return iobytes.getvalue()
+
+
+# Don't run script if loaded as a module.
 if __name__ == "__main__":
-    """Don't run script if loaded as a module."""
     Control().run()
