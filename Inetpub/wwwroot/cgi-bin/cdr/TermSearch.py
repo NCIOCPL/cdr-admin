@@ -58,7 +58,7 @@ class TermSearch(AdvancedSearch):
         opts["value"] = "Search NCI Thesaurus"
         opts["onclick"] = f"window.open('{self.NCIT}', 'ncit');"
         page.form.append(page.B.INPUT(classes, **opts))
-        page.body.append(page.B.SCRIPT(src=f"{page.USWDS}/js/uswds.min.js"))
+        page.add_uswds_script()
         Controller.send_page(page.tostring())
 
     @cached_property

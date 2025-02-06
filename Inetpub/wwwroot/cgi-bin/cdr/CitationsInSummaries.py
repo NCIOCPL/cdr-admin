@@ -41,20 +41,6 @@ class Control(Controller):
         "documents to be included, and/or the maximum number of seconds "
         "for collecting the information to be included in the report."
     )
-    SCRIPT = """\
-function check_options(setting) {
-    if (setting == "quick") {
-        if (jQuery("#options-quick").prop("checked")) {
-            jQuery("#limit-block").show();
-            jQuery("#email-block").hide();
-        }
-        else {
-            jQuery("#limit-block").hide();
-            jQuery("#email-block").show();
-        }
-    }
-}
-"""
 
     def populate_form(self, page):
         """Find out how the users wants to run this report.
@@ -91,7 +77,7 @@ function check_options(setting) {
             opts = dict(label=display, value=value)
             fieldset.append(page.text_field(name, **opts))
         page.form.append(fieldset)
-        page.add_script(self.SCRIPT)
+        page.head.append(page.B.SCRIPT(src="/js/CitationsInSummaries.js"))
 
     def show_report(self):
         """Queue the report or generate it directly."""

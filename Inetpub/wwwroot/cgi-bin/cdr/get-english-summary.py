@@ -93,7 +93,7 @@ class Control(Controller):
         opts = dict(value="raw", label="Raw (for import into Trados)")
         fieldset.append(page.radio_button("fmt", **opts))
         page.form.append(fieldset)
-        page.add_script("jQuery(function(){jQuery('id').focus();}")
+        page.head.append(page.B.SCRIPT(src="/js/get-english-summary.js"))
 
     def show_report(self):
         """Not a standard report, so we override the base class version."""

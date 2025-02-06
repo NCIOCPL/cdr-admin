@@ -85,21 +85,7 @@ class Control(Controller):
         page.form.append(fieldset)
 
         # Add the client-side script to control the password block.
-        page.add_script("""\
-function check_authmode(mode) {
-    switch (mode) {
-        case 'local':
-            jQuery('#password-fields').show();
-            break;
-        case 'network':
-            jQuery('#password-fields').hide();
-            break;
-    }
-}
-jQuery(function() {
-    var mode = jQuery("input[name='authmode']:checked").val();
-    check_authmode(mode);
-});""")
+        page.head.append(page.B.SCRIPT(src="/js/EditUser.js"))
 
         # Make it easier to see all the groups.
         page.add_css("""\

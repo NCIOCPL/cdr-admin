@@ -42,23 +42,6 @@ class Control(Controller):
         ("Response Date", "Resp. Date"),
     )
     DEFAULTS = "Phone", "E-mail"
-    JS = (
-        "function check_columns(dummy) {}",
-        "function check_type(choice) {",
-        "    if (choice == 'full') {",
-        "        jQuery('#full-options-box').show();",
-        "        jQuery('.summary-fieldset').hide();",
-        "    }",
-        "    else {",
-        "        jQuery('#full-options-box').hide();",
-        "        jQuery('.summary-fieldset').show();",
-        "    }",
-        "}",
-        "jQuery(function() {",
-        "    var choice = jQuery('input[name=\"type\"]:radio:checked').val();",
-        "    check_type(choice);",
-        "});",
-    )
     EXTRA_HELP = (
         "The 'Extra Cols' field's value must be an integer, specifying the "
         "number of additional blank columns to be added to the report. You "
@@ -104,7 +87,7 @@ class Control(Controller):
         page.form.append(fieldset)
         fieldset = page.fieldset("Columns to Include")
         fieldset.set("class", "summary-fieldset hidden usa-fieldset")
-        for name, header in self.COLUMNS:
+        for name, _ in self.COLUMNS:
             checked = name in self.DEFAULTS
             opts = dict(value=name, label=name, checked=checked)
             if name == "Term End Date":
@@ -121,7 +104,7 @@ class Control(Controller):
         page.form.append(fieldset)
         fieldset = page.add_output_options(default="html")
         fieldset.set("class", "summary-fieldset hidden usa-fieldset")
-        page.add_script("\n".join(self.JS))
+        page.head.append(page.B.SCRIPT(src="/js/BoardRoster.js"))
 
     def show_report(self):
         """Override the base class (this might not be a tabular report)."""

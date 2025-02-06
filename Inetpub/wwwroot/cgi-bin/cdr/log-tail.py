@@ -70,7 +70,7 @@ class Control(Controller):
         label = "Retrieve raw log bytes"
         fieldset.append(page.checkbox("r", value="yes", label=label))
         page.form.append(fieldset)
-        page.body.append(page.B.SCRIPT("jQuery('#p').focus();"))
+        page.body.append(page.B.SCRIPT(src="/js/log-tail.js"))
 
     def find(self):
         """Use the Windows find command to search for a pattern in the file."""

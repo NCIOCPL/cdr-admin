@@ -15,18 +15,7 @@ class Control(Controller):
     SUBTITLE = "Summaries With Non-Journal Article Citations Report"
     LANGUAGE_PATH = "/Summary/SummaryMetaData/SummaryLanguage"
     BOARD_PATH = "/Summary/SummaryMetaData/PDQBoard/Board/@cdr:ref"
-    SCRIPT = """\
-function check_board(val) {
-    if (val == "all") {
-        jQuery("input[name='board']").prop("checked", false);
-        jQuery("#board-all").prop("checked", true);
-    }
-    else if (jQuery("input[name='board']:checked").length > 0)
-        jQuery("#board-all").prop("checked", false);
-    else
-        jQuery("#board-all").prop("checked", true);
-}
-"""
+    SCRIPT = "/js/SummariesWithNonJournalArticleCitations.js"
 
     def populate_form(self, page):
         """Add the report request fields to the form.
@@ -41,7 +30,7 @@ function check_board(val) {
         for value in self.types:
             fieldset.append(page.checkbox("type", value=value, label=value))
         page.form.append(fieldset)
-        page.add_script(self.SCRIPT)
+        page.head.append(page.B.SCRIPT(src=self.SCRIPT))
 
     def show_report(self):
         """Overridden because the table is too wide for the standard layout."""

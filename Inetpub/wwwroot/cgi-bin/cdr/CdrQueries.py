@@ -96,27 +96,8 @@ class Control(Controller):
 
         # Add some client-side scripting to support scrolling through
         # the stored queries.
-        page.add_script(f"""\
-var queries = {dumps(self.queries, indent=4)};
-function show_query() {{
-    let name = jQuery("#query").children("option:selected").val();
-    jQuery("#sql").val(queries[name]);
-    adjust_height();
-}}
-function adjust_height() {{
-    console.log("adjusting height");
-    let box = jQuery("#sql");
-    let sql = box.val() + "x";
-    let rows = sql.split(/\\r\\n|\\r|\\n/).length;
-    let old_rows = box.attr("rows");
-    console.log("rows=" + rows + " old rows=" + old_rows);
-    if (box.attr("rows") != rows)
-        box.attr("rows", rows);
-}}
-jQuery(function() {{
-    jQuery("#query").focus();
-    jQuery("#sql").on("input", adjust_height);
-}});""")
+        page.add_script(f"var queries = {dumps(self.queries, indent=2)};")
+        page.head.append(page.B.SCRIPT(src="/js/CdrQueries.js"))
 
     def run(self):
         """Override the top-level entry point."""

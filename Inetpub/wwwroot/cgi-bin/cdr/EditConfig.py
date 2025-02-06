@@ -36,13 +36,7 @@ class Control(Controller):
         page.add_css("""\
 .usa-textarea { font-family: monospace; font-size: .9rem; height: 32rem; }
 """)
-        page.add_script(f"""\
-function change_file() {{
-    var url = "{self.script}?Session={self.session.name}&filename=";
-    var filename = jQuery("#filename option:selected").val();
-    if (filename)
-        window.location.href = url + filename;
-}}""")
+        page.head.append(page.B.SCRIPT(src="/js/EditConfig.js"))
 
     def run(self):
         """Override the top-level entry point, as this isn't a report."""

@@ -19,3 +19,7 @@ li { list-style-type: none; }
 fieldset li.filter { color: blue; }
 fieldset li.dummy { color: red; }
 #filters, #sets { height: 150px; overflow-y: scroll; }
+.remove-intent {
+    opacity: 0.5;
+    background-color: #f8d7da;
+}

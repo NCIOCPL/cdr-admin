@@ -140,19 +140,7 @@ p { margin: 0 0 35px 0; font-style: italic; }""")
             opts = dict(value=value, label=label, checked=checked)
             fieldset.append(page.checkbox("column", **opts))
         page.form.append(fieldset)
-        page.add_script("""\
-function check_format(which) {
-    let format = jQuery("#report-formats input:checked").val();
-    console.log("format is now " + format);
-    if (format == "full")
-        jQuery("#columns").hide();
-    else
-        jQuery("#columns").show();
-}
-jQuery(function() {
-    //jQuery("#report-formats input").click(check_format);
-    check_format();
-});""")
+        page.head.append(page.B.SCRIPT(src="/js/BoardRosterFull.js"))
 
     @cached_property
     def boards(self):

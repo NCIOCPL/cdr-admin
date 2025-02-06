@@ -85,27 +85,6 @@ class Control(Controller):
         """
 
         page.form.set("enctype", "multipart/form-data")
-        if not self.job.new:
-            page.add_script(f"""\
-jQuery(function() {{
-  jQuery("input[value='{self.DELETE}']").click(function(e) {{
-    if (confirm("Are you sure?"))
-      return true;
-    e.preventDefault();
-  }});
-}});""")
-        else:
-            page.add_script(f"""\
-var submitted = false;
-jQuery(function() {{
-  jQuery("input[value='{self.SUBMIT}']").click(function(e) {{
-    if (!submitted) {{
-      submitted = true;
-      return true;
-    }}
-    e.preventDefault();
-  }});
-}});""")
         user = self.job.assigned_to
         users = self.translators
         if user:
@@ -164,6 +143,7 @@ jQuery(function() {{
             "#doc-identification { margin-bottom: 1.5rem; }\n"
             "#doc-identification div { font-weight: bold; }\n"
         )
+        page.head.append(page.B.SCRIPT(src="/js/translation-job.js"))
 
     def populate_summary_selection_form(self, page):
         """

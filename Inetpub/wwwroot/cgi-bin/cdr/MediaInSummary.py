@@ -42,7 +42,6 @@ h1 { text-align: center; font-size: 1.3em; }
                     label=summary.display,
                     value=summary.id,
                     tooltip=summary.tooltip,
-                    onclick=None
                 )
                 fieldset.append(page.radio_button("cdr-id", **opts))
             page.form.append(fieldset)
@@ -54,6 +53,7 @@ h1 { text-align: center; font-size: 1.3em; }
             for method in self.METHODS:
                 value = method.split()[-1].lower()
                 opts = dict(label=f"By {method}", value=value, checked=checked)
+                opts["onclick"] = f'check_selection_method("{value}");'
                 fieldset.append(page.radio_button("selection_method", **opts))
                 checked = True
             page.form.append(fieldset)
@@ -75,7 +75,7 @@ h1 { text-align: center; font-size: 1.3em; }
         fieldset = page.fieldset("Language")
         label = "Display English and Spanish Document"
         checked = self.show_both_languages
-        opts = dict(value="all", label=label, checked=True, onclick=None)
+        opts = dict(value="all", label=label, checked=True)
         fieldset.append(page.checkbox("language", **opts))
         page.form.append(fieldset)
 
@@ -87,7 +87,7 @@ h1 { text-align: center; font-size: 1.3em; }
         )
         for value, label in display_options:
             checked = not self.request or value in self.display
-            opts = dict(value=value, label=label, checked=checked, onclick="")
+            opts = dict(value=value, label=label, checked=checked)
             fieldset.append(page.checkbox("show", **opts))
         page.form.append(page.hidden_field("debug", self.debug or ""))
         page.form.append(fieldset)

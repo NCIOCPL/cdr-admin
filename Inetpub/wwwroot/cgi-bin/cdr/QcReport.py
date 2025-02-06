@@ -311,7 +311,6 @@ class Control(Controller):
                     "Show Individual Options",
                     page.B.CLASS("usa-button"),
                     id="show-options",
-                    onclick="toggle_alternate_comment_options()",
                     type="button",
                 )
             )

@@ -91,49 +91,8 @@ class Control(Controller):
         page.form.append(fieldset)
 
         # Add some fancy client-side scripting.
-        page.add_script(f"""\
-var groups = {self.groups.json};
-function check_group() {{
-    let group = jQuery("#group option:checked").val();
-    console.log("new group is " + group);
-    //let name = groups[group]["default"];
-    let dropdown = jQuery("#name");
-    dropdown.empty();
-    let checked = true;
-    let options = groups[group].options;
-    for (let o in options) {{
-        let val = options[o].key;
-        let name = options[o].name;
-        console.log(name);
-        let elem = jQuery("<option></option>").attr("value", val).text(name);
-        if (checked) {{
-            elem.attr("checked", true);
-            dropdown.prop("selectedIndex", 0);
-        }}
-        checked = false;
-        dropdown.append(elem);
-    }}
-    check_name();
-}}
-function check_name() {{
-    let group = jQuery("#group option:checked").val();
-    console.log("check_name(): group="+group);
-    let name = jQuery("#name option:checked").val();
-    console.log("check_name(): name="+name);
-    let values = groups[group].values[name]
-    jQuery("#value").val(values.value);
-    jQuery("#comment").val(values.comment);
-    let lines = (values.value.match(/\\n/g) || "").length + 2;
-    if (lines > 50)
-        lines = 50;
-    jQuery("#value").attr("rows", lines);
-}}
-/*
-jQuery(function() {{
-    jQuery("input[value='{self.SHOW}']").click(function() {{
-        window.open("{self.URL}", "_blank");
-    }});
-}}); */""")
+        page.add_script(f"const groups = {self.groups.json};")
+        page.head.append(page.B.SCRIPT(src="/js/EditControlValues.js"))
 
         # Customize the fonts.
         page.add_css("#value { font-family: Courier; }")

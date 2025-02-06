@@ -1,23 +1,23 @@
+/**
+ * Client-side scripting for the Summary Metadata report.
+ */
+
+// Show the fields required for the current document selection method.
 function check_method(method) {
-    switch (method) {
-    case "id":
-        $("#doc-id-box").show();
-        $("#doc-title-box").hide();
-        $("#group-box").hide();
-        break;
-    case "title":
-        $("#doc-id-box").hide();
-        $("#doc-title-box").show();
-        $("#group-box").hide();
-        break;
-    case "group":
-        $("#doc-id-box").hide();
-        $("#doc-title-box").hide();
-        $("#group-box").show();
-        break;
-    }
+  const blocks = [
+    ["id", "doc-id-box"],
+    ["title", "doc-title-box"],
+    ["group", "group-box"],
+  ];
+  blocks.forEach(([m, id]) => document.getElementById(id).style.display = method === m ? "block" : "none");
 }
-$(function() {
-    var method = $("input[name='method']:checked").val();
-    check_method(method);
+
+// Hook up the listener and start out with the right blocks visible.
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll("input[name='method']").forEach(button => {
+    button.addEventListener("click", () => check_method(button.value));
+  });
+  const selector = "input[name='method']:checked";
+  const method = document.querySelector(selector).value ?? "";
+  check_method(method);
 });

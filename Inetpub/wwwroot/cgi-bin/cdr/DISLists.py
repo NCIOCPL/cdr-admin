@@ -156,11 +156,7 @@ class Control(Controller):
             opts = dict(value=value, label=label, checked=checked)
             fieldset.append(page.checkbox("options", **opts))
         page.form.append(fieldset)
-        page.add_script("""\
-function check_options(value) {
-    if (!jQuery("#options-gridlines").prop("checked"))
-        jQuery("#options-extra").prop("checked", false);
-}""")
+        page.head.append(page.B.SCRIPT(src="/js/DISLists.js"))
 
     @property
     def agent_types(self):

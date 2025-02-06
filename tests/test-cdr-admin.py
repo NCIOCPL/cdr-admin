@@ -180,7 +180,7 @@ class Tester(TestCase):
     @cached_property
     def wait(self):
         """A WebDriverWait instance, used for interacting with popups."""
-        return WebDriverWait(self.driver, timeout=2)
+        return WebDriverWait(self.driver, timeout=15)
 
     def add_user_to_group(self, user, group):
         """Add the specified user to a CDR user group.
@@ -975,6 +975,10 @@ class Tester(TestCase):
     def tearDownClass(cls):
         now = datetime.now()
         cls.LOGGER.info("%s elapsed for %s", now - cls._started, cls.__name__)
+        if Tester.ERRORS or Tester.FAILURES:
+            args = Tester.SUCCESSES, Tester.ERRORS, Tester.FAILURES
+            message = "interim counts: succeeded=%d errors=%d failures=%d"
+            Tester.LOGGER.info(message, *args)
 
     class Table:
         """Collects the body cells for the node's table."""
@@ -1220,13 +1224,14 @@ class CitationTests(Tester):
         etree.SubElement(citation, "PMID").text = "1"
         xml = etree.tostring(root, encoding="unicode")
         doc_id = self.save_doc(xml, "Citation", unlock=True, version=True)
-        self.logger.debug(f"created CDR{doc_id} linked to PMID 1")
+        self.logger.debug("created CDR%s linked to PMID 1", doc_id)
 
         # Test the utility.
         self.navigate_to("UpdatePreMedlineCitations.py")
         self.assert_title("Citation Status Changes")
         self.assert_page_has("Instructions")
         self.assert_page_has("This utility checks to see if any")
+        self.click("submit-button-check")
         self.assert_page_has("Available For Refresh")
         self.assert_page_has(
             f"Citation 1 (CDR{doc_id}): "
@@ -1540,6 +1545,9 @@ class DeveloperTests(Tester):
             test_type_link.click()
             self.select_new_tab()
             self.click("submit-button-delete")
+            alert = self.wait.until(expected_conditions.alert_is_present())
+            alert.accept()
+            sleep(1)
             self.assert_title("Manage Link Types")
             self.assert_page_has(
                 f"Successfully deleted link type '{test_link_type_name}'."
@@ -1620,6 +1628,9 @@ class DeveloperTests(Tester):
         test_type_link.click()
         self.select_new_tab()
         self.click("submit-button-delete")
+        alert = self.wait.until(expected_conditions.alert_is_present())
+        alert.accept()
+        sleep(1)
         self.assert_title("Manage Link Types")
         self.assert_page_has(
             f"Successfully deleted link type '{test_link_type_name}'."

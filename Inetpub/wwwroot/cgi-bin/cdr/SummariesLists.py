@@ -25,19 +25,6 @@ class Control(Controller):
         ("N", "Publishable only", True),
         ("Y", "Publishable and non-publishable", False),
     )
-    SCRIPT = """\
-function check_board(val) {
-  if (val == "all")
-    jQuery(".some").prop("checked", false);
-  else
-    jQuery("#board-all").prop("checked", false);
-}
-function check_included(val) {
-  if (val == "p")
-    jQuery("#select-summary-sets-box").hide();
-  else
-    jQuery("#select-summary-sets-box").show();
-}"""
 
     def build_tables(self):
         """Assemble the tables from each of the boards."""
@@ -84,7 +71,7 @@ function check_included(val) {
             opts = dict(value=id, label=name, classes="some")
             fieldset.append(page.checkbox("board", **opts))
         page.form.append(fieldset)
-        page.add_script(self.SCRIPT)
+        page.head.append(page.B.SCRIPT(src="/js/SummariesLists.js"))
 
     def show_report(self):
         """Override base class version so we can handle extra columns."""

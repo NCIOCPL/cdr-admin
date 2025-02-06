@@ -175,9 +175,17 @@ class Control(Controller):
         args = "check_type", self.HISTORICAL, "history"
         page.add_script(self.toggle_display(*args))
         page.add_script("""\
-$(function() {
-    check_type($("input[name='type']:checked").val());
-});""")
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll("input[name='type']").forEach(button => {
+    button.addEventListener("click", () => check_type(button.value));
+  });
+  document.querySelectorAll("input[name='selection_method']").forEach(button => {
+    button.addEventListener("click", () => check_selection_method(button.value));
+  });
+  const type = document.querySelector("input[name='type']:checked");
+  check_type(type.value ?? "");
+});
+""")
 
     @cached_property
     def all_dis_types(self):

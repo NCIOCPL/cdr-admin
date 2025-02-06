@@ -23,14 +23,6 @@ class Control(Controller):
         "#summary-title span { font-size: .85em; }",
         "#wrapper h2 { font-size: 14pt; }",
     )
-    SCRIPT = (
-        "function check_scope(scope) {",
-        "  if (scope == 'all')",
-        "    jQuery('#date-range').hide();",
-        "  else",
-        "    jQuery('#date-range').show();",
-        "}",
-    )
 
     def populate_form(self, page):
         """Ask for the information we need for the report.
@@ -85,8 +77,8 @@ class Control(Controller):
         fieldset.append(page.date_field("start", value=start))
         fieldset.append(page.date_field("end", value=end))
         page.form.append(fieldset)
-        page.add_script("\n".join(self.SCRIPT))
         page.form.append(fieldset)
+        page.head.append(page.B.SCRIPT(src="/js/SummaryChanges.js"))
 
     def show_report(self):
         """Override, because this is not a tabular report."""

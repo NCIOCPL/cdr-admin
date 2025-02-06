@@ -4,115 +4,132 @@
 
 // Insert buttons for adding/removing job options.
 function add_buttons() {
-    console.log("start add_buttons()")
-    jQuery(".job-opt-button").remove();
-    jQuery(".opt-block legend").last().append(green_button());
-    jQuery(".opt-block legend").each(function(i) {
-        jQuery(this).append(red_button(i));
-    });
-    console.log("done add_buttons()")
+  document.querySelectorAll(".job-opt-button").forEach(button => button.remove());
+
+  const legends = document.querySelectorAll(".opt-block legend");
+  if (legends.length > 0) {
+    legends[legends.length - 1].appendChild(green_button());
+  }
+
+  legends.forEach((legend, i) => {
+    legend.appendChild(red_button(i));
+  });
 }
 
 // Create a button which adds a new (empty) option block.
 function green_button() {
-    var span = jQuery("<span>", {class: "job-opt-button"});
-    var img = jQuery("<img>", {
-        src: "/images/add.gif",
-        onclick: "add_option_block()",
-        class: "clickable",
-        title: "Add another option"
-    });
-    span.append(img);
-    return span;
+  const span = document.createElement("span");
+  span.className = "job-opt-button";
+
+  const img = document.createElement("img");
+  img.src = "/images/add.gif";
+  img.onclick = () => add_option_block();
+  img.className = "clickable";
+  img.title = "Add another option";
+  img.alt = "green plus sign";
+
+  span.appendChild(img);
+  return span;
 }
 
 // Create a button which removes the option block it's in.
 function red_button(i) {
-    var span = jQuery("<span>", {class: "job-opt-button"});
-    var img = jQuery("<img>", {
-        src: "/images/del.gif",
-        onclick: "remove_option(" + ++i + ")",
-        class: "clickable",
-        title: "Remove option"
-    });
-    span.append(img);
-    return span;
+  const span = document.createElement("span");
+  span.className = "job-opt-button";
+
+  const img = document.createElement("img");
+  img.src = "/images/del.gif";
+  img.onclick = () => remove_option(i + 1);
+  img.className = "clickable";
+  img.title = "Remove option";
+  img.alt = "red X";
+
+  span.appendChild(img);
+  return span;
 }
 
 // Add a new block, possibly with existing options.
 function add_option_block(i, name, value) {
-    var id = i ? i : jQuery(".opt-name").length + 1;
-    var attrs = {class: "opt-block usa-fieldset", id: "opt-block-" + id};
-    var fieldset = jQuery("<fieldset>", attrs);
-    var legend = jQuery("<legend>Named Job Option</legend>");
-    legend.attr("class", "usa-legend");
-    fieldset.append(legend);
-    fieldset.append(make_field("name", id, "Name", name));
-    fieldset.append(make_field("value", id, "Value", value));
-    //jQuery("form").append(fieldset);
-    fieldset.insertBefore("#options-block")
-    jQuery("input[name='num-opts']").val(id);
-    console.log("num-opts is " + jQuery("input[name='num-opts']").val())
-    if (!i) {
-        add_buttons();
-    }
+  const id = i ?? document.querySelectorAll(".opt-name").length + 1;
+
+  const fieldset = document.createElement("fieldset");
+  fieldset.className = "opt-block usa-fieldset";
+  fieldset.id = `opt-block-${id}`;
+
+  const legend = document.createElement("legend");
+  legend.className = "usa-legend";
+  legend.textContent = "Named Job Option";
+
+  fieldset.appendChild(legend);
+  fieldset.appendChild(make_field("name", id, "Name", name));
+  fieldset.appendChild(make_field("value", id, "Value", value));
+
+  const optionsBlock = document.getElementById("options-block");
+  optionsBlock.parentNode.insertBefore(fieldset, optionsBlock);
+
+  document.querySelector("input[name='num-opts']").value = id;
+  i ?? add_buttons();
 }
 
 // Delete an option block and recreate all the remaining blocks.
 function remove_option(id) {
-    console.log("removing block " + id);
-    var blocks = collect_options(id);
-    console.log(JSON.stringify(blocks));
-    jQuery(".opt-block").remove();
-    jQuery.each(blocks, function(i, block) {
-        add_option_block(i + 1, block["name"], block["value"]);
-    });
-    if (blocks.length === 0) {
-        add_option_block();
-    }
-    add_buttons();
+  const blocks = collect_options(id);
+  document.querySelectorAll(".opt-block").forEach(block => block.remove());
+  blocks.forEach((block, i) => {
+    add_option_block(i + 1, block.name, block.value);
+  });
+  if (blocks.length === 0) {
+    add_option_block();
+  }
+  add_buttons();
 }
 
 // Create a labeled form field, possibly with an existing value.
 function make_field(name, id, label, value) {
-    var id = "opt-" + name + "-" + id;
-    var field = jQuery("<div>", {class: "labeled-field"});
-    field.append(jQuery("<label>", {for: id, text: label, class: "usa-label"}));
-    field.append(jQuery("<input>", {
-        class: "usa-input usa-input--xl opt-" + name,
-        name: id,
-        id: id,
-        value: value
-    }));
-    return field;
+  const fieldName = `opt-${name}-${id}`;
+
+  const field = document.createElement("div");
+  field.className = "labeled-field";
+
+  const labelElement = document.createElement("label");
+  labelElement.className = "usa-label";
+  labelElement.htmlFor = fieldName;
+  labelElement.textContent = label;
+
+  const input = document.createElement("input");
+  input.className = `opt-${name} usa-input usa-input--xl`;
+  input.name = fieldName;
+  input.id = fieldName;
+  if (value) input.value = value;
+
+  field.appendChild(labelElement);
+  field.appendChild(input);
+
+  return field;
 }
 
 // Gather up all the value information so we can recreate the blocks.
 // Leave out the block we're going to remove.
 function collect_options(skip) {
-    var num_options = jQuery("input[name='num-opts']").val();
-    var options = [];
-    for (var i = 1; i <= num_options; ++i) {
-        if (i != skip) {
-            var name = jQuery("#opt-name-" + i).val();
-            var value = jQuery("#opt-value-" + i).val();
-            options.push({name: name, value: value});
-        }
-    }
-    return options;
+  const count = parseInt(document.querySelector("input[name='num-opts']").value);
+  const positions = Array.from({ length: count }, (_, i) => i + 1);
+
+  return positions.filter(i => i !== skip).map(i => {
+    const name = document.getElementById(`opt-name-${i}`).value;
+    const value = document.getElementById(`opt-value-${i}`).value;
+    return { name, value };
+  });
 }
 
-// Add the red and green buttons when the page first loads.
-jQuery(function() {
-    add_buttons();
-    jQuery("input[value='Run Job Now']").click(function(e) {
-        if (confirm("Are you sure?"))
-            return true;
-        e.preventDefault();
+// Add some buttons and some handlers when the page first loads.
+document.addEventListener("DOMContentLoaded", () => {
+  add_buttons();
+  ["Run Job Now", "Delete Job"].forEach(text => {
+    document.querySelector(`input[value="${text}"]`).addEventListener("click", e => {
+      if (confirm("Are you sure?")) {
+        return true;
+      }
+      e.preventDefault();
     });
-    jQuery("input[value='Delete Job']").click(function(e) {
-        if (confirm("Are you sure?"))
-            return true;
-        e.preventDefault();
-    });
+  });
 });

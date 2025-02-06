@@ -42,6 +42,8 @@ class Control(Controller):
         "members.",
         "Click Submit when your selections are ready.",
     )
+    PAGE1JS = "../../js/SummaryMailerReqFormPage1.js"
+    PAGE2JS = "../../js/SummaryMailerReqFormPage2.js"
 
     def run(self):
         """Override for custom routing."""
@@ -170,27 +172,7 @@ class Control(Controller):
         fieldset.append(div)
         self.board.show_choices(page, fieldset)
         page.form.append(fieldset)
-        page.add_script("""\
-function check_all() {
-    jQuery(".outer-cb input").prop("checked", true);
-    jQuery(".inner-cb input").prop("checked", true);
-}
-function clear_all() {
-    jQuery(".outer-cb input").prop("checked", false);
-    jQuery(".inner-cb input").prop("checked", false);
-}
-function inner_clicked(id) {
-    if (jQuery(".inner-" + id + ":checked").length > 0)
-        jQuery("#outer-" + id).prop("checked", true);
-    else
-        jQuery("#outer-" + id).prop("checked", false);
-}
-function outer_clicked(id) {
-    if (jQuery("#outer-" + id + ":checked").length > 0)
-        jQuery(".inner-" + id).prop("checked", true);
-    else
-        jQuery(".inner-" + id).prop("checked", false);
-}""")
+        page.head.append(page.B.SCRIPT(src=self.PAGE2JS))
         page.add_css(
             ".outer-cb { margin-top: 2rem; }\n"
             ".inner-cb { margin-left: 1rem; }\n"
@@ -227,80 +209,7 @@ function outer_clicked(id) {
         """
 
         page.add_script(self.board_objects)
-        page.add_script("""\
-function toggle_help() {
-    var tooltip = 'Click [More] to see more complete instructions.';
-    switch (jQuery('#instructions legend').text()) {
-        case 'Instructions [More]':
-            tooltip = 'Click [Less] to collapse instructions box.';
-            jQuery('.more').show();
-            jQuery('#instructions legend').text('Instructions [Less]');
-            jQuery('#instructions').attr('title', tooltip);
-            break;
-        default:
-            jQuery('.more').hide();
-            jQuery('#instructions legend').text('Instructions [More]');
-            jQuery('#instructions').attr('title', tooltip);
-            break;
-    }
-}
-function check_selection_method(method) {
-    switch (method) {
-        case 'all':
-            jQuery('#members-block').hide();
-            jQuery('#summaries-block').hide();
-            break;
-        case 'summary':
-            jQuery('#members-block').hide();
-            jQuery('#summaries-block').show();
-            break;
-        case 'member':
-            jQuery('#members-block').show();
-            jQuery('#summaries-block').hide();
-            break;
-    }
-}
-function check_all(which) {
-    var specific = false;
-    jQuery('#' + which + ' .individual:selected').each(function() {
-        if (jQuery(this).val() != 'all')
-            specific = true;
-    });
-    if (specific)
-        jQuery('#' + which + " .all").removeAttr('selected');
-    else
-        jQuery('#' + which + " .individual").removeAttr('selected');
-}
-function memchg() { check_all('members'); }
-function sumchg() { check_all('summaries'); }
-function board_change() {
-    var board_id = jQuery('#board option:selected').val();
-    if (!board_id) {
-        jQuery('#method-block').hide();
-        jQuery('#members-block').hide();
-        jQuery('#summaries-block').hide();
-        return;
-    }
-    jQuery('#method-block').show();
-    var method = jQuery('input[name=selection_method]:checked').val();
-    check_selection_method(method);
-    var board = boards[board_id];
-    var members = jQuery('#members');
-    var summaries = jQuery('#summaries');
-    members.empty();
-    summaries.empty();
-    var tag = '<option value="all" class="all" selected>';
-    members.append(jQuery(tag + 'All Members of Board</option>'));
-    summaries.append(jQuery(tag + 'All Summaries for Board</option>'));
-    var option = '<option class="individual"></option>';
-    jQuery.each(board.members, function(id, m) {
-        members.append(jQuery(option).val(m.value).html(m.label));
-    });
-    jQuery.each(board.summaries, function(id, s) {
-        summaries.append(jQuery(option).val(s.value).html(s.label));
-    });
-}
-jQuery(document).ready(function() { board_change(); });""")
+        page.head.append(page.B.SCRIPT(src=self.PAGE1JS))
 
     @cached_property
     def board(self):

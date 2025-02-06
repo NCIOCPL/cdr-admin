@@ -50,17 +50,8 @@ class Control(Controller):
         for doctype in self.doctypes:
             opts = dict(value=doctype, label=doctype, classes="dt")
             fieldset.append(page.checkbox("doctype", **opts))
-        page.add_script("\n".join([
-            "function check_doctype(name) {",
-            "  if (name == 'all') {",
-            "    jQuery('.dt').prop('checked', false);",
-            "    jQuery('#doctype-all').prop('checked', true);",
-            "  }",
-            "  else",
-            "    jQuery('#doctype-all').prop('checked', false);",
-            "}",
-        ]))
         page.form.append(fieldset)
+        page.head.append(page.B.SCRIPT(src="/js/PubStatsByDate.js"))
 
     def show_report(self):
         """Override the base class version to add a key to the columns."""

@@ -41,7 +41,8 @@ class Control(Controller):
             fieldset.append(page.radio_button("report_type", **opts))
         page.form.append(fieldset)
         fieldset = page.fieldset("Select Boards")
-        fieldset.append(page.checkbox("board", value="all", checked=True))
+        opts = dict(value="all", checked=True)
+        fieldset.append(page.checkbox("board", **opts))
         for board in sorted(self.boards.values()):
             opts = dict(value=board.id, label=str(board))
             fieldset.append(page.checkbox("board", **opts))
@@ -54,17 +55,7 @@ class Control(Controller):
         fieldset.append(page.date_field("end", value=str(end)))
         page.form.append(fieldset)
         page.form.set("method", "get")
-        page.add_script("""\
-function check_board(val) {
-    if (val == "all") {
-        jQuery("input[name='board']").prop("checked", false);
-        jQuery("#board-all").prop("checked", true);
-    }
-    else if (jQuery("input[name='board']:checked").length > 0)
-        jQuery("#board-all").prop("checked", false);
-    else
-        jQuery("#board-all").prop("checked", true);
-}""")
+        page.head.append(page.B.SCRIPT(src="../../js/BoardMeetingDates.js"))
 
     @cached_property
     def caption(self):

@@ -60,24 +60,7 @@ class Control(Controller):
         table = Reporter.Table(rows, **opts)
         page.form.append(table.node)
         page.add_css("th.clickable { cursor: pointer; }")
-        page.add_script("""\
-function toggle(show, hide) {
-    jQuery(show).show();
-    jQuery(hide).hide();
-}
-jQuery(function() {
-    jQuery("#idsort .title-col").click(function() {
-        toggle("#titlesort", "#idsort");
-    });
-    jQuery("#titlesort .id-col").click(function() {
-        toggle("#idsort", "#titlesort");
-    });
-    jQuery("#idsort .title-col").addClass("clickable")
-    jQuery("#titlesort .id-col").addClass("clickable")
-    jQuery("#idsort").hide();
-    jQuery("#titlesort").show();
-    console.log('ready');
-});""")
+        page.head.append(page.B.SCRIPT(src="/js/EditFilters.js"))
 
     def run(self):
         """Support our custom commands and bypass a form."""

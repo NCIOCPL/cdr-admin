@@ -179,7 +179,6 @@ class Control(Controller):
             args = self.id, self.table
             self.logger.info("editing value %s for table %s", *args)
             return True
-        self.logger
         match self.request:
             case self.CANCEL | self.SUBMIT:
                 return False

@@ -60,16 +60,8 @@ class Control(Controller):
 
         # Button/script for adding new search term fields.
         page.add_css(".term-button { padding-left: 10px; }")
-        page.add_script("""\
-function add_term_field() {
-  var id = "term-" + (jQuery(".term").length + 1);
-  var field = jQuery("<div>", {class: "labeled-field"});
-  var term_classes = "term usa-input usa-input--xl";
-  field.append(jQuery("<label>", {for: id, text: "Term", class: "usa-label"}));
-  field.append(jQuery("<input>", {class: term_classes, name: "term", id: id}));
-  jQuery("#search-terms").append(field);
-}
-""")
+        js = "/js/MediaKeywordSearchReport.js"
+        page.head.append(page.B.SCRIPT(src=js))
 
     @property
     def columns(self):

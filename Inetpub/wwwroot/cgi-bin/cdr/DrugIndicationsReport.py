@@ -77,17 +77,7 @@ class Control(Controller):
         )
         fieldset.append(page.select("indication", **opts))
         page.form.append(fieldset)
-        page.add_script("""\
-function check_type(value) {
-    if (value == "plain")
-        jQuery("fieldset.hideable").hide();
-    else
-        jQuery("fieldset.hideable").show();
-}h
-jQuery(function() {
-    var value = jQuery("input[name='type']:checked").val();
-    check_type(value);
-});""")
+        page.head.append(page.B.SCRIPT(src="/js/DrugIndicationsReport.js"))
 
     def show_indicators_with_drugs(self):
         """Show the drugs associated with each approved indicator.
