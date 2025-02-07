@@ -102,6 +102,8 @@ class Control(Controller):
     def run(self):
         """Override the top-level entry point."""
 
+        if not self.session.can_do("RUN SQL QUERIES"):
+            self.bail("Not permitted")
         if self.request in self.buttons:
             self.buttons[self.request]()
         Controller.run(self)
