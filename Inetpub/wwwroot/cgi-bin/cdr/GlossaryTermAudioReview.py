@@ -278,6 +278,7 @@ class Control(Controller):
             f"Content-Type: {mime_type}",
             f"Content-disposition: inline; filename={name}",
             f"Content-Length: {len(payload):d}",
+            "X-Content-Type-Options: nosniff",
         )
         for header in headers:
             stdout.buffer.write(header.encode("utf-8"))

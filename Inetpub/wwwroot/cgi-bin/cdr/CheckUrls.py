@@ -156,7 +156,8 @@ class Control(Controller):
             else:
                 from CdrLongReports import PageTitleMismatches as Report
             report = Report(job).create_html_report()
-            stdout.buffer.write(b"Content-type: text/html\n\n")
+            stdout.buffer.write(b"Content-type: text/html\n")
+            stdout.buffer.write(b"X-Content-Type-Options: nosniff\n\n")
             stdout.buffer.write(report.encode("utf-8"))
         else:
             if not self.email:

@@ -19,7 +19,7 @@ class Control(Controller):
 
         if self.id:
             sys.stdout.buffer.write(b"Content-type: text/plain;charset=utf-8")
-            sys.stdout.buffer.write(b"\n\n")
+            sys.stdout.buffer.write(b"\nX-Content-Type-Options: nosniff\n\n")
             sys.stdout.buffer.write(self.doc.xml.encode("utf-8"))
             sys.exit(0)
         Controller.run(self)

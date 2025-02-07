@@ -100,6 +100,7 @@ if process.returncode:
 
 stdout.buffer.write(f"""\
 Content-type: text/plain;charset=utf-8
+X-Content-Type-Options: nosniff
 
 read {len(file_bytes)} bytes
 checksum is {checksum}

@@ -152,6 +152,7 @@ sys.stdout.buffer.write(f"""\
 Content-Type: {info.mimeType}
 Content-Disposition: {disp}; filename={info.filename}
 Content-Length: {len(blob_bytes)}
+X-Content-Type-Options: nosniff
 
 """.encode("utf-8"))
 sys.stdout.buffer.write(blob_bytes)

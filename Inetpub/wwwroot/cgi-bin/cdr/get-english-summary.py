@@ -120,7 +120,11 @@ class Control(Controller):
             opts = dict(HTMLPage.STRING_OPTS, encoding="unicode")
             page = html.tostring(report.page, **opts)
             page = page.replace("@@PRE@@", self.display)
-            string = f"Content-type: text/html;charset=utf-8\n\n{page}"
+            headers = "\n".join([
+                "Content-type: text/html;charset=utf-8",
+                "X-Content-Type-Options: nosniff",
+            ])
+            string = f"{headers}\n\n{page}"
             stdout.buffer.write(string.encode("utf-8"))
             sys_exit(0)
 

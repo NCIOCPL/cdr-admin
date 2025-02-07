@@ -76,5 +76,6 @@ for partner in sorted(partners):
 xml = etree.tostring(root, pretty_print=True, encoding="unicode")
 sys.stdout.buffer.write(f"""\
 Content-type: text/xml
+X-Content-Type-Options: nosniff
 
 {xml}""".encode("utf-8"))

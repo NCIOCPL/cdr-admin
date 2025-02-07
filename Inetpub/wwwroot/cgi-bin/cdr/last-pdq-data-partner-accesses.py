@@ -20,6 +20,7 @@ for line in open("d:/cdr/sftp_log/cumulative.log"):
         sid = int(words[3][5:-2])
         user = words[9]
         sids[sid] = user
-print("Content-type: text/plain\n")
+print("Content-type: text/plain")
+print("X-Content-Type-Options: nosniff\n")
 for user in sorted(users):
     print(("{} {}".format(user, users[user])))

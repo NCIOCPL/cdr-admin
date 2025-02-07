@@ -17,6 +17,7 @@ except Exception:
 stdout.buffer.write(f"""\
 Content-type: application/vnd.ms-excel
 Content-disposition: attachment;filename={name}
+X-Content-Type-Options: nosniff
 
 """.encode("utf-8"))
 stdout.buffer.write(book)

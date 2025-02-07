@@ -22,7 +22,8 @@ try:
 except Exception:
     pass
 if session:
-    print("Content-type: text/plain\n")
+    print("Content-type: text/plain")
+    print("X-Content-Type-Options: nosniff\n")
     print(session)
 else:
     print("Status: 401 Unauthorized\n")

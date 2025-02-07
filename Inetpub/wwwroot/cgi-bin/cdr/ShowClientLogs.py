@@ -45,6 +45,7 @@ td { padding-right: 1rem; }
 Content-Type: application/zip
 Content-Disposition: attachment; filename={filename}
 Content-Length: {len(zip_bytes)}
+X-Content-Type-Options: nosniff
 
 """.encode("utf-8"))
         stdout.buffer.write(zip_bytes)

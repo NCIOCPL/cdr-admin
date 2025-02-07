@@ -42,6 +42,7 @@ class Disk:
 
 
 print("Content-type: text/plain")
+print("X-Content-Type-Options: nosniff")
 print("")
 
 try:

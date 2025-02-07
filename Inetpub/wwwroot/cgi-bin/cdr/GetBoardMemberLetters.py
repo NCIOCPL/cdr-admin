@@ -40,6 +40,7 @@ class Control(Controller):
                 "Content-Type: application/rtf;charset=utf-8",
                 f"Content-Length: {len(file_bytes)}",
                 f"Content-Disposition: attachment; filename={self.filename}",
+                "X-Content-Type-Options: nosniff",
             )
             for header in headers:
                 sys.stdout.buffer.write(header.encode("utf-8"))

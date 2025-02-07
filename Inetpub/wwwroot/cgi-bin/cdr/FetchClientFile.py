@@ -44,6 +44,7 @@ class Control(Controller):
                 "Content-Type: application/octet-stream",
                 f"Content-Disposition: attachment; filename={path.name}",
                 f"Content-Length: {len(file_bytes)}",
+                "X-Content-Type-Options: nosniff",
             ]) + "\r\n\r\n"
             stdout.buffer.write(headers.encode("utf-8"))
             if file_bytes:

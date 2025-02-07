@@ -65,7 +65,8 @@ class Control(Controller):
             B.BODY(content)
         )
         html = tostring(page, encoding="unicode")
-        print(f"Content-type: text/html\n\n{html}")
+        print("Content-type: text/html")
+        print(f"X-Content-Type-Options: nosniff\n\n{html}")
         exit(0)
 
 

@@ -18,7 +18,10 @@ class Control(Controller):
 
     SUBTITLE = "Log Viewer"
     DEFAULT_PATH = f"{cdr.DEFAULT_LOGDIR}/cdrpub.log"
-    HEADERS = "Content-type: text/plain; charset=utf-8\n\n".encode("utf-8")
+    HEADERS = "\n".join([
+        "Content-type: text/plain; charset=utf-8",
+        "X-Content-Type-Options: nosniff\n\n",
+    ]).encode("utf-8")
     ENCODINGS = "utf-8", "latin-1"
 
     def run(self):
@@ -101,6 +104,7 @@ class Control(Controller):
             sys.stdout.buffer.write(f"""\
 Content-type: application/octet-stream
 Content-disposition: attachment;filename={name}
+X-Content-Type-Options: nosniff
 
 """.encode("utf-8"))
             sys.stdout.buffer.write(file_bytes)
@@ -118,6 +122,7 @@ Content-disposition: attachment;filename={name}
             border = "-" * len(description)
             prologue = f"""\
 Content-type: text/plain; charset=utf-8
+X-Content-Type-Options: nosniff
 
 {border}
 {description}

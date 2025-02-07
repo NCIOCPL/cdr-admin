@@ -131,6 +131,7 @@ class Control(Controller):
 Content-type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
 Content-Disposition: attachment; filename={filename}
 Content-length: {len(book_bytes)}
+X-Content-Type-Options: nosniff
 
 """.encode("utf-8"))
         stdout.buffer.write(book_bytes)

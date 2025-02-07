@@ -2,6 +2,7 @@
 
 print("""\
 Content-type: text/html
+X-Content-Type-Options: nosniff
 
 <!DOCTYPE HTML PUBLIC '-//IETF//DTD HTML//EN'>
 <html>

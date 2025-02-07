@@ -155,7 +155,8 @@ class Control(Controller):
             if not self.cursor.description:
                 self.bail("No query results")
             payload = dict(columns=self.cursor.description, rows=rows)
-            print("Content-type: application/json\n")
+            print("Content-type: application/json")
+            print("X-Content-Type-Options: nosniff\n")
             print(dumps(payload, default=str, indent=2))
             sys_exit(0)
         else:

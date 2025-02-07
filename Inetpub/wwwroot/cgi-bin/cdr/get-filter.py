@@ -35,4 +35,6 @@ else:
     if doctype.lower() != "filter":
         print("Status: 400 not a filter document\n")
     else:
-        stdout.buffer.write(f"Content-type: text/xml\n\n{xml}".encode("utf-8"))
+        stdout.buffer.write(b"Content-type: text/xml\n")
+        stdout.buffer.write(b"X-Content-Type-Options: nosniff\n\n")
+        stdout.buffer.write(xml.encode("utf-8"))
