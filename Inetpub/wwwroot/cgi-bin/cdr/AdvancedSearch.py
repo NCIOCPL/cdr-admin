@@ -73,7 +73,7 @@ link to each matching document's QC report.
 .usa-form .menu-links a { text-decoration: none; }
 .usa-form .menu-links a:visited { color: #005ea2 }
 .usa-form .menu-links li { margin-bottom: .5rem; }
-.usa-accordion { margin-bottom: 2rem; }
+#primary-form .usa-accordion { margin-bottom: 2rem; }
 code { color: brown; }
 """
 
