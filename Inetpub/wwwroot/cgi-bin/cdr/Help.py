@@ -11,53 +11,46 @@ class Control(Controller):
     """Access to the database and HTML page creation."""
 
     FILTER = "name:Help Table of Contents"
-    SUBTITLE = HELP = "CDR Help"
+    SUBTITLE = "CDR Help"
     PAGES = (
         (365, "User Help"),
         (354511, "Operating Instructions"),
         (256207, "System Information"),
     )
-    CSS = "\n".join([
-        "form li { list-style-type: none; }",
-    ])
+    CSS = """\
+#help-menu a, #help-menu a:active, #help-menu a:visited, #help-menu a:hover {
+  color: #005ea2; text-decoration: none;
+}
+#help-menu a:hover { text-decoration: underline; }
+"""
 
     def populate_form(self, page):
-        """Show the user the available help pages.
+        """Show help menu or available menus.
 
         Required positional argument:
           page - instance of the cdrcgi.HTMLPage class
         """
 
-        fieldset = page.fieldset("Choose Help Page Set")
-        checked = True
-        for id, label in self.PAGES:
-            opts = dict(value=id, label=label, checked=checked)
-            fieldset.append(page.radio_button("id", **opts))
-            checked = False
-        page.form.append(fieldset)
+        if self.id:
+            page.form.append(self.menu)
+            page.add_css(self.CSS)
+        else:
+            fieldset = page.fieldset("Choose Help Page Set")
+            checked = True
+            for id, label in self.PAGES:
+                opts = dict(value=id, label=label, checked=checked)
+                fieldset.append(page.radio_button("id", **opts))
+                checked = False
+            page.form.append(fieldset)
+
+    def show_report(self):
+        """Redirect back to the form."""
+        self.show_form()
 
     @cached_property
-    def report(self):
-        """Override to bypass the form/table module."""
-
-        opts = dict(
-            banner=self.title,
-            subtitle=self.doc.title.split(";")[0],
-            no_results=None,
-            page_opts=dict(session=self.session),
-        )
-        report = self.Reporter(self.title, [], **opts)
-        for menu_list in self.lists:
-            report.page.form.append(menu_list)
-        report.page.add_css(self.CSS)
-        return report
-
-    @cached_property
-    def lists(self):
-        """Nested lists of menu links."""
-
-        root = self.doc.filter(self.FILTER).result_tree.getroot()
-        return root.findall("body/ul")
+    def buttons(self):
+        """Sequence of names for request buttons to be provided."""
+        return [] if self.id else [self.SUBMIT]
 
     @cached_property
     def doc(self):
@@ -70,11 +63,29 @@ class Control(Controller):
         return self.fields.getvalue("id")
 
     @cached_property
-    def no_results(self):
-        """Suppress warning that we have no tables. We know."""
-        return None
+    def menu(self):
+        """Menu of help pages."""
+
+        root = self.doc.filter(self.FILTER).result_tree.getroot()
+        self.logger.info("root=%s", list(root.find("body")))
+        return root.find("body/main/div")
+
+    @cached_property
+    def same_window(self):
+        """Don't open new tabs."""
+        return [self.SUBMIT]
+
+    @cached_property
+    def subtitle(self):
+        """Pick an appropriate value depending on whether a menu is chosen."""
+
+        if self.id:
+            subtitle = dict(self.PAGES).get(self.doc.id)
+            if subtitle:
+                return subtitle
+        return self.SUBTITLE
 
 
+# Don't execute the script if loaded as a module.
 if __name__ == "__main__":
-    """Don't execute the script if loaded as a module."""
     Control().run()
