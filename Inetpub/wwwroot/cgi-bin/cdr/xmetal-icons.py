@@ -23,7 +23,7 @@ class Control(Controller):
         Structure="Structure (Custom)",
     )
     CSS = "img { border: 1px black solid } * { font-family: Arial; }"
-    PATH = Path("d:/Inetpub/wwwroot/images/xmetal")
+    PATH = Path("../../images/xmetal")
     INSTRUCTIONS = (
         "Press Submit to bring up a page showing the button icons "
         "which are available for use on the CDR toolbars in XMetaL. "

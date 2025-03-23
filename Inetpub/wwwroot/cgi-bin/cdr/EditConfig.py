@@ -98,7 +98,7 @@ class Control(Controller):
     @cached_property
     def filepath(self):
         """Where the current configuration file is stored."""
-        return r"{}\cdr{}".format(self.DIRECTORY, self.filename)
+        return r"{}/cdr{}".format(self.DIRECTORY, self.filename)
 
     @cached_property
     def files(self):
@@ -118,6 +118,6 @@ class Control(Controller):
         return self.buttons
 
 
+# Don't execute the script if loaded as a module.
 if __name__ == "__main__":
-    """Don't execute script if loaded as a module."""
     Control().run()
