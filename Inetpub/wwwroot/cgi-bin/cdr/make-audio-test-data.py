@@ -37,7 +37,7 @@ class Control(Controller):
     TIER = Tier()
     LOGNAME = "testing"
     USER = "cdroperator"
-    SSH_KEY = r"\etc\cdroperator_rsa"
+    SSH_KEY = "/etc/cdroperator_rsa"
     CDRSTAGING = "/sftp/sftphome/cdrstaging"
     AUDIO_DIR = f"{CDRSTAGING}/ciat/{TIER.name.lower()}/Audio"
     TARGET_DIR = f"{AUDIO_DIR}/Term_Audio"

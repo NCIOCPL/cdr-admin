@@ -135,16 +135,17 @@ class Control(Controller):
 
             # Assemble the instructions for using the form.
             instructions = (
-                "Click a hyperlinked mp3 filename to play the sound in "
-                "your browser-configured mp3 player (files which have "
-                "already been reviewed files are at the bottom of the "
-                "list of files).",
+                "Click a hyperlinked MP3 filename to play the sound in "
+                "your browser-configured MP3 player (files which have "
+                "already been reviewed are at the bottom of the page).",
                 "Use the radio buttons to approve or reject a file.",
-                "When finished, click 'Save' to save any changes to "
-                "the database. If all files in the set have been reviewed "
-                "and any have been rejected, a spreadsheet containing "
-                "rejected terms will be created and displayed on your "
-                "workstation. Please save it for future use.",
+                "Click 'Save' to save any changes to the database. "
+                "If all files in the set have been reviewed and any of "
+                "those files have been rejected, a spreadsheet containing "
+                "rejected terms will be created and a link to its workbook "
+                "will be displayed so that you can retrieve it, to be given "
+                "to the audio pronunciationon contractor so that those "
+                "pronunciations can be re-recorded.",
             )
             fieldset = page.fieldset("Instructions")
             for paragraph in instructions:
