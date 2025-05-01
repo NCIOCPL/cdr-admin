@@ -10,7 +10,7 @@ class PoliticalSubUnitSearch(AdvancedSearch):
     """Customize search for this document type."""
 
     DOCTYPE = "PoliticalSubUnit"
-    SUBTITLE = DOCTYPE
+    SUBTITLE = "Political SubUnit"
     FILTER = "set:QC PoliticalSubUnit Set"
     PATHS = (
         "/PoliticalSubUnit/PoliticalSubUnitFullName",

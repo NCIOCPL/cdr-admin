@@ -48,12 +48,14 @@ class GlossaryTermConceptSearch(AdvancedSearch):
         # pylint: enable=no-member
         statuses_en = [""] + self.statuses_en
         statuses_es = [""] + self.statuses_es
+        status_en = "Status (English)"
+        status_es = "Status (Spanish)"
         self.search_fields = (
             self.text_field("concept"),
             self.select("audience", options=[""]+self.audiences),
             self.select("dictionary", options=[""]+self.dictionaries),
-            self.select("stat_en", label="Status (en)", options=statuses_en),
-            self.select("stat_es", label="Status (es)", options=statuses_es),
+            self.select("stat_en", label=status_en, options=statuses_en),
+            self.select("stat_es", label=status_es, options=statuses_es),
         )
         self.query_fields = []
         for name, paths in self.PATHS.items():

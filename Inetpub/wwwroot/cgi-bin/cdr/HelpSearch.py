@@ -41,12 +41,14 @@ class DocumentationSearch(AdvancedSearch):
             if value and value not in values:
                 raise Exception("Tampering with form values")
             setattr(self, f"{name}s", [""] + values)
+        dtype_opts = dict(label="Document Type", options=self.doctypes)
+        itype_opts = dict(label="Information Type", options=self.infotypes)
         self.search_fields = (
             # pylint: disable=no-member
-            self.select("doctype", label="Doc Type", options=self.doctypes),
+            self.select("doctype", **dtype_opts),
             self.select("function", options=self.functions),
             self.text_field("keyword"),
-            self.select("infotype", label="Info Type", options=self.infotypes),
+            self.select("infotype", **itype_opts),
         )
         self.query_fields = []
         for name, paths in self.PATHS.items():
