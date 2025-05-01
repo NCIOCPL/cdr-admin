@@ -4,13 +4,18 @@
 # JIRA::OCECDR-3849
 # JIRA::OCECDR-4092
 # ----------------------------------------------------------------------
-import cgi
+
 import os
 import cdrlite
 import datetime
+import urllib.parse
 
-fields = cgi.FieldStorage()
-target = fields.getvalue("target") or "cgi-bin/cdr/Admin.py"
+target = "cgi-bin/cdr/Admin.py"
+query_string = os.environ.get("QUERY_STRING")
+if query_string:
+    for key, value in urllib.parse.parse_qsl(query_string):
+        if key.lower() == "target":
+            target = value
 session = None
 auth_user = os.environ.get("AUTH_USER")
 webserver = os.environ.get("SERVER_NAME")
@@ -23,17 +28,18 @@ if auth_user:
             session = False
 now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 try:
-    strings = (now, repr(auth_user), repr(session), target)
+    strings = now, repr(auth_user), repr(session), target
     fp = open("d:/cdr/log/admin-login.log", "a")
-    fp.write("%s admin.py %s %s %s\n" % strings)
+    fp.write("{} admin.py {} {} {}\n".format(*strings))
     fp.close()
 except Exception:
     pass
 if session:
     if "//" not in target:
-        target = "https://%s/%s" % (webserver, target.lstrip("/"))
-    delimiter = ("?" in target) and "&" or "?"
-    url = "%s%sSession=%s" % (target, delimiter, session)
-    print("Location: %s\n" % url)
+        path = target.lstrip("/")
+        target = f"https://{webserver}/{path}"
+    delimiter = "&" if "?" in target else "?"
+    url = f"{target}{delimiter}Session={session}"
+    print(f"Location: {url}\n")
 else:
     print("Status: 401 Unauthorized\n")
