@@ -10,13 +10,10 @@ from cdrapi.docs import Doc
 class Control(Controller):
     """Access to the database and HTML page creation."""
 
-    FILTER = "name:Help Table of Contents"
+    TOC_FILTER = "name:Help Table of Contents"
+    PAGE_FILTER = "name:Documentation Help Screens Filter"
     SUBTITLE = "CDR Help"
-    PAGES = (
-        (365, "User Help"),
-        (354511, "Operating Instructions"),
-        (256207, "System Information"),
-    )
+    TOC_ID = 365
     CSS = """\
 #help-menu a, #help-menu a:active, #help-menu a:visited, #help-menu a:hover {
   color: #005ea2; text-decoration: none;
@@ -25,23 +22,17 @@ class Control(Controller):
 """
 
     def populate_form(self, page):
-        """Show help menu or available menus.
+        """Show help page or list of help pages.
 
         Required positional argument:
           page - instance of the cdrcgi.HTMLPage class
         """
 
         if self.id:
-            page.form.append(self.menu)
-            page.add_css(self.CSS)
+            self.send_page(self.help_page)
         else:
-            fieldset = page.fieldset("Choose Help Page Set")
-            checked = True
-            for id, label in self.PAGES:
-                opts = dict(value=id, label=label, checked=checked)
-                fieldset.append(page.radio_button("id", **opts))
-                checked = False
-            page.form.append(fieldset)
+            page.form.append(self.toc)
+            page.add_css(self.CSS)
 
     def show_report(self):
         """Redirect back to the form."""
@@ -49,26 +40,23 @@ class Control(Controller):
 
     @cached_property
     def buttons(self):
-        """Sequence of names for request buttons to be provided."""
-        return [] if self.id else [self.SUBMIT]
+        """No buttons needed."""
+        return []
 
     @cached_property
     def doc(self):
-        """The documentation table of contents document to display."""
+        """The document for the help page to display."""
         return Doc(self.session, id=self.id)
 
     @cached_property
-    def id(self):
-        """ID of the table of contents document to render."""
-        return self.fields.getvalue("id")
+    def help_page(self):
+        """Rendered HTML for the help page."""
+        return str(self.doc.filter(self.PAGE_FILTER).result_tree)
 
     @cached_property
-    def menu(self):
-        """Menu of help pages."""
-
-        root = self.doc.filter(self.FILTER).result_tree.getroot()
-        self.logger.info("root=%s", list(root.find("body")))
-        return root.find("body/main/div")
+    def id(self):
+        """ID of the help page to render."""
+        return self.fields.getvalue("id")
 
     @cached_property
     def same_window(self):
@@ -76,14 +64,12 @@ class Control(Controller):
         return [self.SUBMIT]
 
     @cached_property
-    def subtitle(self):
-        """Pick an appropriate value depending on whether a menu is chosen."""
+    def toc(self):
+        """Menu of help pages."""
 
-        if self.id:
-            subtitle = dict(self.PAGES).get(self.doc.id)
-            if subtitle:
-                return subtitle
-        return self.SUBTITLE
+        doc = Doc(self.session, id=self.TOC_ID)
+        root = doc.filter(self.TOC_FILTER).result_tree.getroot()
+        return root.find("body/main/div")
 
 
 # Don't execute the script if loaded as a module.
