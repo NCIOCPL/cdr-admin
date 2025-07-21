@@ -613,9 +613,6 @@ class Control(Controller):
         parms = dumps(sorted(self.parameters))
         self.logger.info("dumped")
         self.logger.info("filter parms=%s", parms)
-        path = f"dumped-filter-parms-{self.timestamp}.json"
-        with open(path, "w", encoding="utf-8") as fp:
-            fp.write(parms)
         self.cursor.execute(query, parms)
         self.conn.commit()
         self.cursor.execute("SELECT @@IDENTITY AS id")
