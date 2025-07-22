@@ -3541,11 +3541,11 @@ class GeneralTests(Tester):
         """Test the Political Subunit search page."""
 
         self.navigate_to("PoliticalSubUnitSearch.py")
-        self.assert_title("PoliticalSubUnit")
+        self.assert_title("Political SubUnit")
         self.set_field_value("state", "North Dak%")
         self.find('form input[value="Search"]').click()
         self.select_new_tab()
-        self.assert_title("PoliticalSubUnit")
+        self.assert_title("Political SubUnit")
         self.assert_single_table_report()
         self.assert_tables_in_grid_container()
         table = self.load_table()
