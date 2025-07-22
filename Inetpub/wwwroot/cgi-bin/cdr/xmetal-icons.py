@@ -23,7 +23,9 @@ class Control(Controller):
         Structure="Structure (Custom)",
     )
     CSS = "img { border: 1px black solid } * { font-family: Arial; }"
-    PATH = Path("../../images/xmetal")
+    SCRIPT_PATH = Path(__file__).resolve()
+    WWWROOT = SCRIPT_PATH.parent.parent.parent
+    PATH = WWWROOT / "images" / "xmetal"
     INSTRUCTIONS = (
         "Press Submit to bring up a page showing the button icons "
         "which are available for use on the CDR toolbars in XMetaL. "
