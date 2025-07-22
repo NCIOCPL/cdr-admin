@@ -3093,18 +3093,18 @@ class GeneralTests(Tester):
 
         self.navigate_to("HelpSearch.py")
         self.assert_title("Documentation")
-        self.set_field_value("keyword", "%new%table%")
+        self.set_field_value("keyword", "global changes")
         self.find('form input[value="Search"]').click()
         self.select_new_tab()
         self.assert_title("Documentation")
         self.assert_tables_in_grid_container()
         self.assert_single_table_report()
         table = self.load_table()
-        expected = "1 document matches '%new%table%'"
+        expected = "1 document matches 'global changes'"
         self.assertEqual(table.caption.text, expected)
         self.assertEqual(len(table.rows), 1)
         table.rows[0][1].find_element(By.TAG_NAME, "a").click()
-        self.assert_page_has("<h2>Creating a New Table</h2>")
+        self.assert_page_has("<h1>Global Changes</h1>")
 
     def test_doc_viewer(self):
         """Test the document viewer."""
@@ -3213,21 +3213,12 @@ class GeneralTests(Tester):
 
         self.navigate_to("Help.py")
         self.assert_title("CDR Help")
-        self.assert_page_has("Choose Help Page Set")
-        labels = self.find("form fieldset .usa-radio label", all=True)
-        self.assertEqual(len(labels), 3)
-        expected = (
-            "User Help",
-            "Operating Instructions",
-            "System Information",
-        )
-        for i, label in enumerate(labels):
-            self.assertEqual(label.text, expected[i])
-        self.submit_form()
-        self.assert_title("CDR Help")
-        self.assert_non_tabular_report()
+        self.assert_page_has("Primarily For Users")
+        self.assert_page_has("Primarily For Developers")
+        self.find("form h4").click()
+        self.assert_page_has("Creating/Editing Documents")
         self.find("main ul li a").click()
-        self.assert_page_has("<h2>Searching for Documents: Overview</h2>")
+        self.assert_page_has("<h1>Create/Edit Documents</h1>")
 
     def test_home_page(self):
         """Test the landing page for the site."""
