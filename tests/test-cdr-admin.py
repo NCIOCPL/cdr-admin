@@ -3218,6 +3218,7 @@ class GeneralTests(Tester):
         self.find("form h4").click()
         self.assert_page_has("Creating/Editing Documents")
         self.find("main ul li a").click()
+        self.select_new_tab()
         self.assert_page_has("<h1>Create/Edit Documents</h1>")
 
     def test_home_page(self):
