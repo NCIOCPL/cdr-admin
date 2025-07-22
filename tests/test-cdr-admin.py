@@ -2283,8 +2283,15 @@ class DrugTests(Tester):
 
         self.navigate_to("DISSearch.py")
         self.assert_page_has("Drug Information Summary")
-        for field in "Title", "FDA Appr", "Last Mod", "Appr Ind", "Drug Ref":
-            self.assert_page_has(field)
+        labels = (
+            "Title",
+            "FDA Approved",
+            "Last Modified",
+            "Approved Indication",
+            "Drug Reference Type",
+        )
+        for label in labels:
+            self.assert_page_has(label)
         drug = self.get_test_drug_info()
         drug_id = drug["id"]
         drug_name = drug["name"]
