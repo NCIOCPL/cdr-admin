@@ -7070,6 +7070,7 @@ class SummaryTests(Tester):
         self.submit_form(new_tab=False)
 
         # Check the queue page, make sure the job is there.
+        self.driver.set_window_size(2048, 1024)
         self.assert_title("Summary Translation Job Queue")
         table = self.load_table()
         columns = (
