@@ -5104,7 +5104,7 @@ class MediaTests(Tester):
         archive.link.click()
         self.select_new_tab()
         self.assert_title("Glossary Term Audio Review")
-        self.assert_page_has("When finished, click 'Save' to save any changes")
+        self.assert_page_has("Click 'Save' to save any changes")
         columns = (
             "Disposition",
             "CDR ID",
