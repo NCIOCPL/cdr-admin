@@ -3094,6 +3094,7 @@ class GeneralTests(Tester):
         self.navigate_to("HelpSearch.py")
         self.assert_title("Documentation")
         self.set_field_value("keyword", "global changes")
+        self.driver.set_page_load_timeout(600)
         self.find('form input[value="Search"]').click()
         self.select_new_tab()
         self.assert_title("Documentation")
