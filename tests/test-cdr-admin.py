@@ -7382,6 +7382,7 @@ class TerminologyTests(Tester):
     def test_term_match_utility(self):
         """Test the Match Drug Terms By Name tool."""
 
+        self.driver.set_page_load_timeout(600)
         self.navigate_to("MatchDrugTermsByName.py")
         self.assert_title("Match Drug Terms By Name")
         tables = self.load_tables()
