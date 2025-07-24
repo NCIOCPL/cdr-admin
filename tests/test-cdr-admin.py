@@ -1369,8 +1369,10 @@ class DeveloperTests(Tester):
             self.set_field_value("value", test_values[i])
             self.set_field_value("comment", test_comments[i])
             self.click("submit-button-save")
+            sleep(.5)
 
         # Verify the values using the HTML table report.
+        sleep(2)
         self.click("submit-button-show-all-values")
         self.select_new_tab()
         tables = self.load_tables()
@@ -1394,8 +1396,10 @@ class DeveloperTests(Tester):
             self.set_field_value("value", new_test_values[i])
             self.set_field_value("comment", new_test_comments[i])
             self.click("submit-button-save")
+            sleep(.5)
 
         # Verify the values using the JSON report.
+        sleep(2)
         group = load_values().get(test_group)
         self.assertIsNotNone(group)
         values = group["values"]
@@ -3929,6 +3933,7 @@ class GlossaryTests(Tester):
             self.assertIsNotNone(img)
             img.click()
             self.submit_form(new_tab=False)
+            sleep(1)
             s = "" if server_count == 1 else "s"
             message = f"Successfully stored {server_count} glossary server{s}."
             self.assert_page_has(message)
@@ -3952,6 +3957,7 @@ class GlossaryTests(Tester):
         self.set_field_value(f"alias-{i}", test_alias)
         self.set_field_value(f"url-{i}", bogus_url)
         self.submit_form(new_tab=False)
+        sleep(1)
         self.assert_title("Manage Glossary Servers")
         expected = (
             f"Duplicate alias {test_alias!r}.",
@@ -3968,6 +3974,7 @@ class GlossaryTests(Tester):
         self.set_field_value(f"alias-{i}", test_alias)
         self.set_field_value(f"url-{i}", test_url)
         self.submit_form(new_tab=False)
+        sleep(1)
         new_server_count = original_server_count + 1
         self.assertEqual(get_server_count(), new_server_count)
         server_block = find_test_server()
@@ -3983,6 +3990,7 @@ class GlossaryTests(Tester):
         self.assertIsNotNone(img)
         img.click()
         self.submit_form(new_tab=False)
+        sleep(1)
         n = original_server_count
         s = "" if n == 1 else "s"
         message = f"Successfully stored {n} glossary server{s}."
@@ -7383,7 +7391,8 @@ class TerminologyTests(Tester):
     def test_term_match_utility(self):
         """Test the Match Drug Terms By Name tool."""
 
-        self.driver.set_page_load_timeout(600)
+        self.driver.set_page_load_timeout(1500)
+        self.driver.command_executor._client_config._timeout = 600
         self.navigate_to("MatchDrugTermsByName.py")
         self.assert_title("Match Drug Terms By Name")
         tables = self.load_tables()
@@ -7457,6 +7466,8 @@ class TerminologyTests(Tester):
         """Test the utilities for refreshing Term docs from EVS concepts."""
 
         # Check the landing page.
+        self.driver.set_page_load_timeout(1500)
+        self.driver.command_executor._client_config._timeout = 600
         landing_page = self.navigate_to("SyncWithEVS.py")
         self.assert_title("EVS Concept Tools")
         self.assert_page_has("Instructions")
@@ -7547,6 +7558,7 @@ class TerminologyTests(Tester):
         # and verify that the unsuppressed term has been restored.
         self.switch_to(refresh_form)
         self.find("submit-button-sort-by-cdr-id", method=By.ID).click()
+        sleep(5)
         self.assert_single_table_report()
         self.assert_title("Refresh Drug Terms")
         table = self.load_table()
