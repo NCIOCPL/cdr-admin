@@ -54,7 +54,9 @@ class Control(Controller):
 
         B = self.HTMLPage.B
         content = B.CENTER(B.H1("XMetaL CDR Icons"))
+        self.logger.info("PATH: %s", self.PATH)
         for path in sorted(self.PATH.glob("*.jpg")):
+            self.logger.info("path: %s", path)
             name = path.name[:-4]
             if "xmetal_cdr" not in name and "Standard" not in name:
                 content.append(B.H2(self.NAMES.get(name, name)))
