@@ -10,71 +10,68 @@ from cdrapi.docs import Doc
 class Control(Controller):
     """Access to the database and HTML page creation."""
 
-    FILTER = "name:Help Table of Contents"
-    SUBTITLE = HELP = "CDR Help"
-    PAGES = (
-        (365, "User Help"),
-        (354511, "Operating Instructions"),
-        (256207, "System Information"),
-    )
-    CSS = "\n".join([
-        "form li { list-style-type: none; }",
-    ])
+    TOC_FILTER = "name:Help Table of Contents"
+    PAGE_FILTER = "name:Documentation Help Screens Filter"
+    SUBTITLE = "CDR Help"
+    TOC_ID = 365
+    CSS = """\
+#help-menu a, #help-menu a:active, #help-menu a:visited, #help-menu a:hover {
+  color: #005ea2; text-decoration: none;
+}
+#help-menu a:hover { text-decoration: underline; }
+"""
 
     def populate_form(self, page):
-        """Show the user the available help pages.
+        """Show help page or list of help pages.
 
         Required positional argument:
           page - instance of the cdrcgi.HTMLPage class
         """
 
-        fieldset = page.fieldset("Choose Help Page Set")
-        checked = True
-        for id, label in self.PAGES:
-            opts = dict(value=id, label=label, checked=checked)
-            fieldset.append(page.radio_button("id", **opts))
-            checked = False
-        page.form.append(fieldset)
+        if self.id:
+            self.send_page(self.help_page)
+        else:
+            page.form.append(self.toc)
+            page.add_css(self.CSS)
+
+    def show_report(self):
+        """Redirect back to the form."""
+        self.show_form()
 
     @cached_property
-    def report(self):
-        """Override to bypass the form/table module."""
-
-        opts = dict(
-            banner=self.title,
-            subtitle=self.doc.title.split(";")[0],
-            no_results=None,
-            page_opts=dict(session=self.session),
-        )
-        report = self.Reporter(self.title, [], **opts)
-        for menu_list in self.lists:
-            report.page.form.append(menu_list)
-        report.page.add_css(self.CSS)
-        return report
-
-    @cached_property
-    def lists(self):
-        """Nested lists of menu links."""
-
-        root = self.doc.filter(self.FILTER).result_tree.getroot()
-        return root.findall("body/ul")
+    def buttons(self):
+        """No buttons needed."""
+        return []
 
     @cached_property
     def doc(self):
-        """The documentation table of contents document to display."""
+        """The document for the help page to display."""
         return Doc(self.session, id=self.id)
 
     @cached_property
+    def help_page(self):
+        """Rendered HTML for the help page."""
+        return str(self.doc.filter(self.PAGE_FILTER).result_tree)
+
+    @cached_property
     def id(self):
-        """ID of the table of contents document to render."""
+        """ID of the help page to render."""
         return self.fields.getvalue("id")
 
     @cached_property
-    def no_results(self):
-        """Suppress warning that we have no tables. We know."""
-        return None
+    def same_window(self):
+        """Don't open new tabs."""
+        return [self.SUBMIT]
+
+    @cached_property
+    def toc(self):
+        """Menu of help pages."""
+
+        doc = Doc(self.session, id=self.TOC_ID)
+        root = doc.filter(self.TOC_FILTER).result_tree.getroot()
+        return root.find("body/main/div")
 
 
+# Don't execute the script if loaded as a module.
 if __name__ == "__main__":
-    """Don't execute the script if loaded as a module."""
     Control().run()

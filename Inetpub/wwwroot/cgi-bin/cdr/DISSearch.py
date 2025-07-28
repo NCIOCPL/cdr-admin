@@ -39,12 +39,15 @@ class DrugInformationSummarySearch(AdvancedSearch):
                 raise Exception("Tampering with form values")
         # pylint: enable=no-member
         appr_ind_vals = [""] + appr_ind_vals
+        fda_appr = "FDA Approved"
+        appr_ind = "Approved Indication"
+        drug_ref = "Drug Reference Type"
         self.search_fields = (
             self.text_field("title"),
-            self.select("fda_appr", label="FDA Appr", options=fda_appr_vals),
-            self.text_field("last_mod", label="Last Mod"),
-            self.select("appr_ind", label="Appr Ind", options=appr_ind_vals),
-            self.select("drug_ref", label="Drug Ref", options=drug_ref_vals),
+            self.select("fda_appr", label=fda_appr, options=fda_appr_vals),
+            self.text_field("last_mod", label="Last Modified"),
+            self.select("appr_ind", label=appr_ind, options=appr_ind_vals),
+            self.select("drug_ref", label=drug_ref, options=drug_ref_vals),
         )
         self.query_fields = []
         for name, path in self.PATHS.items():

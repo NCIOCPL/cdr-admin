@@ -40,46 +40,6 @@ h1 { text-align: center; font-size: 1.3em; }
 .lang-wrapper { float: left; width: 48%; margin: 0 .5rem; }
 .single .lang-wrapper { width: 98%; }
 """
-    SCRIPT = """\
-function check_set(name, val) {
-    var all_selector = "#" + name + "-all";
-    var ind_selector = "#" + name + "-set .ind";
-    if (val == "all") {
-        if (jQuery(all_selector).prop("checked"))
-            jQuery(ind_selector).prop("checked", false);
-        else
-            jQuery(all_selector).prop("checked", true);
-    }
-    else if (jQuery(ind_selector + ":checked").length > 0)
-        jQuery(all_selector).prop("checked", false);
-    else
-        jQuery(all_selector).prop("checked", true);
-}
-/* function check_board(board) { check_set("board", board); } */
-function check_selection_method(method) {
-    switch (method) {
-        case 'id':
-            jQuery('.by-search-block').hide();
-            jQuery('.by-id-block').show();
-            jQuery('.by-title-block').hide();
-            break;
-        case 'search':
-            jQuery('.by-search-block').show();
-            jQuery('.by-id-block').hide();
-            jQuery('.by-title-block').hide();
-            break;
-        case 'title':
-            jQuery('.by-search-block').hide();
-            jQuery('.by-id-block').hide();
-            jQuery('.by-title-block').show();
-            break;
-    }
-}
-jQuery(function() {
-    var method = jQuery("input[name='selection_method']:checked").val();
-    check_selection_method(method);
-});
-"""
 
     def populate_form(self, page):
         """Put the fields on the form.
@@ -97,7 +57,6 @@ jQuery(function() {
                     label=title.display,
                     value=title.id,
                     tooltip=title.tooltip,
-                    onclick=None,
                 )
                 fieldset.append(page.radio_button("cdr-id", **opts))
             page.form.append(fieldset)
@@ -162,7 +121,7 @@ jQuery(function() {
         fieldset = page.fieldset("Language")
         fieldset.set("class", "by-search-block usa-fieldset")
         for value, label in self.LANGUAGE:
-            opts = dict(value=value, label=label, onclick=None)
+            opts = dict(value=value, label=label)
             opts["checked"] = value == self.languages
             fieldset.append(page.radio_button("language", **opts))
         page.form.append(fieldset)
@@ -170,7 +129,7 @@ jQuery(function() {
         # Fieldset for display options.
         fieldset = page.fieldset("Display Options")
         for value, label in self.DISPLAY_OPTIONS:
-            opts = dict(value=value, label=label, onclick=None)
+            opts = dict(value=value, label=label)
             opts["checked"] = value in self.display
             fieldset.append(page.checkbox("show", **opts))
         page.form.append(fieldset)
@@ -184,14 +143,14 @@ jQuery(function() {
         current = self.audiences[0] if len(self.audiences) == 1 else "all"
         fieldset = page.fieldset("Audience Display")
         for value, label in values:
-            opts = dict(value=value, label=label, onclick=None)
+            opts = dict(value=value, label=label)
             opts["checked"] = value == current
             fieldset.append(page.radio_button("audience", **opts))
         page.form.append(fieldset)
 
         # Add client-side scripting and a hidden debug field.
         page.form.append(page.hidden_field("debug", self.debug or ""))
-        page.add_script(self.SCRIPT)
+        page.head.append(page.B.SCRIPT(src="/js/MediaLanguageCompare.js"))
 
     def show_report(self):
         """Send the report back to the browser."""

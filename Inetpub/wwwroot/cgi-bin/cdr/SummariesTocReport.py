@@ -43,40 +43,6 @@ h5 { font-size: 1.17em; }
 li { line-height: 1.3; }
 hr { margin-top: 2rem; }
 """
-    SCRIPT = """\
-function check_method(value) {
-    console.log("check_method(" + value + ")");
-    if (value == "id") {
-        jQuery("fieldset.board-fieldset").hide();
-        jQuery("fieldset#title-fieldset").hide();
-        jQuery("fieldset#cdrid-fieldset").show();
-    }
-    else if (value == "title") {
-        jQuery("fieldset.board-fieldset").hide();
-        jQuery("fieldset#title-fieldset").show();
-        jQuery("fieldset#cdrid-fieldset").hide();
-    }
-    else {
-        jQuery("fieldset.board-fieldset").show();
-        jQuery("fieldset#title-fieldset").hide();
-        jQuery("fieldset#cdrid-fieldset").hide();
-    }
-}
-function check_board(val) {
-    if (val == "all") {
-        jQuery("input[name='board']").prop("checked", false);
-        jQuery("#board-all").prop("checked", true);
-    }
-    else if (jQuery("input[name='board']:checked").length > 0)
-        jQuery("#board-all").prop("checked", false);
-    else
-        jQuery("#board-all").prop("checked", true);
-}
-jQuery(function() {
-    var value = jQuery("input[name='method']:checked").val();
-    check_method(value);
-});
-"""
 
     def add_audience_fieldset(self, page):
         """Add the radio buttons for choosing the audience.
@@ -247,7 +213,7 @@ jQuery(function() {
             self.add_board_fieldset(page)
             self.add_audience_fieldset(page)
             self.add_language_fieldset(page)
-            page.add_script(self.SCRIPT)
+            page.head.append(page.B.SCRIPT(src="/js/SummariesTocReport.js"))
 
         # Carry these fields forward for all the steps.
         self.add_level_fieldset(page)

@@ -92,7 +92,8 @@ class Media:
             doctype="<!DOCTYPE html>",
             encoding="utf-8",
         )
-        sys.stdout.buffer.write(b"Content-type: text/html;charset=utf-8\n\n")
+        sys.stdout.buffer.write(b"Content-type: text/html;charset=utf-8\n")
+        sys.stdout.buffer.write(b"X-Content-Type-Options: nosniff\n\n")
         sys.stdout.buffer.write(html.tostring(self.report, **opts))
         sys.exit(0)
 

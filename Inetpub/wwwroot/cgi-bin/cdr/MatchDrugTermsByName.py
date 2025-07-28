@@ -59,7 +59,7 @@ class Control(Controller):
         # Perform and report any requested updates from the EVS.
         start = datetime.now()
         page = BasicWebPage()
-        url = f"{self.HTMLPage.USWDS}/css/uswds.min.css"
+        url = "/uswds/css/uswds.min.css"
         page.head.append(page.B.LINK(href=url, rel="stylesheet"))
         page.head.append(page.B.STYLE("\n".join(self.CSS)))
         page.wrapper.append(page.B.H1(self.SUBTITLE))

@@ -180,7 +180,7 @@ class Tester(TestCase):
     @cached_property
     def wait(self):
         """A WebDriverWait instance, used for interacting with popups."""
-        return WebDriverWait(self.driver, timeout=2)
+        return WebDriverWait(self.driver, timeout=15)
 
     def add_user_to_group(self, user, group):
         """Add the specified user to a CDR user group.
@@ -975,6 +975,10 @@ class Tester(TestCase):
     def tearDownClass(cls):
         now = datetime.now()
         cls.LOGGER.info("%s elapsed for %s", now - cls._started, cls.__name__)
+        if Tester.ERRORS or Tester.FAILURES:
+            args = Tester.SUCCESSES, Tester.ERRORS, Tester.FAILURES
+            message = "interim counts: succeeded=%d errors=%d failures=%d"
+            Tester.LOGGER.info(message, *args)
 
     class Table:
         """Collects the body cells for the node's table."""
@@ -1220,13 +1224,14 @@ class CitationTests(Tester):
         etree.SubElement(citation, "PMID").text = "1"
         xml = etree.tostring(root, encoding="unicode")
         doc_id = self.save_doc(xml, "Citation", unlock=True, version=True)
-        self.logger.debug(f"created CDR{doc_id} linked to PMID 1")
+        self.logger.debug("created CDR%s linked to PMID 1", doc_id)
 
         # Test the utility.
         self.navigate_to("UpdatePreMedlineCitations.py")
         self.assert_title("Citation Status Changes")
         self.assert_page_has("Instructions")
         self.assert_page_has("This utility checks to see if any")
+        self.click("submit-button-check")
         self.assert_page_has("Available For Refresh")
         self.assert_page_has(
             f"Citation 1 (CDR{doc_id}): "
@@ -1364,8 +1369,10 @@ class DeveloperTests(Tester):
             self.set_field_value("value", test_values[i])
             self.set_field_value("comment", test_comments[i])
             self.click("submit-button-save")
+            sleep(.5)
 
         # Verify the values using the HTML table report.
+        sleep(2)
         self.click("submit-button-show-all-values")
         self.select_new_tab()
         tables = self.load_tables()
@@ -1389,8 +1396,10 @@ class DeveloperTests(Tester):
             self.set_field_value("value", new_test_values[i])
             self.set_field_value("comment", new_test_comments[i])
             self.click("submit-button-save")
+            sleep(.5)
 
         # Verify the values using the JSON report.
+        sleep(2)
         group = load_values().get(test_group)
         self.assertIsNotNone(group)
         values = group["values"]
@@ -1540,6 +1549,9 @@ class DeveloperTests(Tester):
             test_type_link.click()
             self.select_new_tab()
             self.click("submit-button-delete")
+            alert = self.wait.until(expected_conditions.alert_is_present())
+            alert.accept()
+            sleep(1)
             self.assert_title("Manage Link Types")
             self.assert_page_has(
                 f"Successfully deleted link type '{test_link_type_name}'."
@@ -1620,6 +1632,9 @@ class DeveloperTests(Tester):
         test_type_link.click()
         self.select_new_tab()
         self.click("submit-button-delete")
+        alert = self.wait.until(expected_conditions.alert_is_present())
+        alert.accept()
+        sleep(1)
         self.assert_title("Manage Link Types")
         self.assert_page_has(
             f"Successfully deleted link type '{test_link_type_name}'."
@@ -2272,8 +2287,15 @@ class DrugTests(Tester):
 
         self.navigate_to("DISSearch.py")
         self.assert_page_has("Drug Information Summary")
-        for field in "Title", "FDA Appr", "Last Mod", "Appr Ind", "Drug Ref":
-            self.assert_page_has(field)
+        labels = (
+            "Title",
+            "FDA Approved",
+            "Last Modified",
+            "Approved Indication",
+            "Drug Reference Type",
+        )
+        for label in labels:
+            self.assert_page_has(label)
         drug = self.get_test_drug_info()
         drug_id = drug["id"]
         drug_name = drug["name"]
@@ -3075,18 +3097,19 @@ class GeneralTests(Tester):
 
         self.navigate_to("HelpSearch.py")
         self.assert_title("Documentation")
-        self.set_field_value("keyword", "%new%table%")
+        self.set_field_value("keyword", "global changes")
+        self.driver.set_page_load_timeout(600)
         self.find('form input[value="Search"]').click()
         self.select_new_tab()
         self.assert_title("Documentation")
         self.assert_tables_in_grid_container()
         self.assert_single_table_report()
         table = self.load_table()
-        expected = "1 document matches '%new%table%'"
+        expected = "1 document matches 'global changes'"
         self.assertEqual(table.caption.text, expected)
         self.assertEqual(len(table.rows), 1)
         table.rows[0][1].find_element(By.TAG_NAME, "a").click()
-        self.assert_page_has("<h2>Creating a New Table</h2>")
+        self.assert_page_has("<h1>Global Changes</h1>")
 
     def test_doc_viewer(self):
         """Test the document viewer."""
@@ -3195,21 +3218,13 @@ class GeneralTests(Tester):
 
         self.navigate_to("Help.py")
         self.assert_title("CDR Help")
-        self.assert_page_has("Choose Help Page Set")
-        labels = self.find("form fieldset .usa-radio label", all=True)
-        self.assertEqual(len(labels), 3)
-        expected = (
-            "User Help",
-            "Operating Instructions",
-            "System Information",
-        )
-        for i, label in enumerate(labels):
-            self.assertEqual(label.text, expected[i])
-        self.submit_form()
-        self.assert_title("CDR Help")
-        self.assert_non_tabular_report()
+        self.assert_page_has("Primarily For Users")
+        self.assert_page_has("Primarily For Developers")
+        self.find("form h4").click()
+        self.assert_page_has("Creating/Editing Documents")
         self.find("main ul li a").click()
-        self.assert_page_has("<h2>Searching for Documents: Overview</h2>")
+        self.select_new_tab()
+        self.assert_page_has("<h1>Create/Edit Documents</h1>")
 
     def test_home_page(self):
         """Test the landing page for the site."""
@@ -3531,11 +3546,11 @@ class GeneralTests(Tester):
         """Test the Political Subunit search page."""
 
         self.navigate_to("PoliticalSubUnitSearch.py")
-        self.assert_title("PoliticalSubUnit")
+        self.assert_title("Political SubUnit")
         self.set_field_value("state", "North Dak%")
         self.find('form input[value="Search"]').click()
         self.select_new_tab()
-        self.assert_title("PoliticalSubUnit")
+        self.assert_title("Political SubUnit")
         self.assert_single_table_report()
         self.assert_tables_in_grid_container()
         table = self.load_table()
@@ -3918,6 +3933,7 @@ class GlossaryTests(Tester):
             self.assertIsNotNone(img)
             img.click()
             self.submit_form(new_tab=False)
+            sleep(1)
             s = "" if server_count == 1 else "s"
             message = f"Successfully stored {server_count} glossary server{s}."
             self.assert_page_has(message)
@@ -3941,6 +3957,7 @@ class GlossaryTests(Tester):
         self.set_field_value(f"alias-{i}", test_alias)
         self.set_field_value(f"url-{i}", bogus_url)
         self.submit_form(new_tab=False)
+        sleep(1)
         self.assert_title("Manage Glossary Servers")
         expected = (
             f"Duplicate alias {test_alias!r}.",
@@ -3957,6 +3974,7 @@ class GlossaryTests(Tester):
         self.set_field_value(f"alias-{i}", test_alias)
         self.set_field_value(f"url-{i}", test_url)
         self.submit_form(new_tab=False)
+        sleep(1)
         new_server_count = original_server_count + 1
         self.assertEqual(get_server_count(), new_server_count)
         server_block = find_test_server()
@@ -3972,6 +3990,7 @@ class GlossaryTests(Tester):
         self.assertIsNotNone(img)
         img.click()
         self.submit_form(new_tab=False)
+        sleep(1)
         n = original_server_count
         s = "" if n == 1 else "s"
         message = f"Successfully stored {n} glossary server{s}."
@@ -5094,7 +5113,7 @@ class MediaTests(Tester):
         archive.link.click()
         self.select_new_tab()
         self.assert_title("Glossary Term Audio Review")
-        self.assert_page_has("When finished, click 'Save' to save any changes")
+        self.assert_page_has("Click 'Save' to save any changes")
         columns = (
             "Disposition",
             "CDR ID",
@@ -7060,6 +7079,7 @@ class SummaryTests(Tester):
         self.submit_form(new_tab=False)
 
         # Check the queue page, make sure the job is there.
+        self.driver.set_window_size(2048, 1024)
         self.assert_title("Summary Translation Job Queue")
         table = self.load_table()
         columns = (
@@ -7371,6 +7391,8 @@ class TerminologyTests(Tester):
     def test_term_match_utility(self):
         """Test the Match Drug Terms By Name tool."""
 
+        self.driver.set_page_load_timeout(1500)
+        self.driver.command_executor._client_config._timeout = 600
         self.navigate_to("MatchDrugTermsByName.py")
         self.assert_title("Match Drug Terms By Name")
         tables = self.load_tables()
@@ -7444,6 +7466,8 @@ class TerminologyTests(Tester):
         """Test the utilities for refreshing Term docs from EVS concepts."""
 
         # Check the landing page.
+        self.driver.set_page_load_timeout(1500)
+        self.driver.command_executor._client_config._timeout = 600
         landing_page = self.navigate_to("SyncWithEVS.py")
         self.assert_title("EVS Concept Tools")
         self.assert_page_has("Instructions")
@@ -7534,6 +7558,7 @@ class TerminologyTests(Tester):
         # and verify that the unsuppressed term has been restored.
         self.switch_to(refresh_form)
         self.find("submit-button-sort-by-cdr-id", method=By.ID).click()
+        sleep(5)
         self.assert_single_table_report()
         self.assert_title("Refresh Drug Terms")
         table = self.load_table()

@@ -20,18 +20,6 @@ class Control(Controller):
         "td.active { width: 80px; }",
         "td.title { text-align: left; vertical-align: top; width: 550px; }",
     )
-    SCRIPT = """\
-function check_board(val) {
-    if (val == "all") {
-        jQuery("input[name='board']").prop("checked", false);
-        jQuery("#board-all").prop("checked", true);
-    }
-    else if (jQuery("input[name='board']:checked").length > 0)
-        jQuery("#board-all").prop("checked", false);
-    else
-        jQuery("#board-all").prop("checked", true);
-}
-"""
 
     def build_tables(self):
         """Sequence of one table for each board selected."""
@@ -69,7 +57,7 @@ function check_board(val) {
         fieldset.append(page.radio_button(name, value="yes"))
         fieldset.append(page.radio_button(name, value="no", checked=True))
         page.form.append(fieldset)
-        page.add_script(self.SCRIPT)
+        page.head.append(page.B.SCRIPT(src="/js/SummariesWithMarkup.js"))
 
     def show_report(self):
         """Override base class version to add custom styling."""

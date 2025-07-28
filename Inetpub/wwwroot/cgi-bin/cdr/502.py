@@ -43,7 +43,6 @@ class Control(Controller):
                     parent.remove(nav)
             page.body.remove(page.footer)
         page.add_alert(self.alert, type="error")
-        page.add_uswds_script()
         page.send()
 
     @cached_property

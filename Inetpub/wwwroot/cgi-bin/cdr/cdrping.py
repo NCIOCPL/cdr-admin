@@ -13,6 +13,7 @@ import cdr
 def report(what):
     print(f"""\
 Content-type: text/plain
+X-Content-Type-Options: nosniff
 
 CDR {what}""")
 

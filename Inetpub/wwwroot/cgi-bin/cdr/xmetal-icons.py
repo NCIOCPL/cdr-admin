@@ -23,7 +23,9 @@ class Control(Controller):
         Structure="Structure (Custom)",
     )
     CSS = "img { border: 1px black solid } * { font-family: Arial; }"
-    PATH = Path("d:/Inetpub/wwwroot/images/xmetal")
+    SCRIPT_PATH = Path(__file__).resolve()
+    WWWROOT = SCRIPT_PATH.parent.parent.parent
+    PATH = WWWROOT / "images" / "xmetal"
     INSTRUCTIONS = (
         "Press Submit to bring up a page showing the button icons "
         "which are available for use on the CDR toolbars in XMetaL. "
@@ -52,7 +54,9 @@ class Control(Controller):
 
         B = self.HTMLPage.B
         content = B.CENTER(B.H1("XMetaL CDR Icons"))
+        self.logger.info("PATH: %s", self.PATH)
         for path in sorted(self.PATH.glob("*.jpg")):
+            self.logger.info("path: %s", path)
             name = path.name[:-4]
             if "xmetal_cdr" not in name and "Standard" not in name:
                 content.append(B.H2(self.NAMES.get(name, name)))
@@ -65,7 +69,8 @@ class Control(Controller):
             B.BODY(content)
         )
         html = tostring(page, encoding="unicode")
-        print(f"Content-type: text/html\n\n{html}")
+        print("Content-type: text/html")
+        print(f"X-Content-Type-Options: nosniff\n\n{html}")
         exit(0)
 
 

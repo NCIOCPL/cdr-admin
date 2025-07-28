@@ -98,7 +98,8 @@ class Control(Controller):
         show_subtotals = boards_with_summaries > 1
         for board in boards:
             board.show(body, show_subtotals)
-        stdout.buffer.write(b"Content-type: text/html; charset=utf-8\n\n")
+        stdout.buffer.write(b"Content-type: text/html; charset=utf-8\n")
+        stdout.buffer.write(b"X-Content-Type-Options: nosniff\n\n")
         page = B.HTML(head, body)
         page = lxml.html.tostring(page, pretty_print=True, encoding="unicode")
         stdout.buffer.write(page.encode("utf-8"))

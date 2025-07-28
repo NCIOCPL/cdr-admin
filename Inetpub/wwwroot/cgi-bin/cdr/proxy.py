@@ -42,8 +42,11 @@ class Control(Controller):
         See https://bugs.python.org/issue11395.
         """
 
-        header = f"Content-type: {self.content_type}\r\n\r\n"
-        stdout.buffer.write(header.encode("utf-8"))
+        headers = "\r\n".join([
+            f"Content-type: {self.content_type}",
+            "X-Content-Type-Options: nosniff\r\n\r\n",
+        ])
+        stdout.buffer.write(headers.encode("utf-8"))
         written = 0
         while written < len(self.payload):
             portion = self.payload[written:written+self.CHUNK]

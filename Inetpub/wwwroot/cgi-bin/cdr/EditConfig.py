@@ -36,13 +36,7 @@ class Control(Controller):
         page.add_css("""\
 .usa-textarea { font-family: monospace; font-size: .9rem; height: 32rem; }
 """)
-        page.add_script(f"""\
-function change_file() {{
-    var url = "{self.script}?Session={self.session.name}&filename=";
-    var filename = jQuery("#filename option:selected").val();
-    if (filename)
-        window.location.href = url + filename;
-}}""")
+        page.head.append(page.B.SCRIPT(src="/js/EditConfig.js"))
 
     def run(self):
         """Override the top-level entry point, as this isn't a report."""
@@ -104,7 +98,7 @@ function change_file() {{
     @cached_property
     def filepath(self):
         """Where the current configuration file is stored."""
-        return r"{}\cdr{}".format(self.DIRECTORY, self.filename)
+        return r"{}/cdr{}".format(self.DIRECTORY, self.filename)
 
     @cached_property
     def files(self):
@@ -124,6 +118,6 @@ function change_file() {{
         return self.buttons
 
 
+# Don't execute the script if loaded as a module.
 if __name__ == "__main__":
-    """Don't execute script if loaded as a module."""
     Control().run()

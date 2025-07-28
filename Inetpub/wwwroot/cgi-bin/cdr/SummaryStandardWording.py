@@ -87,16 +87,7 @@ class Control(Controller):
 
         # Button/script for adding new search term fields.
         page.add_css(".term-button { padding-left: 10px; }")
-        page.add_script("""\
-function add_term_field() {
-  var id = "term-" + (jQuery(".term").length + 1);
-  var field = jQuery("<div>", {class: "labeled-field"});
-  var cls = "term usa-input usa-input--xl";
-  field.append(jQuery("<label>", {for: id, text: "Term", class: "usa-label"}));
-  field.append(jQuery("<input>", {class: cls, name: "term", id: id}));
-  jQuery("#search-terms").append(field);
-}
-""")
+        page.head.append(page.B.SCRIPT(src="/js/SummaryStandardWording.js"))
 
     def send_workbook(self):
         """Create and send the Excel version of the report.
@@ -140,6 +131,7 @@ function add_term_field() {
 Content-type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
 Content-Disposition: attachment; filename={filename}
 Content-length: {len(book_bytes)}
+X-Content-Type-Options: nosniff
 
 """.encode("utf-8"))
         stdout.buffer.write(book_bytes)

@@ -45,25 +45,6 @@ class CitationSearch(AdvancedSearch):
         ],
     }
 
-    # Add some JavaScript to monitor the Import/Update fields.
-    JS = """\
-function chk_cdrid() {
-    console.log("cdr id is " + jQuery("#cdrid").val());
-    if (jQuery("#cdrid").val().replace(/\\D/g, "").length === 0)
-        jQuery("#submit-button-import").val("Import");
-    else
-        jQuery("#submit-button-import").val("Update");
-}
-function chk_pmid() {
-    console.log("pmid is " + jQuery("#pmid").val().trim());
-    if (jQuery("#pmid").val().trim().length === 0)
-        jQuery("#submit-button-import").prop("disabled", true);
-    else
-        jQuery("#submit-button-import").prop("disabled", false);
-}
-$(function() { chk_cdrid(); chk_pmid(); });
-"""
-
     def __init__(self):
         """Set the stage for showing the search form or the search results."""
 
@@ -119,7 +100,7 @@ $(function() { chk_cdrid(); chk_pmid(); });
         fieldset.append(pmid_field)
         fieldset.append(cdrid_field)
         page.form.append(fieldset)
-        page.head.append(self.B.SCRIPT(self.JS))
+        page.head.append(page.B.SCRIPT(src="/js/CiteSearch.js"))
 
     def show_form(self, message=None, error=None):
         args = self.session.name, self.SUBTITLE, self.search_fields
@@ -131,9 +112,8 @@ $(function() { chk_cdrid(); chk_pmid(); });
         page.form.append(page.button("Search PubMed", onclick=pubmed))
         if self.session.can_do("ADD DOCUMENT", "Citation"):
             button = self.button("Import")
-            onclick = "jQuery('#primary-form').attr('target', '');"
-            button.set("onclick", onclick)
             button.set("disabled")
+            button.set("onclick", "clear_target()")
             page.form.append(button)
         if message:
             type = "warning" if "validation errors" in message else "success"

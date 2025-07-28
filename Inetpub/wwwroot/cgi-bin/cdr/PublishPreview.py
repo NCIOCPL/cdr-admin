@@ -437,24 +437,17 @@ class GTN:
         "//assets.adobedtm.com/f1bfa9f7170c81b1a9a9ecdcc6c5215ee0b03c84"
         "/satelliteLib-5b3dcf1f2676c378b518a1583ef5355acd83cd3d.js"
     )
+    # We are removing our dependency on jQuery from the CDR. As far as I
+    # can tell, removing links to jQuery, jQuery UI, and jPlayer have no
+    # undesirable effects on publish preview for glossary terms. The
+    # WCMS team has given us the following link which we can use. We'll
+    # add it to SCRIPT below if any incorrect behavior is reported.
+    JQUERY_FOR_DICTIONARY = (
+        "https://github.com/NCIOCPL/cgov-digital-platform/blob/develop/docroot"
+        "/profiles/custom/cgov_site/themes/custom/ncids_trans/front-end/static"
+        "/js/jqueryandui.js"
+    )
     SCRIPT = (
-        dict(
-            src="https://code.jquery.com/jquery-3.6.0.min.js",
-            integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=",
-            crossorigin="anonymous",
-        ),
-        dict(
-            src="https://code.jquery.com/ui/1.13.0/jquery-ui.min.js",
-            integrity="sha256-hlKLmzaRlE8SCJC1Kw8zoUbU8BxA+8kR3gseuKfMjxA=",
-            crossorigin="anonymous",
-            defer=None,
-        ),
-        dict(
-            src=(
-                "https://cdnjs.cloudflare.com/ajax/libs/jplayer/2.9.2"
-                "/jplayer/jquery.jplayer.min.js"
-            ),
-        ),
         dict(
             src=(
                 "https://www.cancer.gov/app-modules/glossary-app"

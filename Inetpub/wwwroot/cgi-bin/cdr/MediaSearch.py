@@ -44,10 +44,10 @@ class MediaSearch(AdvancedSearch):
         # pylint: enable=no-member
         self.search_fields = (
             self.text_field("title"),
-            self.text_field("desc", label="Content Desc"),
+            self.text_field("desc", label="Content Description"),
             self.select("category", options=[""]+self.categories),
             self.select("diagnosis", options=[""]+self.diagnoses),
-            self.text_field("use", label="Prop Use"),
+            self.text_field("use", label="Proposed Use"),
             self.select("image_type", options=[""]+self.image_types),
             self.select("language", options=[""]+self.languages)
         )

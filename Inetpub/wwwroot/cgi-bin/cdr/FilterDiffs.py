@@ -37,7 +37,8 @@ class Control:
         if not lines:
             lines = [f"Filters on {self.tier.name} and PROD are identical"]
         lines = "\n".join(lines) + "\n"
-        stdout.buffer.write(b"Content-type: text/plain; charset=utf-8\n\n")
+        stdout.buffer.write(b"Content-type: text/plain; charset=utf-8\n")
+        stdout.buffer.write(b"X-Content-Type-Options: nosniff\n\n")
         stdout.buffer.write(lines.encode("utf-8"))
 
     def compare(self, name):

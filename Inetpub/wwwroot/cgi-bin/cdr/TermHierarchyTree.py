@@ -22,7 +22,7 @@ class Control(Controller):
         "nodes dynamically, with the ability to copy the document IDs "
         "for a given subset of the tree into the clipboard. The leaf nodes "
         "of the tree are displayed in a teal color. Nodes which have children "
-        "have a navy font color."
+        "have a navy font color. The report may take a while to be generated."
     )
 
     def populate_form(self, page):
@@ -43,7 +43,6 @@ class Control(Controller):
 
         report = BasicWebPage()
         report.wrapper.append(report.B.H1(self.SUBTITLE))
-        report.head.append(report.B.SCRIPT(src=self.HTMLPage.JQUERY))
         report.head.append(report.B.SCRIPT(src=self.SCRIPT))
         report.head.append(report.B.LINK(href=self.CSS, rel="stylesheet"))
         report.body.append(self.tree)
@@ -317,7 +316,7 @@ class Term:
             if self.name == "AIDS-related malignancies":
                 self.control.logger.info("%s children: %s", *args)
             id = f"li-{self.control.id}"
-            onclick = f"toggle_node(event, '#{id}')"
+            onclick = f"toggle_node(event, '{id}')"
             sign = B.SPAN("+", B.CLASS("sign"))
             name = B.SPAN(self.name)
             span = B.SPAN(sign, name, onclick=onclick)

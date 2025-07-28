@@ -42,27 +42,6 @@ class Control(Controller):
             page - object used to collect the form fields
         """
 
-        if self.job and not self.job.new:
-            page.add_script(f"""\
-jQuery(function() {{
-  jQuery("input[value='{self.DELETE}']").click(function(e) {{
-    if (confirm("Are you sure?"))
-      return true;
-    e.preventDefault();
-  }});
-}});""")
-        else:
-            page.add_script(f"""\
-var submitted = false;
-jQuery(function() {{
-  jQuery("input[value='{self.SUBMIT}']").click(function(e) {{
-    if (!submitted) {{
-      submitted = true;
-      return true;
-    }}
-    e.preventDefault();
-  }});
-}});""")
         fieldset = page.fieldset(self.doc_title or "Create Translation Job")
         if self.doc_id:
             page.form.append(page.hidden_field("doc_id", self.doc_id))
@@ -83,6 +62,7 @@ jQuery(function() {{
         comments = (comments or "").replace("\r", "")
         fieldset.append(page.textarea("comments", value=comments))
         page.form.append(fieldset)
+        page.head.append(page.B.SCRIPT(src="/js/translation-job.js"))
 
     def run(self):
         """

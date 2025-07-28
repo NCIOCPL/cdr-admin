@@ -133,6 +133,7 @@ if fname:
 sys.stdout.buffer.write(f"""\
 Content-Type: image/jpeg
 Content-Length: {len(image_bytes)}
+X-Content-Type-Options: nosniff
 
 """.encode("utf-8"))
 sys.stdout.buffer.write(image_bytes)

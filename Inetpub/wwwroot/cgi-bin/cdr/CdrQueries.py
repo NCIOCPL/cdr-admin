@@ -96,31 +96,14 @@ class Control(Controller):
 
         # Add some client-side scripting to support scrolling through
         # the stored queries.
-        page.add_script(f"""\
-var queries = {dumps(self.queries, indent=4)};
-function show_query() {{
-    let name = jQuery("#query").children("option:selected").val();
-    jQuery("#sql").val(queries[name]);
-    adjust_height();
-}}
-function adjust_height() {{
-    console.log("adjusting height");
-    let box = jQuery("#sql");
-    let sql = box.val() + "x";
-    let rows = sql.split(/\\r\\n|\\r|\\n/).length;
-    let old_rows = box.attr("rows");
-    console.log("rows=" + rows + " old rows=" + old_rows);
-    if (box.attr("rows") != rows)
-        box.attr("rows", rows);
-}}
-jQuery(function() {{
-    jQuery("#query").focus();
-    jQuery("#sql").on("input", adjust_height);
-}});""")
+        page.add_script(f"var queries = {dumps(self.queries, indent=2)};")
+        page.head.append(page.B.SCRIPT(src="/js/CdrQueries.js"))
 
     def run(self):
         """Override the top-level entry point."""
 
+        if not self.session.can_do("RUN SQL QUERIES"):
+            self.bail("Not permitted")
         if self.request in self.buttons:
             self.buttons[self.request]()
         Controller.run(self)
@@ -174,7 +157,8 @@ jQuery(function() {{
             if not self.cursor.description:
                 self.bail("No query results")
             payload = dict(columns=self.cursor.description, rows=rows)
-            print("Content-type: application/json\n")
+            print("Content-type: application/json")
+            print("X-Content-Type-Options: nosniff\n")
             print(dumps(payload, default=str, indent=2))
             sys_exit(0)
         else:

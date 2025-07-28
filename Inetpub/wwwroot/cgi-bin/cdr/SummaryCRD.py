@@ -102,17 +102,7 @@ class Control(Controller):
             fieldset.append(page.radio_button("include", **opts))
         page.form.append(fieldset)
         page.add_output_options("html")
-        page.add_script("""\
-function check_board(val) {
-    if (val == 'all')
-        jQuery('.some').prop('checked', false);
-    else
-        jQuery('#board-all').prop('checked', false);
-    var n = jQuery('.some:checked').length;
-    console.log(n + " individual board(s) selected");
-    if (n < 1)
-        jQuery('#board-all').prop('checked', true);
-}""")
+        page.head.append(page.B.SCRIPT(src="/js/SummaryCRD.js"))
 
     @cached_property
     def audience(self):

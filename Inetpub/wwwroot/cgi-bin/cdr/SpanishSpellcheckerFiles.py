@@ -68,6 +68,7 @@ class Control(Controller):
 Content-type: application/octet-stream
 Content-Disposition: attachment; filename={filename}
 Content-length: {len(dict_bytes)}
+X-Content-Type-Options: nosniff
 
 """.encode("utf-8"))
         sys.stdout.buffer.write(dict_bytes)

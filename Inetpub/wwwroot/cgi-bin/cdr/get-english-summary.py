@@ -93,7 +93,7 @@ class Control(Controller):
         opts = dict(value="raw", label="Raw (for import into Trados)")
         fieldset.append(page.radio_button("fmt", **opts))
         page.form.append(fieldset)
-        page.add_script("jQuery(function(){jQuery('id').focus();}")
+        page.head.append(page.B.SCRIPT(src="/js/get-english-summary.js"))
 
     def show_report(self):
         """Not a standard report, so we override the base class version."""
@@ -120,7 +120,11 @@ class Control(Controller):
             opts = dict(HTMLPage.STRING_OPTS, encoding="unicode")
             page = html.tostring(report.page, **opts)
             page = page.replace("@@PRE@@", self.display)
-            string = f"Content-type: text/html;charset=utf-8\n\n{page}"
+            headers = "\n".join([
+                "Content-type: text/html;charset=utf-8",
+                "X-Content-Type-Options: nosniff",
+            ])
+            string = f"{headers}\n\n{page}"
             stdout.buffer.write(string.encode("utf-8"))
             sys_exit(0)
 

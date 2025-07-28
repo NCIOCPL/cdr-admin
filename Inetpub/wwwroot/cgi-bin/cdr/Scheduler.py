@@ -37,10 +37,11 @@ on the landing page for this script.
 from functools import cached_property
 from importlib import import_module
 from json import loads, dumps
+from os import environ
+from sys import path
 from cdrapi import db
 from cdrcgi import Controller
 from cdr import ordinal
-from sys import path
 
 
 class Control(Controller):
@@ -452,7 +453,7 @@ class Control(Controller):
         """Set of option names allowed for the job (None if unrestricted)."""
 
         if "scheduler" not in str(path).lower():
-            path.insert(1, "d:/cdr/Scheduler")
+            path.insert(1, environ.get("CDR_SCHEDULER", "d:/cdr/Scheduler"))
         try:
             module_name, class_name = self.job_class.split(".", 1)
             module = import_module(f"jobs.{module_name}")

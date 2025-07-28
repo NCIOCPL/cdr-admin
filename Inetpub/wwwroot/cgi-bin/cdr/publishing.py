@@ -4,13 +4,13 @@
 """
 
 from functools import cached_property
+from os import stat
+import re
 from cdrcgi import Controller
 from cdr import PDQDTDPATH, PUBTYPES
 from cdrapi import db
 from cdrapi.docs import Doc
 from cdrapi.publishing import Job
-from os import stat
-import re
 
 
 class Control(Controller):
@@ -40,7 +40,7 @@ class Control(Controller):
                 opts = dict(label="Enter CDR IDs", rows=3)
                 field = page.textarea("docs", **opts)
                 help = "Separate IDs with whitespace; 'CDR' prefix is optional"
-                field.find("label").set("title", help)
+                self.__add_help_icon(page, field, help)
                 fieldset.append(field)
                 page.form.append(fieldset)
             fieldset = page.fieldset("Job Options")
@@ -59,8 +59,7 @@ class Control(Controller):
                     opts["readonly"] = p.name in Control.READONLY_PARMS
                     opts["value"] = p.default or ""
                     field = page.text_field(p.name, **opts)
-                if help:
-                    field.find("label").set("title", help)
+                self.__add_help_icon(page, field, help)
                 fieldset.append(field)
             user = self.session.User(self.session, id=self.session.user_id)
             email = user.email
@@ -70,23 +69,20 @@ class Control(Controller):
             help = self.system.param_info["notify"].help
             opts = dict(options=yes_no, default=notify)
             field = page.select("notify", **opts)
-            if help:
-                field.find("label").set("title", help)
+            self.__add_help_icon(page, field, help)
             fieldset.append(field)
             label = "Address(es)"
             help = self.system.param_info["email"].help
             opts = dict(value=email, label="Address(es)")
             field = page.text_field("email", **opts)
-            if help:
-                field.find("label").set("title", help)
+            self.__add_help_icon(page, field, help)
             fieldset.append(field)
             label = "No Output"
             help = self.system.param_info["no-output"].help
             no = "No"
             opts = dict(label=label, options=yes_no, default=no)
             field = page.select("no-output", **opts)
-            if help:
-                field.find("label").set("title", help)
+            self.__add_help_icon(page, field, help)
             fieldset.append(field)
             page.form.append(fieldset)
 
@@ -105,11 +101,12 @@ class Control(Controller):
                     tooltip = tooltip.replace("@@NL@@", "\n\n")
                     opts = dict(
                         label=subset.name,
-                        tooltip=tooltip,
                         value=subset.name,
                         checked=checked,
                     )
-                    fieldset.append(page.radio_button("subset", **opts))
+                    button = page.radio_button("subset", **opts)
+                    self.__add_help_icon(page, button, tooltip)
+                    fieldset.append(button)
                     checked = False
             page.form.append(fieldset)
             page.add_css("fieldset { width: 600px; }")
@@ -122,14 +119,20 @@ class Control(Controller):
             for system in sorted(self.systems.values()):
                 opts = dict(
                     label=f"{system.name} [Version {system.doc.version:d}]",
-                    tooltip=system.description,
                     value=system.id,
                     checked=checked,
                 )
-                fieldset.append(page.radio_button("system", **opts))
+                button = page.radio_button("system", **opts)
+                self.__add_help_icon(page, button, system.description)
                 checked = False
+                fieldset.append(button)
             page.form.append(fieldset)
-        page.add_script("jQuery(document).tooltip({show:'fold'});")
+        # We're removing the dependency on jQuery, and in theory the USWDS
+        # framework has comparable tooltip support, but right now it's broken
+        # when used on the label for a radio button, so for now at least, we
+        # are going back to inserting a "help" icon on the side of the fields
+        # and radio buttons. See https://github.com/uswds/uswds/issues/6372.
+        # page.add_script("jQuery(document).tooltip({show:'fold'});")
 
     def publish(self):
         """Create the publishing job and link to its status.
@@ -313,6 +316,28 @@ class Control(Controller):
             system = PublishingSystem(self, row)
             systems[system.id] = system
         return systems
+
+    @staticmethod
+    def __add_help_icon(page, field, description):
+        """Add an icon that will bring up a tooltip with documentation.
+
+        Pass:
+            page - access to DOM-node creation tools
+            field - wrapper for field's label and value elements
+            description - string to be displayed in the tooltip
+        """
+
+        if description:
+            opts = {
+                "src": "/images/help.gif",
+                "alt": "Help icon",
+                "title": description.strip(),
+            }
+            label = field.find("label")
+            icon = page.B.IMG(**opts)
+            icon.set("class", "usa-tooltip margin-left-1")
+            icon.set("data-position", "right")
+            label.append(icon)
 
     class Candidate(Doc):
         """Derived class which problems in publishing candidate docs."""

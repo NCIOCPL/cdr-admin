@@ -43,7 +43,7 @@ class SummarySearch(AdvancedSearch):
         types = [""] + self.section_types
         self.search_fields = (
             self.text_field("title"),
-            self.select("section_type", label="Sec Type", options=types),
+            self.select("section_type", label="Section Type", options=types),
             self.select("diagnosis", options=[""]+self.diagnoses),
             self.select("audience", options=[""]+self.audiences),
             self.select("topic", options=[""]+self.topics),

@@ -642,62 +642,8 @@ class Control(Controller):
         fieldset.append(page.date_field("start"))
         fieldset.append(page.date_field("end"))
         page.form.append(fieldset)
-        page.add_script("""\
-function check_type(value) {
-    if (value == "images") {
-        var method = jQuery("input[name='image_method']:checked").val();
-        check_image_method(method);
-    }
-    else {
-        var method = jQuery("input[name='summary_method']:checked").val();
-        check_summary_method(method);
-    }
-}
-function check_image_method(value) {
-    jQuery("fieldset.default-hidden").hide();
-    jQuery("fieldset#image-method-fieldset").show();
-    if (value == "id") {
-        jQuery("fieldset#image-id-fieldset").show();
-    }
-    else if (value == "title") {
-        jQuery("fieldset#image-title-fieldset").show();
-    }
-    else {
-        jQuery("fieldset#image-category-fieldset").show();
-    }
-}
-function check_summary_method(value) {
-    jQuery("fieldset.default-hidden").hide();
-    jQuery("fieldset#summary-method-fieldset").show();
-    jQuery("fieldset#summary-options-fieldset").show();
-    if (value == "id") {
-        jQuery("fieldset#summary-id-fieldset").show();
-    }
-    else if (value == "title") {
-        jQuery("fieldset#summary-title-fieldset").show();
-    }
-    else if (value == "board") {
-        jQuery("fieldset#summary-board-fieldset").show();
-    }
-    else {
-        jQuery("fieldset#summary-type-fieldset").show();
-    }
-}
-function check_board(val) {
-    if (val == "all") {
-        jQuery("input[name='board']").prop("checked", false);
-        jQuery("#board-all").prop("checked", true);
-    }
-    else if (jQuery("input[name='board']:checked").length > 0)
-        jQuery("#board-all").prop("checked", false);
-    else
-        jQuery("#board-all").prop("checked", true);
-}
-jQuery(function() {
-    var value = jQuery("input[name='type']:checked").val();
-    console.log("value is " + value);
-    check_type(value);
-});""")
+        src = "/js/ImageDemographicInformationReport.js"
+        page.head.append(page.B.SCRIPT(src=src))
 
     def __apply_common_filtering(self, query):
         """Narrow the report further, if requested.

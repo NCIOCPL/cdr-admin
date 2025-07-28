@@ -7,6 +7,7 @@ process for which the Excel workbook created by this script is used.
 """
 
 from functools import cached_property
+from sys import platform
 from cdrcgi import Controller, Excel
 from cdrapi.docs import Doc
 from cdr import run_command
@@ -155,11 +156,12 @@ class Control(Controller):
             directory = f"{self.session.tier.basedir}/reports"
             self.book.save(directory)
             path = f"{directory}/{self.book.filename}"
-            path = path.replace("/", "\\")
-            process = run_command(f"fix-permissions.cmd {path}")
-            if process.stderr:
-                self.bail(f"Failure settings permissions for {path}",
-                          extra=[process.stderr])
+            if platform == "win32":
+                path = path.replace("/", "\\")
+                process = run_command(f"fix-permissions.cmd {path}")
+                if process.stderr:
+                    message = f"Failure settings permissions for {path}"
+                    self.bail(message, extra=[process.stderr])
             return f"/cdrReports/{self.book.filename}"
         return None
 

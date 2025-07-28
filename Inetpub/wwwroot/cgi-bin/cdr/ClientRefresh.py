@@ -13,6 +13,7 @@ from argparse import ArgumentParser
 import base64
 import logging
 import os
+import pathlib
 import sys
 import tempfile
 from lxml import etree
@@ -162,16 +163,22 @@ def build_zip_file(file_names):
     list_name = base_name + ".txt"
     list_file = open(list_name, "w")
     for name in file_names:
-        list_file.write("%s\n" % name)
+        list_file.write("%s\n" % name.replace("\\", "/"))
     list_file.close()
     os.chdir(cdr.CLIENT_FILES_DIR)
     Control.logger.debug("Creating %s", zip_name)
-    command = f"d:\\bin\\zip -@ {zip_name} < {list_name}"
+    if pathlib.Path("d:\\bin\\zip.exe").exists():
+        zip_executable = "d:\\bin\\zip.exe"
+    elif pathlib.Path("/usr/bin/zip").exists():
+        zip_executable = "/usr/bin/zip"
+    else:
+        raise Exception("unable to find zip executable")
+    command = f"{zip_executable} -@ {zip_name} < {list_name}"
     process = cdr.run_command(command, merge_output=True)
     if process.returncode:
         msg = f"zip failure code {process.returncode} ({process.stdout})"
         Control.logger.debug(msg)
-        raise msg
+        raise Exception(msg)
     with open(zip_name, "rb") as fp:
         zip_bytes = fp.read()
     Control.logger.debug("saved zip file as %r", zip_name)
@@ -265,6 +272,7 @@ def main():
             error = "Don't understand %r" % request.type
             response = WebService.ErrorResponse(error, Control.logger)
     except Exception as e:
+        Control.logger.exception("failure: %s", e)
         response = WebService.ErrorResponse(str(e), Control.logger)
     Control.logger.debug("Response:\n%s\n", response.body)
     if Control.STANDALONE:
